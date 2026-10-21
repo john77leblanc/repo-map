@@ -4,7 +4,8 @@ An interactive architecture map for any repo, with plain-language process tracin
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
 - **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files.
-- **Keep what you learn.** Save traces locally, or share one as a short code a teammate can paste in.
+- **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
+- **Stay current.** The map knows which commit it describes, flags when the code has moved on, and updates itself from just the diff.
 
 Everything runs on your machine. The server listens on `localhost` only, and no code leaves your machine except what your AI tool reads while tracing. With a local model, nothing leaves it at all.
 
@@ -38,6 +39,8 @@ Add a script so teammates only need `npm install` and `npm run map`:
 
 Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignore`). Saved traces and personal AI settings stay out of git.
 
+**Keeping it current:** the map remembers the commit it was drawn from. When files in the code folders change, a banner shows what changed, and **Update map** sends only the diff to your AI tool to patch the map. From a terminal, use `repo-map update`. Commit the updated `map.json` like any other change.
+
 The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
 
 Want to see it first? Clone this repo and run `npm run example`.
@@ -53,6 +56,7 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 | `generate` | Draft `map.json` with your AI tool (read-only) |
 | `ai <tool>` | Choose the AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`; `ai show` prints the settings in effect |
 | `doctor`   | Show which AI tool traces will use and check that it works (`--json` for scripts) |
+| `update`   | Bring the map up to date with code changed since it was last evaluated (only the diff is sent); `--check` for scripts |
 | `validate` | Report unknown ids, groups, kinds and missing paths; exits 1 on errors, so it fits in CI |
 | `serve`    | Start the map without any setup steps |
 

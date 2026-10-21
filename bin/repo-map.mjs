@@ -20,6 +20,8 @@ import { generateMap } from '../lib/generate.mjs';
 import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
 import { runStart } from '../lib/start.mjs';
+import { mapStatus, markCurrent } from '../lib/freshness.mjs';
+import { updateMap } from '../lib/update.mjs';
 import { validateMap } from '../lib/validate.mjs';
 
 const PKG_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +37,7 @@ Commands
               command, auto or none.  \`repo-map ai show\` prints the effective settings
   doctor      Show which AI tool traces will use, and check that it works
   generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists)
+  update      Bring map.json up to date with the code changed since it was last evaluated
   validate    Check map.json for unknown ids, groups, kinds and missing paths
   serve       Start the map on http://localhost:<port> (default)
 
@@ -63,6 +66,11 @@ generate
   --force             Overwrite map.json instead of writing map.draft.json
   --if-missing        Do nothing when map.json already has nodes (safe to re-run)
 
+update
+  --check             Only report whether the map is out of date (exit code 1 if it is)
+  --mark              Record the current commit as evaluated, without changing the map
+  --force             Update even when very many files changed
+
 doctor
   --json              Print the result as JSON (exit code 1 when tracing is off)
 
@@ -80,7 +88,7 @@ const VALUE_FLAGS = {
 };
 const BOOL_FLAGS = {
     '--force': 'force', '--if-missing': 'ifMissing', '--json': 'json', '--yes': 'yes',
-    '--global': 'global', '--local': 'local', '--repo': 'repo',
+    '--global': 'global', '--local': 'local', '--repo': 'repo', '--check': 'check', '--mark': 'mark',
 };
 
 function parseArgs(argv) {
@@ -230,6 +238,56 @@ async function cmdGenerate(opts) {
     }
 }
 
+function describeStatus(st) {
+    switch (st.state) {
+        case 'current': return `Map is up to date${st.commit ? ` (evaluated at ${st.commit.slice(0, 9)})` : ''}.`;
+        case 'stale': return `Map is out of date: ${st.changed} file${st.changed === 1 ? '' : 's'} under the code folders changed since it was evaluated at ${st.commit.slice(0, 9)}${st.commitsSince ? ` (${st.commitsSince} commit${st.commitsSince === 1 ? '' : 's'} ago)` : ''}.`;
+        case 'unrecorded': return 'Map has no recorded commit, so repo-map can’t tell whether it’s current. `repo-map update --mark` records the current one.';
+        case 'unknown': return st.reason;
+        case 'starter': return 'Map is a folder-based starter. Draft a full one with `repo-map generate`.';
+        case 'empty': return 'There is no map yet.';
+        default: return 'Not a git repository; map freshness isn’t tracked.';
+    }
+}
+
+async function cmdUpdate(opts) {
+    const root = resolveRoot(opts);
+    const config = await loadConfig(root);
+    if (opts.mark) {
+        const sha = await markCurrent(root);
+        console.log(`Recorded ${sha.slice(0, 9)} as the commit this map describes.`);
+        return;
+    }
+    const st = await mapStatus(root, config, await loadMap(root));
+    if (opts.check) {
+        console.log(describeStatus(st));
+        st.files?.slice(0, 20).forEach((f) => console.log(`  ${f}`));
+        process.exitCode = st.state === 'current' ? 0 : 1;
+        return;
+    }
+    if (st.state === 'current') {
+        console.log(describeStatus(st));
+        return;
+    }
+    console.log(describeStatus(st));
+    const result = await updateMap({
+        root,
+        config,
+        force: opts.force,
+        onProgress: (text) => process.stdout.write(`  ${text}\n`),
+        onStart: (run) => process.on('SIGINT', () => {
+            run.kill();
+            process.exit(130);
+        }),
+    });
+    const c = result.counts;
+    console.log(`\nUpdated ${MAP_DIR}/map.json in ${result.seconds}s${result.spend ? ` (${result.spend})` : ''}: ${c.added} added, ${c.updated} changed, ${c.removed} removed.`);
+    if (result.summary) {
+        console.log(result.summary);
+    }
+    console.log(`Previous version saved as ${MAP_DIR}/map.prev.json. Review the change with \`git diff ${MAP_DIR}/map.json\`.`);
+}
+
 async function cmdDoctor(opts) {
     const root = resolveRoot(opts);
     const config = await loadConfig(root);
@@ -305,7 +363,7 @@ async function main() {
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;
     }
-    const commands = { start: runStart, init: cmdInit, ai: cmdAi, generate: cmdGenerate, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
+    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, generate: cmdGenerate, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

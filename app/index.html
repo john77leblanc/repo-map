@@ -53,11 +53,16 @@ h1{font-family:var(--f-head);font-weight:600;font-size:26px;letter-spacing:.01em
 .scroller{overflow-x:auto;overflow-y:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:4px 40px}
 .board{position:relative;min-width:1460px}
 #wires{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
-#wires path{fill:none;stroke-width:1.3;opacity:.38;transition:opacity .15s,stroke-width .15s}
-#wires path.http{stroke:var(--http)} #wires path.event{stroke:var(--event)} #wires path.sync{stroke:var(--sync)}
-#wires path.inf{stroke-dasharray:4 3}
-.focusing #wires path{opacity:.07}
-.focusing #wires path.on{opacity:1;stroke-width:2.2}
+#wires path.w{fill:none;stroke-width:1.3;opacity:.38;transition:opacity .15s,stroke-width .15s}
+#wires path.w.http{stroke:var(--http)} #wires path.w.event{stroke:var(--event)} #wires path.w.sync{stroke:var(--sync)}
+#wires path.w.inf{stroke-dasharray:4 3}
+#wires marker path{stroke:none}
+.focusing #wires path.w{opacity:.07}
+.focusing #wires path.w.on{opacity:1;stroke-width:2.2}
+/* fade groups that aren't part of the focus so the lines behind them show through */
+details.grp{transition:opacity .15s}
+.focusing details.grp.dimg{opacity:.28}
+.focusing details.grp.dimg:hover{opacity:.6}
 .cols{position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,minmax(240px,1fr));column-gap:84px;align-items:start}
 .colh{font-family:var(--f-head);font-weight:600;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:0 2px 8px;border-bottom:1px solid var(--line);margin-bottom:12px}
 .colh small{display:block;font-family:var(--f-ui);text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;margin-top:2px}
@@ -144,10 +149,6 @@ details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--fo
 .btn.sm{font-size:12px;padding:4px 8px}
 .status{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .status.err{color:var(--event)}
-.result{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--bg)}
-.result h3{font-family:var(--f-head);font-weight:600;font-size:15px;margin:0 0 4px;text-wrap:balance}
-.result .rp{font-size:12px;color:var(--muted);margin:0 0 8px;font-style:italic}
-.result .rs{margin:0 0 10px;font-size:13px}
 .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;counter-reset:st}
 .steps li button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:22px minmax(0,1fr);gap:2px 8px;width:100%;padding:5px 6px;border-radius:5px}
 .steps li button:hover{background:var(--soft)}
@@ -180,14 +181,27 @@ details.ref .why{margin:0;padding:2px 10px 6px;font-size:12px;color:var(--muted)
 .path a:hover{color:var(--http)}
 .gaps{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;margin:10px 0 0}
 .gaps:empty{display:none}
-.saved-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.saved-list li{border:1px solid var(--line);border-radius:7px;background:var(--bg)}
-.saved-list li.cur{border-color:var(--ink)}
-.sv{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px 10px 4px}
-.sv:focus-visible{outline:2px solid var(--http);outline-offset:-2px;border-radius:7px}
-.sv b{display:block;font-family:var(--f-head);font-weight:600;font-size:13.5px}
-.sv small{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sva{display:flex;gap:4px;padding:2px 8px 8px;flex-wrap:wrap}
+.trace-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ti{border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+.ti.cur{border-color:var(--ink)}
+.th{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:12px minmax(0,1fr);gap:0 8px;align-items:start;width:100%;padding:8px 10px}
+.th:hover{background:var(--soft);border-radius:7px}
+.th:focus-visible{outline:2px solid var(--http);outline-offset:-2px;border-radius:7px}
+.th .car{width:10px;height:10px;stroke:var(--muted);fill:none;stroke-width:2;margin-top:4px;transition:transform .15s}
+.ti.cur .th .car{transform:rotate(90deg)}
+.th b{display:block;font-family:var(--f-head);font-weight:600;font-size:13.5px;text-wrap:balance}
+.th small{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ti.cur .th small{white-space:normal}
+.tb{padding:0 10px 10px 30px}
+.tb .rp{font-size:12px;color:var(--muted);margin:0 0 8px;font-style:italic}
+.tb .rs{margin:0 0 10px;font-size:13px}
+.tbadge{display:inline-block;font-family:var(--f-ui);font-size:10.5px;font-weight:500;color:var(--event);border:1px solid currentColor;border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
+.sva{display:flex;gap:4px;flex-wrap:wrap;margin-top:10px}
+.stale{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-block:0 12px;margin-left:max(16px,env(safe-area-inset-left,0px));margin-right:max(16px,env(safe-area-inset-right,0px));padding:9px 12px;border:1px solid var(--line);border-left:3px solid var(--event);border-radius:7px;background:var(--panel);font-size:13px}
+.stale.ok{border-left-color:var(--sync)}
+.stale b{font-weight:600}
+.stale .files{color:var(--muted);font-family:var(--f-mono);font-size:11.5px;flex-basis:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stale .acts{display:flex;gap:8px;align-items:center;margin-left:auto}
 .linkbtn{all:unset;cursor:pointer;font-size:11.5px;color:var(--muted);padding:2px 4px;border-radius:3px}
 .linkbtn:hover{color:var(--ink);background:var(--soft)}
 .linkbtn:focus-visible{outline:2px solid var(--http)}
@@ -231,6 +245,7 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
   <span class="note">Arrows point from caller to callee, publisher to topic to subscriber, and source to destination for syncs. Hover a card to trace it; click to open it.</span>
 </div>
 
+<div class="stale" id="stale" hidden role="status"></div>
 <div class="scroller" id="scroller">
   <div class="board" id="board">
     <svg id="wires" aria-hidden="true"><defs></defs></svg>
@@ -257,29 +272,16 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
       <span class="status" id="status" aria-live="polite">Connecting…</span>
     </div>
   </section>
-  <section class="result" id="result" hidden>
-    <h3 id="r-title"></h3>
-    <p class="rp" id="r-prompt"></p>
-    <p class="rs" id="r-sum"></p>
-    <ol class="steps" id="r-steps"></ol>
-    <div class="codestat" id="codestat"></div>
-    <p class="gaps" id="r-gaps"></p>
-    <div class="row">
-      <button class="btn sm primary" id="save" type="button">Save trace</button>
-      <button class="btn sm" id="copycode" type="button">Copy trace code</button>
-      <button class="btn sm" id="dismiss" type="button">Close</button>
-    </div>
-    <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
-  </section>
   <section>
-    <h2>Saved traces <span class="gc" id="savedcount"></span></h2>
-    <p class="hint" id="store-note">Saved as files in .repo-map/traces on this machine (git-ignored).</p>
-    <ul class="saved-list" id="saved-list"></ul>
-    <p class="empty" id="saved-empty">No saved traces yet. Run a trace and press Save trace to keep it here.</p>
+    <h2>Traces <span class="gc" id="savedcount"></span></h2>
+    <p class="hint" id="store-note">Saved automatically to .repo-map/traces on this machine (git-ignored). Open one to show it on the map.</p>
+    <ul class="trace-list" id="trace-list"></ul>
+    <p class="empty" id="saved-empty">No traces yet. Describe a flow above, or import a trace code from a teammate.</p>
+    <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
     <details class="imp">
       <summary>Import a trace code</summary>
       <textarea id="importbox" placeholder="Paste a trace code (rmap1:…)"></textarea>
-      <div class="row"><button class="btn sm" id="importbtn" type="button">Show trace</button><span class="status" id="importmsg"></span></div>
+      <div class="row"><button class="btn sm" id="importbtn" type="button">Add trace</button><span class="status" id="importmsg"></span></div>
     </details>
   </section>
 </div>
@@ -428,15 +430,22 @@ function activeSet(){
   if(a.startsWith("g:")){return new Set(NODES.filter(n=>n[1]===a.slice(2)).map(n=>n[0]));}
   return new Set([a]);
 }
+function dimGroups(relevant){
+  Object.entries(groupEl).forEach(([g,d])=>{
+    const keep=!relevant||NODES.some(n=>n[1]===g&&relevant.has(n[0]));
+    d.classList.toggle("dimg",!keep);
+  });
+}
 function applyFocus(){
   const set=activeSet();
   board.classList.toggle("focusing",!!(set||trace));
   document.querySelectorAll(".node.act,.node.nbr,details.grp.nbr").forEach(x=>x.classList.remove("act","nbr"));
   if(!set&&trace){
     drawn.forEach(r=>{const on=r.edges.some(e=>trace.pairs.has(e.f+"|"+e.t));r.p.classList.toggle("on",on);if(on)svg.appendChild(r.p);});
+    dimGroups(new Set(trace.steps.map(s=>s.id)));
     return;
   }
-  if(!set){drawn.forEach(r=>r.p.classList.remove("on"));return;}
+  if(!set){drawn.forEach(r=>r.p.classList.remove("on"));dimGroups(null);return;}
   const nb=new Set();
   drawn.forEach(r=>{
     const on=r.edges.some(e=>set.has(e.f)||set.has(e.t));
@@ -449,7 +458,8 @@ function applyFocus(){
     if(set.has(id))el.classList.add("act");else el.classList.add("nbr");
     if(d&&!d.open&&!set.has(id))d.classList.add("nbr");
   });
-  set.forEach(id=>nodeEl[id].classList.add("act"));
+  set.forEach(id=>{nodeEl[id].classList.add("act");nb.add(id);});
+  dimGroups(nb);
 }
 
 colsEl.addEventListener("click",ev=>{
@@ -547,34 +557,12 @@ function setTrace(t){
     Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});
     pinned=null;
   }
-  renderResult();renderSaved();redraw();
+  renderSaved();redraw();
 }
 function reveal(id){
   const el=nodeEl[id], d=el.closest("details");if(d&&!d.open)d.open=true;
   requestAnimationFrame(()=>{draw();el.scrollIntoView({block:"center",inline:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});});
 }
-function renderResult(){
-  const box=$("result");box.hidden=!trace;$("codebox").hidden=true;
-  if(!trace)return;
-  $("r-title").textContent=trace.title;
-  $("r-prompt").textContent=trace.prompt?"“"+trace.prompt+"”":"";
-  $("r-sum").textContent=trace.summary;
-  $("r-gaps").textContent=trace.gaps?"Not shown clearly: "+trace.gaps:"";
-  const ol=$("r-steps");ol.innerHTML="";
-  trace.steps.forEach((s,i)=>{
-    const li=document.createElement("li");
-    li.innerHTML='<button type="button"><i class="n">'+(i+1)+'</i><b>'+esc(byId[s.id].title)+'</b><span>'+esc(s.note)+'</span></button><div class="refs"></div>';
-    li.firstChild.onclick=()=>reveal(s.id);ol.appendChild(li);
-    const box=li.querySelector(".refs");
-    (trace.refs||[]).filter(r=>r.step===s.id).forEach(r=>box.appendChild(refEl(r)));
-  });
-  const n=(trace.refs||[]).length;
-  $("codestat").innerHTML=n?'<span class="status">'+n+' code reference'+(n===1?'':'s')+' · read from your checkout</span>':'';
-  updateSaveBtn();
-}
-function updateSaveBtn(){if(!trace)return;const sv=$("save");sv.disabled=!!trace._doc||!store.ready;sv.textContent=trace._doc?"Saved":"Save trace";}
-$("dismiss").onclick=()=>setTrace(null);
-
 /* code references: read live from the local repo */
 function refEl(r){
   const d=document.createElement("details");d.className="ref";
@@ -610,56 +598,98 @@ async function copyCode(t,btn){
   try{await navigator.clipboard.writeText(code);const o=btn.textContent;btn.textContent="Copied";setTimeout(()=>btn.textContent=o,1500);}
   catch(_){const cb=$("codebox");cb.value=code;cb.hidden=false;cb.focus();cb.select();}
 }
-$("copycode").onclick=e=>{if(trace)copyCode(trace,e.currentTarget);};
-$("importbtn").onclick=()=>{
-  try{setTrace(decodeTrace($("importbox").value));$("importmsg").textContent="";$("importbox").value="";$("result").scrollIntoView({block:"nearest"});}
-  catch(_){$("importmsg").textContent="That isn't a valid trace code.";$("importmsg").className="status err";}
+$("importbtn").onclick=async()=>{
+  let t;
+  try{t=decodeTrace($("importbox").value);}
+  catch(_){$("importmsg").textContent="That isn't a valid trace code.";$("importmsg").className="status err";return;}
+  $("importmsg").textContent="";$("importbox").value="";
+  document.querySelector("details.imp").open=false;
+  await keepTrace(t);
 };
 
-/* saved traces: JSON files in .repo-map/traces (git-ignored) */
-const store={ready:false,items:[]};
+/* traces: saved automatically as JSON files in .repo-map/traces (git-ignored).
+   The list is an accordion: opening a trace shows it on the map; closing it clears the map. */
+const store={ready:false,items:[],temp:null};   // temp: a trace that couldn't be saved
+function traceBody(t){
+  const body=document.createElement("div");body.className="tb";
+  const p=document.createElement("p");p.className="rp";p.textContent=t.prompt?"“"+t.prompt+"”":"";if(t.prompt)body.appendChild(p);
+  const sum=document.createElement("p");sum.className="rs";sum.textContent=t.summary;if(t.summary)body.appendChild(sum);
+  const ol=document.createElement("ol");ol.className="steps";
+  t.steps.forEach((st,i)=>{
+    const li=document.createElement("li");
+    li.innerHTML='<button type="button"><i class="n">'+(i+1)+'</i><b>'+esc(byId[st.id].title)+'</b><span>'+esc(st.note)+'</span></button><div class="refs"></div>';
+    li.firstChild.onclick=()=>reveal(st.id);
+    const box=li.querySelector(".refs");
+    (t.refs||[]).filter(r=>r.step===st.id).forEach(r=>box.appendChild(refEl(r)));
+    ol.appendChild(li);
+  });
+  body.appendChild(ol);
+  const n=(t.refs||[]).length;
+  if(n){const c=document.createElement("div");c.className="codestat";c.innerHTML='<span class="status">'+n+' code reference'+(n===1?'':'s')+' · read from your checkout</span>';body.appendChild(c);}
+  if(t.gaps){const g=document.createElement("p");g.className="gaps";g.textContent="Not shown clearly: "+t.gaps;body.appendChild(g);}
+  const acts=document.createElement("div");acts.className="sva";
+  acts.innerHTML='<button class="linkbtn" data-a="copy" type="button">Copy trace code</button>'+(t._doc?'<button class="linkbtn danger" data-a="del" type="button">Delete</button>':'<button class="linkbtn" data-a="save" type="button">Retry saving</button>');
+  acts.querySelector('[data-a="copy"]').onclick=e=>copyCode(t,e.currentTarget);
+  const del=acts.querySelector('[data-a="del"]');
+  if(del)del.onclick=async()=>{
+    if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Confirm delete";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete";},3000);return;}
+    await removeTrace(t._doc);
+  };
+  const retry=acts.querySelector('[data-a="save"]');
+  if(retry)retry.onclick=()=>keepTrace(t);
+  body.appendChild(acts);
+  return body;
+}
 function renderSaved(){
-  const ul=$("saved-list");ul.innerHTML="";
-  $("savedcount").textContent=store.items.length||"";
-  $("saved-empty").hidden=store.items.length>0;
-  store.items.forEach(it=>{
-    const li=document.createElement("li");if(trace&&trace._doc===it.key)li.classList.add("cur");
+  const ul=$("trace-list");ul.innerHTML="";
+  const rows=(store.temp?[{...plain(store.temp),key:null,createdAt:store.temp.createdAt,_temp:true}]:[]).concat(store.items);
+  $("savedcount").textContent=rows.length||"";
+  $("saved-empty").hidden=rows.length>0;
+  rows.forEach(it=>{
+    const open=trace&&(it._temp?trace===store.temp:trace._doc===it.key);
+    const li=document.createElement("li");li.className="ti"+(open?" cur":"");
     const when=it.createdAt?new Date(it.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"";
-    li.innerHTML='<button class="sv" type="button"><b></b><small></small></button><div class="sva"><button class="linkbtn" data-a="copy" type="button">Copy code</button><button class="linkbtn danger" data-a="del" type="button">Delete</button></div>';
+    li.innerHTML='<button class="th" type="button" aria-expanded="'+open+'"><svg class="car" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3"/></svg><span><b></b><small></small></span></button>';
     li.querySelector("b").textContent=it.title;
-    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",it.prompt].filter(Boolean).join(" · ");
-    li.querySelector(".sv").onclick=()=>{try{const t=normalizeTrace(it,it.prompt);t._doc=it.key;setTrace(t);}catch(_){}};
-    li.querySelector('[data-a="copy"]').onclick=e=>copyCode(it,e.currentTarget);
-    const del=li.querySelector('[data-a="del"]');
-    del.onclick=async()=>{
-      if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Confirm delete";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete";},3000);return;}
-      await removeTrace(it.key);
+    if(it._temp)li.querySelector("b").insertAdjacentHTML("beforeend",'<span class="tbadge">not saved</span>');
+    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",open?"":it.prompt].filter(Boolean).join(" · ");
+    li.querySelector(".th").onclick=()=>{
+      if(open){setTrace(null);return;}
+      if(it._temp){setTrace(store.temp);return;}
+      try{const t=normalizeTrace(it,it.prompt);t._doc=it.key;t.createdAt=it.createdAt;setTrace(t);}catch(_){setStatus("That trace refers to nodes that are no longer on the map.",true);}
     };
+    if(open)li.appendChild(traceBody(trace));
     ul.appendChild(li);
   });
+  const cur=ul.querySelector(".ti.cur");if(cur)cur.scrollIntoView({block:"nearest"});
 }
 async function loadSaved(){
   try{const r=await api("/api/traces");store.items=(await r.json()).traces||[];store.ready=true;}
   catch(_){$("store-note").textContent="Couldn't read saved traces from disk.";}
-  renderSaved();updateSaveBtn();
+  renderSaved();
 }
-async function saveTrace(){
-  if(!trace||trace._doc)return;
-  const sv=$("save");sv.disabled=true;sv.textContent="Saving…";
+/** Save a trace (new, imported, or a retry) and open it. If saving fails it stays in the list, marked "not saved". */
+async function keepTrace(t){
+  t.createdAt=t.createdAt||Date.now();
   try{
-    const r=await api("/api/traces",{method:"POST",body:JSON.stringify({...plain(trace),createdAt:Date.now()})});
-    if(!r.ok)throw new Error();trace._doc=(await r.json()).key;await loadSaved();
-  }catch(_){sv.disabled=false;sv.textContent="Save trace";setStatus("Couldn't save this trace.",true);return;}
-  updateSaveBtn();renderSaved();
+    const r=await api("/api/traces",{method:"POST",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
+    if(!r.ok)throw new Error();
+    t._doc=(await r.json()).key;
+    if(store.temp===t)store.temp=null;
+    await loadSaved();
+  }catch(_){
+    store.temp=t;
+    setStatus("Couldn't save this trace to disk; it's shown below until you reload.",true);
+  }
+  setTrace(t);
 }
 async function removeTrace(key){
   try{
     const r=await api("/api/traces/"+encodeURIComponent(key),{method:"DELETE"});if(!r.ok)throw new Error();
-    if(trace&&trace._doc===key){trace._doc=null;updateSaveBtn();}
+    if(trace&&trace._doc===key)setTrace(null);
     await loadSaved();
   }catch(_){setStatus("Couldn't delete that trace.",true);}
 }
-$("save").onclick=saveTrace;
 
 /* repo info + GitHub links */
 const REPO={exact:true};
@@ -705,9 +735,10 @@ async function runTrace(){
     }
     if(error)throw new Error(error);
     if(!result)throw new Error((AI_BOOT.label||"The AI tool")+" ended without an answer. Run repo-map doctor to check your setup.");
-    setTrace(normalizeTrace(result.trace,q));
+    const t=normalizeTrace(result.trace,q);
     setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):result.tokens?" · "+result.tokens.toLocaleString()+" tokens":""));
-    $("result").scrollIntoView({block:"nearest"});
+    await keepTrace(t);
+    $("prompt").value="";
   }catch(e){
     if(e&&e.name==="AbortError")setStatus("Stopped.");
     else setStatus(e&&e.message&&e.message!=="no known services"?e.message:"The answer didn't name any services on this map. Try rephrasing.",true);
@@ -718,7 +749,70 @@ async function runTrace(){
 $("run").onclick=runTrace;
 $("stop").onclick=()=>ctl&&ctl.abort();
 $("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
-loadRepo();loadSaved();
+/* is the map out of date? compare map.json's recorded commit with HEAD */
+let upCtl=null;
+async function loadMapStatus(){
+  const box=$("stale");
+  let st;
+  try{st=await (await api("/api/map/status")).json();}catch(_){return;}
+  const short=x=>String(x||"").slice(0,9);
+  const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+  box.className="stale";box.hidden=true;box.innerHTML="";
+  if(st.state==="stale"){
+    const ago=st.commitsSince?" ("+plural(st.commitsSince,"commit")+" ago)":"";
+    box.innerHTML='<span><b>This map is out of date.</b> '+plural(st.changed,"file")+' in the code folders changed since it was evaluated at <code>'+short(st.commit)+'</code>'+ago+'.</span>'
+      +'<span class="acts"><span class="status" id="up-status"></span><button class="btn sm" id="up-stop" type="button" hidden>Stop</button><button class="btn sm primary" id="up-go" type="button">Update map</button></span>'
+      +'<span class="files" title="'+esc(st.files.join("\n"))+'">'+esc(st.files.slice(0,6).join("  ·  "))+(st.changed>6?"  · …":"")+'</span>';
+    box.hidden=false;
+    const go=$("up-go");
+    if(!AI_BOOT.available){go.disabled=true;go.title="Needs an AI tool: run repo-map doctor";$("up-status").textContent="Needs an AI tool.";}
+    if(st.tooBig){$("up-status").textContent="Too many changes for a quick update: run repo-map generate --force.";go.disabled=true;}
+    go.onclick=runUpdate;$("up-stop").onclick=()=>upCtl&&upCtl.abort();
+  }else if(st.state==="unrecorded"){
+    box.innerHTML='<span>This map has no recorded commit, so repo-map can’t tell when it goes out of date.</span><span class="acts"><button class="btn sm" id="up-mark" type="button">Mark as current</button></span>';
+    box.hidden=false;
+    $("up-mark").onclick=async()=>{try{await api("/api/map/mark",{method:"POST"});loadMapStatus();}catch(_){}};
+  }else if(st.state==="unknown"){
+    box.innerHTML='<span>'+esc(st.reason)+' To refresh it, run <code>repo-map generate --force</code>.</span>';box.hidden=false;
+  }else if(st.state==="starter"){
+    box.innerHTML='<span>This is a starter map built from your folders.'+(AI_BOOT.available?' Draft a full one with <code>repo-map generate</code>.':' Fill it in by hand in <code>.repo-map/map.json</code>, or set up an AI tool to draft it.')+'</span>';box.hidden=false;
+  }
+}
+async function runUpdate(){
+  if(upCtl)return;
+  upCtl=new AbortController();
+  const go=$("up-go"),stop=$("up-stop"),stat=$("up-status");
+  go.disabled=true;stop.hidden=false;
+  const t0=Date.now();let last="Starting…";
+  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};tick();const tm=setInterval(tick,1000);
+  try{
+    const res=await api("/api/map/update",{method:"POST",signal:upCtl.signal});
+    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
+    const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
+    for(;;){
+      const {value,done}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
+        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
+        if(ev.type==="progress"){last=ev.text;tick();}else if(ev.type==="result")result=ev;else if(ev.type==="error")error=ev.message;
+      }
+    }
+    if(error)throw new Error(error);
+    if(!result)throw new Error("The update ended without an answer.");
+    clearInterval(tm);
+    const c=result.counts||{added:0,updated:0,removed:0};
+    $("stale").className="stale ok";
+    $("stale").innerHTML='<span><b>Map updated.</b> '+c.added+' added, '+c.updated+' changed, '+c.removed+' removed'+(result.summary?'. '+esc(result.summary):'')+' Reloading…</span>';
+    setTimeout(()=>location.reload(),1800);
+  }catch(e){
+    clearInterval(tm);
+    stat.textContent=e&&e.name==="AbortError"?"Stopped.":(e.message||"Update failed.");stat.className="status err";
+    go.disabled=false;stop.hidden=true;
+  }finally{upCtl=null;}
+}
+
+loadRepo();loadSaved();loadMapStatus();
 
 /* ---------- sidebar collapse + resize ---------- */
 (()=>{

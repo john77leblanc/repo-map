@@ -10,6 +10,7 @@ You don't need an AI tool to use the map. Without one you can still browse it, s
 - [2. Install](#2-install)
 - [3. Add a map to a repo](#3-add-a-map-to-a-repo)
 - [4. Choose an AI tool](#4-choose-an-ai-tool)
+- [Keeping the map up to date](#keeping-the-map-up-to-date)
 - [5. Check your setup with `repo-map doctor`](#5-check-your-setup-with-repo-map-doctor)
 - [6. Teammates without an AI tool](#6-teammates-without-an-ai-tool)
 - [7. Troubleshooting](#7-troubleshooting)
@@ -79,6 +80,7 @@ Add `--local` to save the choice for one repo only (`.repo-map/local.json`, git-
 
 ```shell
 npx repo-map validate         # fails the build if map.json references unknown nodes, groups or missing paths
+npx repo-map update --check   # optional: fails when the map hasn't been updated for code changes
 ```
 
 `npx repo-map doctor --json` prints a machine-readable status, `{ "ready": true, "provider": "claude", … }`, and exits 1 when tracing isn't available.
@@ -273,6 +275,23 @@ These presets are starting points from each tool's documentation and haven't bee
 ```shell
 repo-map ai none
 ```
+
+## Keeping the map up to date
+
+`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a banner lists the files and offers **Update map**.
+
+An update sends your AI tool the current map plus **only the git diff** since that commit (capped in size; it can read whole files when it needs more), and asks for a small patch: nodes, groups and connections to add, change or remove. repo-map applies the patch, checks the result with the same rules as `validate`, records the new commit, and keeps the previous version as `.repo-map/map.prev.json`. If the patch would leave the map broken, nothing is written.
+
+From a terminal:
+
+```shell
+repo-map update            # update from the diff
+repo-map update --check    # report only; exits 1 when the map is out of date (useful in CI)
+repo-map update --mark     # record the current commit without changing the map
+repo-map generate --force  # redraw the whole map instead (for big refactors)
+```
+
+After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: the banner offers **Mark as current**, which does the same as `update --mark`.
 
 ## 5. Check your setup with `repo-map doctor`
 
