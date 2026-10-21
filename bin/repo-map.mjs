@@ -1,63 +1,119 @@
 #!/usr/bin/env node
 /**
  * repo-map: an interactive architecture map of a repo, with process tracing
- * through the Claude Code CLI. Each repo keeps its own .repo-map/ folder.
+ * through an AI tool of your choice (Claude Code, Codex, Gemini, or any
+ * OpenAI-compatible API including local models). Each repo keeps its own .repo-map/ folder.
  *
  *   repo-map init       create .repo-map/config.json for this repo
- *   repo-map generate   draft .repo-map/map.json with Claude Code
+ *   repo-map generate   draft .repo-map/map.json with your AI tool
+ *   repo-map doctor     check which AI tool will be used and whether it works
  *   repo-map validate   check map.json for broken ids, groups and paths
  *   repo-map serve      open the map on http://localhost:4477
  */
 import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runClaude, extractJson } from '../lib/claude.mjs';
-import { MAP_DIR, findRepoRoot, loadConfig, loadMap } from '../lib/config.mjs';
-import { generatePrompt } from '../lib/prompts.mjs';
-import { git, githubFromRemote } from '../lib/repo.mjs';
+import { checkApi, detectProvider } from '../lib/ai/index.mjs';
+import { MAP_DIR, globalAiFile, findRepoRoot, loadConfig, loadMap, withDefaults } from '../lib/config.mjs';
+import { AI_PRESETS, writeAiSettings } from '../lib/settings.mjs';
+import { generateMap } from '../lib/generate.mjs';
+import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
+import { runStart } from '../lib/start.mjs';
 import { validateMap } from '../lib/validate.mjs';
 
 const PKG_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const HELP = `repo-map <command> [options]
+const HELP = `repo-map [command] [options]
+
+Just run  repo-map  (or npx @whitemane/repo-map). It sets up whatever is missing,
+asking a few questions the first time, and opens the map.
 
 Commands
-  init        Create .repo-map/ with a starter config.json for this repo
-  generate    Draft .repo-map/map.json with Claude Code (writes map.draft.json if a map exists)
+  start       The default: set up anything missing, then open the map
+  init        Create .repo-map/ with a starter config.json (re-run with flags to update it)
+  ai <tool>   Choose the AI tool: claude, openai, api, ollama, lmstudio, codex, gemini,
+              command, auto or none.  \`repo-map ai show\` prints the effective settings
+  doctor      Show which AI tool traces will use, and check that it works
+  generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists)
   validate    Check map.json for unknown ids, groups, kinds and missing paths
   serve       Start the map on http://localhost:<port> (default)
 
-Options
-  --dir <path>    Repo root (default: nearest folder with .repo-map/, else the current folder)
-  --port <n>      Port for serve (default 4477, or REPO_MAP_PORT)
-  --force         generate: overwrite map.json instead of writing map.draft.json
-  --model <id>    Claude Code model for generate / traces (overrides config)
-  -v, --version   Print the version
-  -h, --help      Show this help`;
+Common options
+  --dir <path>        Repo root (default: nearest folder with .repo-map/, else the current folder)
+  --provider <p>      AI tool for this run only: auto, claude, command, api or none
+  --model <id>        Model for this run (with \`ai\`: the model to save)
+  -v, --version       Print the version
+  -h, --help          Show this help
+
+init
+  --name <text>       Page title
+  --roots <a,b>       Code folders, comma-separated (e.g. src,lib)
+  --context <text>    What the repo is and where code lives (given to the AI tool)
+  --github <o/r|false> GitHub repo for links, or false to turn links off
+
+ai
+  --global            Save for every repo (~/.config/repo-map/ai.json)  [default]
+  --local             Save for this repo, just for you (.repo-map/local.json, git-ignored)
+  --repo              Save as the team default (.repo-map/config.json, committed)
+  --base-url <url>    API base URL (api/openai/ollama/lmstudio)
+  --key-env <VAR>     Environment variable holding the API key (default REPO_MAP_API_KEY)
+  --bin <path>        CLI to run (claude/codex/gemini/command)
+
+generate
+  --force             Overwrite map.json instead of writing map.draft.json
+  --if-missing        Do nothing when map.json already has nodes (safe to re-run)
+
+doctor
+  --json              Print the result as JSON (exit code 1 when tracing is off)
+
+start / serve
+  --port <n>          Port (default 4477, or REPO_MAP_PORT; start moves on if it's taken)
+  --no-open           start: don't open the browser
+  --yes               start: don't ask questions; use defaults
+
+Scripted setup examples are in SETUP.md.`;
+
+const VALUE_FLAGS = {
+    '--dir': 'dir', '--port': 'port', '--model': 'model', '--provider': 'provider',
+    '--name': 'name', '--roots': 'roots', '--context': 'context', '--github': 'github',
+    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin',
+};
+const BOOL_FLAGS = {
+    '--force': 'force', '--if-missing': 'ifMissing', '--json': 'json', '--yes': 'yes',
+    '--global': 'global', '--local': 'local', '--repo': 'repo',
+};
 
 function parseArgs(argv) {
-    const opts = { cmd: 'serve' };
+    const opts = { cmd: 'start', args: [] };
     const rest = [...argv];
     if (rest[0] && !rest[0].startsWith('-')) {
         opts.cmd = rest.shift();
     }
     while (rest.length) {
-        const a = rest.shift();
-        if (a === '--dir') {
-            opts.dir = rest.shift();
-        } else if (a === '--port') {
-            opts.port = Number(rest.shift());
-        } else if (a === '--force') {
-            opts.force = true;
-        } else if (a === '--model') {
-            opts.model = rest.shift();
+        const raw = rest.shift();
+        const [a, inline] = raw.startsWith('--') && raw.includes('=') ? [raw.slice(0, raw.indexOf('=')), raw.slice(raw.indexOf('=') + 1)] : [raw, undefined];
+        if (VALUE_FLAGS[a]) {
+            const v = inline !== undefined ? inline : rest.shift();
+            if (v === undefined || (inline === undefined && v.startsWith('--'))) {
+                throw new Error(`${a} needs a value`);
+            }
+            opts[VALUE_FLAGS[a]] = v;
+        } else if (BOOL_FLAGS[a]) {
+            opts[BOOL_FLAGS[a]] = true;
+        } else if (a === '--no-open') {
+            opts.open = false;
         } else if (a === '-v' || a === '--version') {
             opts.cmd = 'version';
         } else if (a === '-h' || a === '--help') {
             opts.cmd = 'help';
+        } else if (!a.startsWith('-')) {
+            opts.args.push(a);
         } else {
-            throw new Error(`Unknown option ${a}`);
+            throw new Error(`Unknown option ${a}. Run \`repo-map --help\`.`);
         }
+    }
+    if (opts.port !== undefined) {
+        opts.port = Number(opts.port);
     }
     return opts;
 }
@@ -73,72 +129,147 @@ function resolveRoot(opts, { mustExist = true } = {}) {
     return found || process.cwd();
 }
 
+function initPatch(opts) {
+    const patch = {};
+    if (opts.name !== undefined) {
+        patch.name = opts.name;
+    }
+    if (opts.roots !== undefined) {
+        patch.codeRoots = opts.roots.split(',').map((r) => r.trim()).filter(Boolean).map((r) => r.replace(/^\.?\/+/, '').replace(/\/?$/, '/'));
+    }
+    if (opts.context !== undefined) {
+        patch.prompt = { context: opts.context };
+    }
+    if (opts.github !== undefined) {
+        patch.github = opts.github === 'false' ? false : opts.github;
+    }
+    return patch;
+}
+
 async function cmdInit(opts) {
     const root = resolveRoot(opts, { mustExist: false });
-    const dir = path.join(root, MAP_DIR);
-    const cfgFile = path.join(dir, 'config.json');
-    if (existsSync(cfgFile)) {
-        console.log(`${path.relative(process.cwd(), cfgFile) || cfgFile} already exists; leaving it alone.`);
+    const patch = initPatch(opts);
+    const { created, updated, config } = await writeConfig(root, patch);
+    if (created) {
+        console.log(`Created ${MAP_DIR}/config.json (code roots: ${config.codeRoots.join(', ')}).`);
+        console.log('Next: run `repo-map` to finish setup and open the map.');
+    } else if (updated) {
+        console.log(`Updated ${MAP_DIR}/config.json: ${Object.keys(patch).join(', ')}.`);
+    } else {
+        console.log(`${MAP_DIR}/config.json already exists; leaving it alone. (Pass --name, --roots, --context or --github to update it.)`);
+    }
+}
+
+async function cmdAi(opts) {
+    const tool = opts.args[0];
+    if (!tool || tool === 'show') {
+        const root = resolveRoot(opts, { mustExist: false });
+        const config = existsSync(path.join(root, MAP_DIR, 'config.json')) ? await loadConfig(root) : withDefaults({}, { globalAi: await readGlobalAi() });
+        const p = await detectProvider(config);
+        const { provider, claude, command, api, timeoutMs } = config.ai;
+        console.log(JSON.stringify({ provider, resolved: p.available ? p.id : 'none', label: p.label, available: p.available, reason: p.reason || undefined, claude, command, api, timeoutMs }, null, 2));
         return;
     }
-    const template = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'templates', 'config.json'), 'utf8'));
-    const remote = await git(root, 'remote', 'get-url', 'origin');
-    const guesses = ['src', 'app', 'apps', 'pages', 'components', 'lib', 'services', 'packages', 'server', 'client']
-        .filter((d) => existsSync(path.join(root, d)));
-    template.name = `${path.basename(root)} map`;
-    template.github = githubFromRemote(remote);
-    if (guesses.length) {
-        template.codeRoots = guesses.map((d) => `${d}/`);
+    const preset = AI_PRESETS[tool];
+    if (!preset) {
+        throw new Error(`Unknown AI tool "${tool}". Use one of: ${Object.keys(AI_PRESETS).join(', ')}.`);
     }
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(cfgFile, JSON.stringify(template, null, 4) + '\n');
-    await fs.writeFile(path.join(dir, '.gitignore'), 'traces/\nmap.draft.json\nmap.raw.txt\n');
-    console.log(`Created ${MAP_DIR}/config.json (code roots: ${template.codeRoots.join(', ')}).
-Next:
-  1. Edit ${MAP_DIR}/config.json: name, codeRoots, columns, prompt.context.
-  2. repo-map generate     # drafts ${MAP_DIR}/map.json with Claude Code
-  3. repo-map validate
-  4. repo-map serve`);
+    if (['api', 'openai', 'ollama', 'lmstudio'].includes(tool) && !opts.model) {
+        throw new Error(`repo-map ai ${tool} needs --model <id>.`);
+    }
+    if (tool === 'command' && !opts.bin) {
+        throw new Error('repo-map ai command needs --bin <cli>.');
+    }
+    const scope = opts.repo ? 'repo' : opts.local ? 'local' : 'global';
+    const root = scope === 'global' ? null : resolveRoot(opts);
+    const { file } = await writeAiSettings({ root, scope, patch: preset(opts) });
+    console.log(`Saved AI settings (${tool}) to ${file}`);
+    if (['api', 'openai'].includes(tool) && !opts.baseUrl?.match(/localhost|127\.0\.0\.1/)) {
+        console.log(`The API key is read from $${opts.keyEnv || 'REPO_MAP_API_KEY'} (never stored in files).`);
+    }
+    console.log('Check it with: repo-map doctor');
+}
+
+async function readGlobalAi() {
+    try {
+        return JSON.parse(await fs.readFile(globalAiFile(), 'utf8'));
+    } catch {
+        return undefined;
+    }
 }
 
 async function cmdGenerate(opts) {
     const root = resolveRoot(opts);
     const config = await loadConfig(root);
-    if (opts.model) {
-        config.claude.model = opts.model;
-    }
     const existing = await loadMap(root);
-    const target = path.join(root, MAP_DIR, existing.nodes.length && !opts.force ? 'map.draft.json' : 'map.json');
-    config.claude.maxTurns = Math.max(config.claude.maxTurns, 120);
-    config.claude.timeoutMs = Math.max(config.claude.timeoutMs, 30 * 60 * 1000);
-    console.log(`Exploring ${root} with Claude Code (read-only). This can take several minutes…`);
-    const t0 = Date.now();
-    const run = runClaude({
+    if (opts.ifMissing && existing.nodes.length && !existing.starter) {
+        console.log(`${MAP_DIR}/map.json already has ${existing.nodes.length} nodes; skipping (--if-missing).`);
+        return;
+    }
+    const provider = await detectProvider(config);
+    if (provider.available) {
+        console.log(`Exploring ${root} with ${provider.label} (read-only). This can take several minutes…`);
+    }
+    const result = await generateMap({
         root,
-        claude: config.claude,
-        prompt: generatePrompt(config, existing.nodes.length ? existing : null),
+        config,
+        force: opts.force,
         onProgress: (text) => process.stdout.write(`  ${text}\n`),
+        onStart: (run) => process.on('SIGINT', () => {
+            run.kill();
+            process.exit(130);
+        }),
     });
-    process.on('SIGINT', () => {
-        run.kill();
-        process.exit(130);
-    });
-    const out = await run.promise;
-    const map = extractJson(out.text);
-    if (!map || !Array.isArray(map.nodes)) {
-        const raw = path.join(root, MAP_DIR, 'map.raw.txt');
-        await fs.writeFile(raw, String(out.text || ''));
-        throw new Error(`Claude Code didn't return a map in the expected shape. Its reply is in ${raw}.`);
+    const { counts, errors, warnings } = result.check;
+    console.log(`\nWrote ${path.relative(root, result.target)}: ${counts.groups} groups, ${counts.nodes} nodes, ${counts.edges} edges in ${result.seconds}s${result.spend ? ` (${result.spend})` : ''}.`);
+    if (errors.length || warnings.length) {
+        console.log(`${errors.length} errors, ${warnings.length} warnings. Run \`repo-map validate\` for details.`);
     }
-    map.generatedAt = new Date().toISOString();
-    await fs.writeFile(target, JSON.stringify(map, null, 2) + '\n');
-    const check = validateMap(root, config, { groups: map.groups || [], nodes: map.nodes, edges: map.edges || [] });
-    console.log(`\nWrote ${path.relative(root, target)}: ${check.counts.groups} groups, ${check.counts.nodes} nodes, ${check.counts.edges} edges in ${Math.round((Date.now() - t0) / 1000)}s${out.cost ? ` ($${out.cost.toFixed(2)})` : ''}.`);
-    if (check.errors.length || check.warnings.length) {
-        console.log(`${check.errors.length} errors, ${check.warnings.length} warnings. Run \`repo-map validate\` for details.`);
+    if (result.draft) {
+        console.log('Review it against map.json, then rename it to map.json (or rerun with --force).');
     }
-    if (target.endsWith('draft.json')) {
-        console.log(`Review it against map.json, then rename it to map.json (or rerun with --force).`);
+}
+
+async function cmdDoctor(opts) {
+    const root = resolveRoot(opts);
+    const config = await loadConfig(root);
+    const ai = config.ai;
+    const ok = (b) => (b ? 'ok  ' : 'no  ');
+    if (opts.json) {
+        const p = await detectProvider(config);
+        const api = p.available && p.id === 'api' ? await checkApi(ai.api) : undefined;
+        const ready = p.available && (!api || api.ok);
+        console.log(JSON.stringify({ ready, provider: p.id, label: p.label, auto: Boolean(p.auto), reason: p.reason || undefined, api }, null, 2));
+        process.exitCode = ready ? 0 : 1;
+        return;
+    }
+    console.log(`repo-map doctor · ${root}\n`);
+    console.log(`Node ${process.versions.node}`);
+    console.log(`Settings: provider "${ai.provider}"  (sources: .repo-map/config.json, ${globalAiFile()}, .repo-map/local.json, REPO_MAP_* env vars)\n`);
+    const p = await detectProvider(config);
+    if (p.available) {
+        console.log(`${ok(true)}Traces will use ${p.label}${p.auto ? ' (picked automatically)' : ''}${p.detail ? `: ${p.detail}` : ''}`);
+        if (p.id === 'api') {
+            const check = await checkApi(ai.api);
+            console.log(`${ok(check.ok)}API ${check.detail}`);
+            if (!check.ok) {
+                process.exitCode = 1;
+            }
+        } else {
+            console.log('    Installed. Sign-in and usage limits are checked on the first trace.');
+        }
+    } else {
+        console.log(`${ok(false)}${p.reason}`);
+        (p.tried || []).slice(1).forEach((t) => console.log(`    also: ${t}`));
+        console.log(`
+You can still browse the map and open trace codes from teammates.
+To enable tracing, set up any one of these (details in SETUP.md):
+  • Claude Code:   install it and run \`claude\` once to sign in
+  • OpenAI API:    export REPO_MAP_API_KEY=sk-...   and set ai.api.model
+  • Local model:   run Ollama, then in .repo-map/local.json
+                   {"provider":"api","api":{"baseUrl":"http://localhost:11434/v1","model":"qwen2.5-coder:14b"}}
+  • Codex/Gemini:  {"provider":"command","command":{"preset":"codex"}}   (or "gemini")`);
+        process.exitCode = 1;
     }
 }
 
@@ -158,18 +289,23 @@ async function cmdServe(opts) {
     const root = resolveRoot(opts);
     const config = await loadConfig(root);
     const port = opts.port || Number(process.env.REPO_MAP_PORT) || 4477;
-    if (opts.model) {
-        // serve re-reads config per request, so pass the override through the environment
-        process.env.REPO_MAP_MODEL = opts.model;
-    }
     await startServer({ root, port });
+    const p = await detectProvider(config);
     console.log(`${config.name} → http://localhost:${port}`);
     console.log(`Reading ${root}`);
+    console.log(p.available ? `Traces use ${p.label}` : `Tracing is off: ${p.reason} Run \`repo-map doctor\` for options.`);
 }
 
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
-    const commands = { init: cmdInit, generate: cmdGenerate, validate: cmdValidate, serve: cmdServe };
+    // Flags become env overrides so every layer (and serve's per-request config reads) sees them
+    if (opts.model) {
+        process.env.REPO_MAP_MODEL = opts.model;
+    }
+    if (opts.provider) {
+        process.env.REPO_MAP_AI_PROVIDER = opts.provider;
+    }
+    const commands = { start: runStart, init: cmdInit, ai: cmdAi, generate: cmdGenerate, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

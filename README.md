@@ -1,71 +1,63 @@
 # repo-map
 
-An interactive architecture map for any repo, with plain-language process tracing through the [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI.
+An interactive architecture map for any repo, with plain-language process tracing through the AI tool you already use: Claude Code, Codex, Gemini, OpenAI or any OpenAI-compatible API, including local models like Ollama.
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
-- **Ask how a process works.** Type "What happens when someone places an order?" and Claude Code reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files.
+- **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files.
 - **Keep what you learn.** Save traces locally, or share one as a short code a teammate can paste in.
 
-Everything runs on your machine. The server listens on `localhost` only, and no code leaves your machine except what Claude Code reads while tracing, the same as using Claude Code in the repo yourself.
+Everything runs on your machine. The server listens on `localhost` only, and no code leaves your machine except what your AI tool reads while tracing. With a local model, nothing leaves it at all.
+
+**Full setup guide: [SETUP.md](SETUP.md)**, covering install options, adding a map to a repo, configuring each AI tool, and troubleshooting.
 
 ## Requirements
 
 - Node.js 20 or newer
-- The [Claude Code CLI](https://docs.claude.com/en/docs/claude-code), installed and signed in (`claude` on your `PATH`), for tracing and `generate`. The map itself works without it.
+- Optional: an AI tool for tracing and `generate`. Any one of [Claude Code](https://docs.claude.com/en/docs/claude-code), an OpenAI-compatible API key, a local model server (Ollama, LM Studio), or a CLI like Codex or Gemini. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). The map, search and shared trace codes work without one.
 
 No other dependencies.
 
-## Try the example
+## Get started
+
+In the repo you want to map:
 
 ```shell
-git clone https://github.com/john77leblanc/repo-map.git
-cd repo-map
-npm run example      # http://localhost:4477
+npm install --save-dev @whitemane/repo-map
+npx repo-map
 ```
 
-## Add it to a repo
+Or try it without installing anything: `npx @whitemane/repo-map`.
 
-Install it as a dev dependency:
+The first run asks a few questions: a name for the map, which folders hold the code, a one-line description, and which AI tool to use (it lists the ones it finds on your machine, or you can skip). It then offers to draft the map, and opens it in your browser. Every later run goes straight to the map.
 
-```shell
-npm install --save-dev github:john77leblanc/repo-map
-# or, once published to npm:
-npm install --save-dev @john77leblanc/repo-map
-```
-
-Or run it without installing: `npx github:john77leblanc/repo-map <command>`. You can also copy the package folder into the repo (for example `tools/repo-map/`) and run `node tools/repo-map/bin/repo-map.mjs`, which keeps it working for teammates without touching your lockfile.
-
-Then, from the repo root:
-
-```shell
-npx repo-map init        # creates .repo-map/config.json with guessed code folders
-#   edit .repo-map/config.json: name, codeRoots, columns, labels, prompt.context
-npx repo-map generate    # Claude Code explores the repo and drafts .repo-map/map.json (a few minutes)
-npx repo-map validate    # checks ids, groups, kinds and paths
-npx repo-map serve       # http://localhost:4477
-```
-
-Add a script so everyone runs it the same way:
+Add a script so teammates only need `npm install` and `npm run map`:
 
 ```json
-"scripts": { "map": "repo-map serve" }
+"scripts": { "map": "repo-map" }
 ```
 
-Commit `.repo-map/config.json` and `.repo-map/map.json`. Saved traces stay local (`.repo-map/traces/` is git-ignored).
+Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignore`). Saved traces and personal AI settings stay out of git.
 
-Treat the generated map as a first draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Running `generate` again when a map exists writes `map.draft.json` instead, keeping your ids and wording where they still hold, so you can diff before adopting it (`--force` overwrites `map.json`).
+The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
+
+Want to see it first? Clone this repo and run `npm run example`.
+
+For scripted or CI setups, configuring a specific AI tool, and troubleshooting, see [SETUP.md](SETUP.md).
 
 ## Commands
 
 | Command    | What it does |
 |------------|--------------|
+| *(none)* or `start` | Set up anything that's missing (asking only when it has to), then open the map |
 | `init`     | Create `.repo-map/` with a starter `config.json` |
-| `generate` | Draft `map.json` with Claude Code (read-only tools) |
+| `generate` | Draft `map.json` with your AI tool (read-only) |
+| `ai <tool>` | Choose the AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`; `ai show` prints the settings in effect |
+| `doctor`   | Show which AI tool traces will use and check that it works (`--json` for scripts) |
 | `validate` | Report unknown ids, groups, kinds and missing paths; exits 1 on errors, so it fits in CI |
-| `serve`    | Start the map (the default command) |
+| `serve`    | Start the map without any setup steps |
 
 Options: `--dir <repo root>`, `--port <n>` (or `REPO_MAP_PORT`), `--force`, `--model <id>`, `--version`, `--help`.
-`REPO_MAP_CLAUDE_BIN` and `REPO_MAP_MODEL` override the CLI path and model.
+`--provider` and `--model` (or `REPO_MAP_AI_PROVIDER` and `REPO_MAP_MODEL`) pick the AI tool and model for one run. See [SETUP.md](SETUP.md#where-ai-settings-go) for personal settings files.
 
 ## How a repo describes itself
 
@@ -91,10 +83,10 @@ Each repo keeps one folder:
 | `columns`       | Left-to-right stages, each `{ "title", "subtitle" }` |
 | `kinds`         | Labels for the three node shapes: `service` (square), `topic` (diamond), `external` (circle) |
 | `edgeTypes`     | Labels for the three line colours: `http`, `event`, `sync` |
-| `prompt`        | `context` (what the repo is, where code lives) and `hints` (quirks worth knowing), given to Claude Code |
+| `prompt`        | `context` (what the repo is, where code lives) and `hints` (quirks worth knowing), given to the AI tool |
 | `footnote`      | Note shown under the map |
 | `tracesDir`     | Where saved traces go |
-| `claude`        | `bin`, `model`, `maxTurns`, `timeoutMs` for traces |
+| `ai`            | Team default AI tool: `{ "provider": "auto" }`. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). Personal overrides go in `.repo-map/local.json` (git-ignored) or `~/.config/repo-map/ai.json` |
 
 The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend might use *service* / *Kafka topic* / *outside the repo*; a frontend *package* / *store* / *backend or vendor*.
 
@@ -116,16 +108,21 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 
 - `col` indexes `config.columns`. Groups with `"open": false` start collapsed, and edges into them attach to the group header.
 - `path` is the node's folder in the repo. Nodes without one (outside systems) get no code references.
-- `inferred: true` draws the edge dashed and tells Claude Code the link came from docs or naming rather than code.
+- `inferred: true` draws the edge dashed and tells the AI tool the link came from docs or naming rather than code.
 
 ## Safety
 
 - Listens on `127.0.0.1` only and rejects requests addressed to any other host name.
 - The API requires a custom header, so other websites open in your browser can't call it.
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
-- Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed. Each trace is billed to whichever account the CLI is signed in with, and the cost is shown when it finishes.
+- Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
+- API models (OpenAI-compatible, including local) only get repo-map's own read-only tools, which go through the same `codeRoots` and `blocked` rules as the code viewer.
+- `command` tools (Codex, Gemini, others) read files on their own; use their read-only or sandbox modes. repo-map can't restrict a third-party CLI.
+- API keys are read from environment variables and never written to any config file. Each trace is billed to whichever account the tool uses; cost or token counts are shown when it finishes.
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, adding providers, and releasing.
 
 ```shell
 npm test             # node --test

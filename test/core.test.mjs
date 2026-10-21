@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { extractJson } from '../lib/claude.mjs';
+import { extractJson } from '../lib/json.mjs';
 import { loadConfig, loadMap, withDefaults } from '../lib/config.mjs';
 import { mapText, tracePrompt } from '../lib/prompts.mjs';
 import { githubFromRemote, safePath } from '../lib/repo.mjs';

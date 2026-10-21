@@ -3,14 +3,38 @@
     "description": "",
     "github": "",
     "defaultBranch": "main",
-    "codeRoots": ["src/"],
-    "blocked": ["node_modules", ".git", "dist", "build", ".next", "coverage"],
+    "codeRoots": [
+        "src/"
+    ],
+    "blocked": [
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        "coverage"
+    ],
     "columns": [
-        { "title": "Outside world", "subtitle": "Users, browsers and vendors that start flows" },
-        { "title": "Entry points", "subtitle": "Pages, routes and handlers that receive traffic" },
-        { "title": "Core", "subtitle": "Shared state, stores and APIs" },
-        { "title": "Features", "subtitle": "Modules and components by area" },
-        { "title": "Downstream", "subtitle": "Backends and systems the data ends up in" }
+        {
+            "title": "Outside world",
+            "subtitle": "Users, browsers and vendors that start flows"
+        },
+        {
+            "title": "Entry points",
+            "subtitle": "Pages, routes and handlers that receive traffic"
+        },
+        {
+            "title": "Core",
+            "subtitle": "Shared state, stores and APIs"
+        },
+        {
+            "title": "Features",
+            "subtitle": "Modules and components by area"
+        },
+        {
+            "title": "Downstream",
+            "subtitle": "Backends and systems the data ends up in"
+        }
     ],
     "kinds": {
         "service": "module",
@@ -28,10 +52,7 @@
     },
     "footnote": "",
     "tracesDir": ".repo-map/traces",
-    "claude": {
-        "bin": "claude",
-        "model": "",
-        "maxTurns": 40,
-        "timeoutMs": 600000
+    "ai": {
+        "provider": "auto"
     }
 }

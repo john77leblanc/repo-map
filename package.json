@@ -1,14 +1,18 @@
 {
-  "name": "@john77leblanc/repo-map",
-  "version": "0.1.0",
-  "description": "An interactive architecture map for any repo, with plain-language process tracing through the Claude Code CLI",
+  "name": "@whitemane/repo-map",
+  "version": "0.2.0",
+  "description": "An interactive architecture map for any repo, with plain-language process tracing through Claude Code, Codex, Gemini or any OpenAI-compatible API, including local models",
   "keywords": [
     "architecture",
     "diagram",
     "codebase-map",
     "onboarding",
+    "developer-tools",
+    "ai",
+    "llm",
     "claude-code",
-    "developer-tools"
+    "openai",
+    "ollama"
   ],
   "license": "MIT",
   "author": "Johnathan LeBlanc",
@@ -22,7 +26,7 @@
   },
   "type": "module",
   "bin": {
-    "repo-map": "./bin/repo-map.mjs"
+    "repo-map": "bin/repo-map.mjs"
   },
   "files": [
     "app",
@@ -31,6 +35,8 @@
     "templates",
     "examples",
     "README.md",
+    "SETUP.md",
+    "CONTRIBUTING.md",
     "LICENSE",
     "CHANGELOG.md"
   ],

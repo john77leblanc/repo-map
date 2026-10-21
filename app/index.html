@@ -192,6 +192,9 @@ details.ref .why{margin:0;padding:2px 10px 6px;font-size:12px;color:var(--muted)
 .linkbtn:hover{color:var(--ink);background:var(--soft)}
 .linkbtn:focus-visible{outline:2px solid var(--http)}
 .linkbtn.danger{color:var(--event)}
+.noai{font-size:12.5px;line-height:1.5;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:10px 12px;margin:0 0 10px}
+.noai code{font-family:var(--f-mono);font-size:11.5px}
+.noai a{color:var(--http)}
 .empty{font-size:12.5px;color:var(--muted);margin:0}
 details.imp>summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
 details.imp textarea{min-height:60px;font-family:var(--f-mono);font-size:11.5px;margin-top:8px}
@@ -245,7 +248,8 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
   </div>
   <section>
     <h2>Trace a process</h2>
-    <p class="hint">Describe a flow in plain words. Claude Code reads this map and your local checkout, then highlights the services involved and the code behind each step.</p>
+    <p class="hint" id="trace-hint">Describe a flow in plain words. Your AI tool reads this map and your local checkout, then highlights the parts involved and the code behind each step.</p>
+    <div class="noai" id="noai" hidden><b>Tracing is off on this machine.</b> <span id="noai-why"></span> Run <code>repo-map doctor</code> to see your options, or set one up with the package’s SETUP.md. You can still open a trace a teammate shared: paste its code under <a href="#importbox" id="noai-import">Import a trace code</a>.</div>
     <textarea id="prompt" placeholder="e.g. What happens when someone places an order?"></textarea>
     <div class="row">
       <button class="btn primary" id="run" type="button" disabled>Trace</button>
@@ -284,13 +288,13 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 
 <script>
 /* Map data and repo config come from the local server (.repo-map/ in the repo). */
-var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},CFG=null,REPO_BOOT=null;
+var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},CFG=null,REPO_BOOT=null,AI_BOOT=null;
 async function loadMapData(){
   const h={"x-map":"1"};
   const [c,m]=await Promise.all([
     fetch("/api/config",{headers:h}).then(r=>{if(!r.ok)throw new Error("config");return r.json();}),
     fetch("/api/map",{headers:h}).then(r=>{if(!r.ok)throw new Error("map");return r.json();})]);
-  CFG=c.config;REPO_BOOT=c.repo;
+  CFG=c.config;REPO_BOOT=c.repo;AI_BOOT=c.ai||{available:false,label:"AI tool",reason:""};
   COLS=CFG.columns.map(x=>[x.title,x.subtitle||""]);
   const K={service:"s",topic:"t",external:"x"}, T={http:"h",event:"e",sync:"s"};
   GROUPS=m.groups.map(g=>[g.id,g.col,g.title,g.open?1:0,g.note||""]);
@@ -503,14 +507,14 @@ function cleanRefs(r,steps){
   if(!Array.isArray(r))return null;
   const ids=new Set(steps.map(s=>s.id));
   return r.map(x=>({step:String(x&&x.step||""),path:String(x&&x.path||"").replace(/^\/+/,""),start:Math.max(1,parseInt(x&&x.start)||1),end:Math.max(1,parseInt(x&&x.end)||1),why:String(x&&x.why||"").slice(0,300)}))
-    .filter(x=>ids.has(x.step)&&/^(services|packages)\//.test(x.path)).map(x=>(x.end<x.start&&(x.end=x.start),x)).slice(0,20);
+    .filter(x=>ids.has(x.step)&&x.path&&!/(^|\/)\.\.(\/|$)/.test(x.path)).map(x=>(x.end<x.start&&(x.end=x.start),x)).slice(0,20);
 }
 function normalizeTrace(raw,prompt){
   if(!raw||typeof raw!=="object")throw new Error("no trace");
   const rawSteps=Array.isArray(raw.steps)?raw.steps:[];
   const steps=rawSteps.map(s=>({id:String(s&&s.id||"").trim(),note:String(s&&s.note||"")})).filter(s=>byId[s.id]);
   if(!steps.length)throw new Error("no known services");
-  // refs may arrive flat (saved / imported) or nested per step (fresh from Claude Code)
+  // refs may arrive flat (saved / imported) or nested per step (fresh from the AI tool)
   let refs=raw.refs;
   if(!Array.isArray(refs)){refs=[];rawSteps.forEach(s=>(Array.isArray(s&&s.refs)?s.refs:[]).forEach(r=>refs.push({...r,step:s.id})));}
   const pairs=new Set();
@@ -663,11 +667,18 @@ function loadRepo(){
   const j=REPO_BOOT;Object.assign(REPO,j);
   if(j.ghBase){GH_TREE=j.ghBase+"/tree/"+j.ghRef+"/";GH_BLOB=j.ghBase+"/blob/"+j.ghRef+"/";}
   $("repoinfo").textContent="reading "+(j.branch||"detached HEAD")+" @ "+String(j.sha||"").slice(0,9)+(j.dirty?" (uncommitted changes)":"");
-  if(!j.claude){$("run").disabled=true;setStatus("Claude Code CLI wasn't found. Install it and sign in, then restart repo-map serve.",true);}
-  else{$("run").disabled=false;setStatus("");}
+  REPO.ai=AI_BOOT.available;
+  if(!AI_BOOT.available){
+    $("run").disabled=true;$("prompt").disabled=true;setStatus("");
+    $("noai").hidden=false;$("noai-why").textContent=AI_BOOT.reason||"";
+    $("noai-import").onclick=e=>{e.preventDefault();const d=document.querySelector("details.imp");d.open=true;$("importbox").focus();};
+  }else{
+    $("run").disabled=false;setStatus("");
+    $("trace-hint").textContent="Describe a flow in plain words. "+AI_BOOT.label+" reads this map and your local checkout, then highlights the parts involved and the code behind each step.";
+  }
 }
 
-/* running a trace through Claude Code */
+/* running a trace through the configured AI tool */
 
 let ctl=null, timer=0;
 function setStatus(t,err){const s=$("status");s.textContent=t;s.className="status"+(err?" err":"");}
@@ -675,7 +686,7 @@ async function runTrace(){
   const q=$("prompt").value.trim();if(!q||ctl)return;
   ctl=new AbortController();
   $("run").disabled=true;$("stop").hidden=false;
-  const t0=Date.now();let last="Starting Claude Code…";
+  const t0=Date.now();let last="Starting "+(AI_BOOT.label||"AI tool")+"…";
   const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s");tick();timer=setInterval(tick,1000);
   try{
     const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q}),signal:ctl.signal});
@@ -693,15 +704,15 @@ async function runTrace(){
       }
     }
     if(error)throw new Error(error);
-    if(!result)throw new Error("Claude Code ended without an answer.");
+    if(!result)throw new Error((AI_BOOT.label||"The AI tool")+" ended without an answer. Run repo-map doctor to check your setup.");
     setTrace(normalizeTrace(result.trace,q));
-    setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):""));
+    setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):result.tokens?" · "+result.tokens.toLocaleString()+" tokens":""));
     $("result").scrollIntoView({block:"nearest"});
   }catch(e){
     if(e&&e.name==="AbortError")setStatus("Stopped.");
     else setStatus(e&&e.message&&e.message!=="no known services"?e.message:"The answer didn't name any services on this map. Try rephrasing.",true);
   }finally{
-    clearInterval(timer);$("stop").hidden=true;$("run").disabled=!REPO.claude;ctl=null;
+    clearInterval(timer);$("stop").hidden=true;$("run").disabled=!REPO.ai;ctl=null;
   }
 }
 $("run").onclick=runTrace;
@@ -736,7 +747,7 @@ loadRepo();loadSaved();
   window.addEventListener("resize",()=>{if(st.w>max())setW(st.w);});
 })();
 
-if(!NODES.length)document.getElementById("footnote").innerHTML="This map is empty. Run <code>repo-map generate</code> to draft <code>.repo-map/map.json</code> with Claude Code, then reload.";
+if(!NODES.length)document.getElementById("footnote").innerHTML="This map is empty. Run <code>repo-map generate</code> to draft <code>.repo-map/map.json</code> with your AI tool, then reload.";
 new ResizeObserver(redraw).observe(colsEl);
 window.addEventListener("resize",redraw);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
