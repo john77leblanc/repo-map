@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Repo Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: five flow columns (outside world → entry points → core → domain workers → downstream), SVG wires drawn behind opaque cards */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#5d6977; --line:#d5dbe2; --soft:#e6eaef;
+  --http:#2b63c9; --event:#c26a00; --sync:#0f8a6c; --wire:#b9c2cc;
+  --ext:#7a4fc0; --topic:#c26a00; --svc:#2b63c9;
+  --focus:#18212b;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-head:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --panel:#1b222b; --ink:#e4e9ef; --muted:#9aa6b4; --line:#2e3844; --soft:#232c37;
+  --http:#6f9df2; --event:#f0a347; --sync:#3cc49f; --wire:#3b4654;
+  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --panel:#1b222b; --ink:#e4e9ef; --muted:#9aa6b4; --line:#2e3844; --soft:#232c37;
+  --http:#6f9df2; --event:#f0a347; --sync:#3cc49f; --wire:#3b4654;
+  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45}
+.top{padding-block:20px 12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+h1{font-family:var(--f-head);font-weight:600;font-size:26px;letter-spacing:.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:13px}
+.sub code{font-family:var(--f-mono);font-size:12px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.search{position:relative}
+.search input{font:inherit;font-size:13px;padding:7px 10px 7px 30px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);width:220px;max-width:100%}
+.search input:focus{outline:2px solid var(--http);outline-offset:1px}
+.search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--muted);fill:none}
+.btn{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--http);outline-offset:1px}
+.legend{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 12px;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
+.chip[aria-pressed="false"]{opacity:.45}
+.chip[aria-pressed="false"] .sw{background:var(--wire)!important}
+.sw{display:inline-block;width:18px;height:3px;border-radius:2px}
+.sw.http{background:var(--http)} .sw.event{background:var(--event)} .sw.sync{background:var(--sync)}
+.sw.inf{background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+.kd{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:2px}
+.legend .note{margin-left:6px}
+.scroller{overflow-x:auto;overflow-y:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:4px 40px}
+.board{position:relative;min-width:1460px}
+#wires{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
+#wires path{fill:none;stroke-width:1.3;opacity:.38;transition:opacity .15s,stroke-width .15s}
+#wires path.http{stroke:var(--http)} #wires path.event{stroke:var(--event)} #wires path.sync{stroke:var(--sync)}
+#wires path.inf{stroke-dasharray:4 3}
+.focusing #wires path{opacity:.07}
+.focusing #wires path.on{opacity:1;stroke-width:2.2}
+.cols{position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,minmax(240px,1fr));column-gap:84px;align-items:start}
+.colh{font-family:var(--f-head);font-weight:600;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:0 2px 8px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.colh small{display:block;font-family:var(--f-ui);text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;margin-top:2px}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+details.grp{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+details.grp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px 10px;font-family:var(--f-head);font-weight:600;font-size:13.5px;letter-spacing:.02em;border-radius:8px}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary:hover{background:var(--soft)}
+details.grp>summary:focus-visible{outline:2px solid var(--http);outline-offset:-2px}
+details.grp>summary .gc{margin-left:auto;font-family:var(--f-mono);font-weight:400;font-size:11.5px;color:var(--muted);background:var(--soft);border-radius:4px;padding:1px 6px}
+details.grp>summary .car{width:10px;height:10px;stroke:var(--muted);fill:none;stroke-width:2;transition:transform .15s;flex:none}
+details.grp[open]>summary .car{transform:rotate(90deg)}
+details.grp[open]>summary{border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
+details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--focus)}
+.gl{display:flex;flex-direction:column;padding:4px}
+.gnote{font-size:12px;color:var(--muted);padding:4px 8px 6px;margin:0}
+.node{border-radius:5px}
+.nh{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;padding:5px 7px;border-radius:5px;cursor:pointer}
+.nh:hover{background:var(--soft)}
+.nh:focus-visible{outline:2px solid var(--http);outline-offset:-2px}
+.dot{width:8px;height:8px;border-radius:2px;flex:none;background:var(--svc)}
+.k-ext .dot{background:var(--ext);border-radius:50%}
+.k-topic .dot{background:var(--topic);transform:rotate(45deg);width:7px;height:7px;border-radius:1px}
+.nm{font-family:var(--f-mono);font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.k-ext .nm{font-family:var(--f-ui);font-size:13px}
+.bu{margin-left:auto;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);flex:none}
+.chev{width:10px;height:10px;stroke:var(--muted);fill:none;stroke-width:2;flex:none;transition:transform .15s}
+.node.open .chev{transform:rotate(180deg)}
+.node.open{background:var(--soft)}
+.focusing .node.act>.nh{background:var(--focus);color:var(--bg)}
+.focusing .node.act>.nh .bu,.focusing .node.act>.nh .chev{color:var(--bg);stroke:var(--bg)}
+.focusing .node.nbr>.nh{box-shadow:inset 3px 0 0 var(--focus);background:var(--soft)}
+.focusing .node:not(.act):not(.nbr):not(.trn)>.nh .nm{opacity:.45}
+.node.match>.nh .nm{background:color-mix(in srgb,var(--event) 28%,transparent);border-radius:3px}
+.nb{padding:2px 9px 10px 23px;font-size:13px}
+.nb p{margin:4px 0 8px;max-width:60ch}
+.facts{margin:0 0 8px;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+.facts li{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.facts li::before{content:"› ";color:var(--line)}
+.path{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-bottom:8px;word-break:break-all}
+.conn h4{font-family:var(--f-head);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 3px;font-weight:600}
+.conn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.cl{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:baseline;gap:6px;width:100%;padding:2px 4px;border-radius:4px;font-size:12px}
+.cl:hover{background:var(--panel)}
+.cl:focus-visible{outline:2px solid var(--http)}
+.cl .sw{width:12px;height:2px;flex:none;transform:translateY(-3px)}
+.cl b{font-family:var(--f-mono);font-weight:500;font-size:11.5px;white-space:nowrap}
+.cl span{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.cl em{font-style:normal;color:var(--muted);font-size:10.5px;border:1px dashed var(--line);border-radius:3px;padding:0 3px;flex:none}
+.foot{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px;color:var(--muted);font-size:12px;max-width:900px}
+/* app shell + trace sidebar */
+.app{--side-w:360px;display:grid;grid-template-columns:minmax(0,1fr) var(--side-w);align-items:start}
+.app.collapsed{grid-template-columns:minmax(0,1fr) 44px}
+.side-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:-10px}
+.side-bar .lbl{font-family:var(--f-head);font-weight:600;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.iconbtn{all:unset;box-sizing:border-box;cursor:pointer;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;border:1px solid var(--line);background:var(--panel);flex:none}
+.iconbtn:hover{border-color:var(--muted)}
+.iconbtn:focus-visible{outline:2px solid var(--http);outline-offset:1px}
+.iconbtn svg{width:14px;height:14px;stroke:var(--ink);fill:none;stroke-width:1.8;transition:transform .15s}
+.app.collapsed .iconbtn svg{transform:rotate(180deg)}
+.app.collapsed .side-in{padding:14px 7px;align-items:center;overflow:hidden}
+.app.collapsed .side-in>:not(.side-bar){display:none}
+.app.collapsed .side-bar{flex-direction:column-reverse;gap:12px;margin:0}
+.app.collapsed .side-bar .lbl{writing-mode:vertical-rl;cursor:pointer}
+.resizer{position:absolute;left:-5px;height:100%;top:0;bottom:0;width:10px;cursor:col-resize;z-index:5;touch-action:none}
+.resizer::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
+.resizer:hover::after,.resizer:focus-visible::after,.dragging .resizer::after{background:var(--http)}
+.resizer:focus-visible{outline:none}
+.dragging,.dragging *{cursor:col-resize!important;user-select:none!important}
+.app.collapsed .resizer{display:none}
+.main{min-width:0}
+.side{position:sticky;top:env(safe-area-inset-top,0px);border-left:1px solid var(--line);background:var(--panel)}
+.side-in{height:100vh;overflow-y:auto;padding-block:20px 32px;padding-left:18px;padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+@media (max-width:1000px){.app,.app.collapsed{grid-template-columns:minmax(0,1fr)}.resizer{display:none}.side-in{height:auto}
+  .app.collapsed .side-in{padding-block:10px;align-items:stretch}.app.collapsed .side-bar{flex-direction:row;margin:0}.app.collapsed .side-bar .lbl{writing-mode:horizontal-tb}.side{position:static;border-left:0;border-top:1px solid var(--line);order:-1}.side-in{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.side h2{font-family:var(--f-head);font-weight:600;font-size:15px;letter-spacing:.02em;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
+.side h2 .gc{font-family:var(--f-mono);font-weight:400;font-size:11.5px;color:var(--muted)}
+.hint{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.side textarea{width:100%;font:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical;min-height:84px}
+.side textarea:focus{outline:2px solid var(--http);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:500}
+.btn.primary:disabled{opacity:.5;cursor:default}
+.btn.sm{font-size:12px;padding:4px 8px}
+.status{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status.err{color:var(--event)}
+.result{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--bg)}
+.result h3{font-family:var(--f-head);font-weight:600;font-size:15px;margin:0 0 4px;text-wrap:balance}
+.result .rp{font-size:12px;color:var(--muted);margin:0 0 8px;font-style:italic}
+.result .rs{margin:0 0 10px;font-size:13px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;counter-reset:st}
+.steps li button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:22px minmax(0,1fr);gap:2px 8px;width:100%;padding:5px 6px;border-radius:5px}
+.steps li button:hover{background:var(--soft)}
+.steps li button:focus-visible{outline:2px solid var(--http)}
+.steps .n{grid-row:span 2;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--bg);font-family:var(--f-mono);font-size:11px;display:grid;place-items:center;margin-top:1px}
+.steps b{font-family:var(--f-mono);font-weight:500;font-size:12px;overflow-wrap:anywhere}
+.steps span{font-size:12.5px;color:var(--muted)}
+.refs{display:flex;flex-direction:column;gap:4px;margin:2px 0 6px 36px;min-width:0}
+.refs:empty{display:none}
+details.ref{border:1px solid var(--line);border-radius:6px;background:var(--panel);min-width:0}
+details.ref>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:12px;min-width:0}
+details.ref>summary::-webkit-details-marker{display:none}
+details.ref>summary:hover{background:var(--soft)}
+details.ref>summary:focus-visible{outline:2px solid var(--http);outline-offset:-2px}
+details.ref .car{width:9px;height:9px;stroke:var(--muted);fill:none;stroke-width:2;flex:none;transition:transform .15s}
+details.ref[open] .car{transform:rotate(90deg)}
+details.ref .fn{font-family:var(--f-mono);font-weight:500;font-size:12px;white-space:nowrap}
+details.ref .fu{font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+details.ref .gh{flex:none;color:var(--http);text-decoration:none;font-size:13px;padding:0 3px;border-radius:3px}
+details.ref .gh:hover{background:var(--soft)}
+details.ref .why{margin:0;padding:2px 10px 6px;font-size:12px;color:var(--muted)}
+.code{overflow-x:auto;border-top:1px solid var(--line);padding:6px 0;font-family:var(--f-mono);font-size:11.5px;line-height:1.55;max-height:420px;overflow-y:auto;color:var(--ink)}
+.code:focus-visible{outline:2px solid var(--http);outline-offset:-2px}
+.cl2{display:flex;white-space:pre}
+.cl2 .ln{flex:none;width:44px;padding-right:10px;text-align:right;color:var(--muted);user-select:none;border-right:1px solid var(--line);margin-right:10px;font-variant-numeric:tabular-nums}
+.code .more{color:var(--muted);padding:4px 10px 0 64px;font-family:var(--f-ui);font-size:11.5px}
+.codestat{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.codestat:empty{display:none}
+.path a{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
+.path a:hover{color:var(--http)}
+.gaps{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;margin:10px 0 0}
+.gaps:empty{display:none}
+.saved-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.saved-list li{border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+.saved-list li.cur{border-color:var(--ink)}
+.sv{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px 10px 4px}
+.sv:focus-visible{outline:2px solid var(--http);outline-offset:-2px;border-radius:7px}
+.sv b{display:block;font-family:var(--f-head);font-weight:600;font-size:13.5px}
+.sv small{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sva{display:flex;gap:4px;padding:2px 8px 8px;flex-wrap:wrap}
+.linkbtn{all:unset;cursor:pointer;font-size:11.5px;color:var(--muted);padding:2px 4px;border-radius:3px}
+.linkbtn:hover{color:var(--ink);background:var(--soft)}
+.linkbtn:focus-visible{outline:2px solid var(--http)}
+.linkbtn.danger{color:var(--event)}
+.empty{font-size:12.5px;color:var(--muted);margin:0}
+details.imp>summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+details.imp textarea{min-height:60px;font-family:var(--f-mono);font-size:11.5px;margin-top:8px}
+.stepn{flex:none;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--ink);color:var(--bg);font-family:var(--f-mono);font-size:10.5px;display:grid;place-items:center}
+.focusing .node.trn>.nh{background:var(--soft);box-shadow:inset 3px 0 0 var(--ink)}
+.focusing .node.trn>.nh .nm{opacity:1}
+details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+<main class="main">
+<header class="top">
+  <div>
+    <h1 id="map-name">Repo Map</h1>
+    <p class="sub"><code id="repo-name"></code> · <span id="stat"></span> · <span id="repoinfo">connecting to local server…</span></p>
+  </div>
+  <div class="controls">
+    <label class="search"><svg viewBox="0 0 16 16" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+      <input id="q" type="search" placeholder="Find a node" aria-label="Find a node"></label>
+    <button class="btn" id="expand" type="button">Expand groups</button>
+    <button class="btn" id="collapse" type="button">Collapse groups</button>
+    <button class="btn" id="clear" type="button">Clear focus</button>
+  </div>
+</header>
+<div class="legend" role="group" aria-label="Connection types">
+  <button class="chip" type="button" data-type="http" aria-pressed="true"><i class="sw http"></i><span data-lbl="http">HTTP call</span></button>
+  <button class="chip" type="button" data-type="event" aria-pressed="true"><i class="sw event"></i><span data-lbl="event">Event</span></button>
+  <button class="chip" type="button" data-type="sync" aria-pressed="true"><i class="sw sync"></i><span data-lbl="sync">Data sync / job</span></button>
+  <span class="chip" style="cursor:default"><i class="sw inf"></i>Inferred</span>
+  <span class="note"><i class="kd" style="background:var(--svc)"></i><span data-kind="service">service</span> <i class="kd" style="background:var(--topic);transform:rotate(45deg)"></i><span data-kind="topic">topic</span> <i class="kd" style="background:var(--ext);border-radius:50%"></i><span data-kind="external">outside the repo</span></span>
+  <span class="note">Arrows point from caller to callee, publisher to topic to subscriber, and source to destination for syncs. Hover a card to trace it; click to open it.</span>
+</div>
+
+<div class="scroller" id="scroller">
+  <div class="board" id="board">
+    <svg id="wires" aria-hidden="true"><defs></defs></svg>
+    <div class="cols" id="cols"></div>
+  </div>
+</div>
+<p class="foot" id="footnote">Edges into a collapsed group attach to the group header.</p>
+</main>
+<aside class="side" aria-label="Traces" id="side">
+  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize traces panel" tabindex="0" title="Drag to resize · double-click to reset"></div>
+  <div class="side-in">
+  <div class="side-bar">
+    <span class="lbl" id="side-lbl">Traces</span>
+    <button class="iconbtn" id="side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Collapse panel"><svg viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
+  </div>
+  <section>
+    <h2>Trace a process</h2>
+    <p class="hint">Describe a flow in plain words. Claude Code reads this map and your local checkout, then highlights the services involved and the code behind each step.</p>
+    <textarea id="prompt" placeholder="e.g. What happens when someone places an order?"></textarea>
+    <div class="row">
+      <button class="btn primary" id="run" type="button" disabled>Trace</button>
+      <button class="btn" id="stop" type="button" hidden>Stop</button>
+      <span class="status" id="status" aria-live="polite">Connecting…</span>
+    </div>
+  </section>
+  <section class="result" id="result" hidden>
+    <h3 id="r-title"></h3>
+    <p class="rp" id="r-prompt"></p>
+    <p class="rs" id="r-sum"></p>
+    <ol class="steps" id="r-steps"></ol>
+    <div class="codestat" id="codestat"></div>
+    <p class="gaps" id="r-gaps"></p>
+    <div class="row">
+      <button class="btn sm primary" id="save" type="button">Save trace</button>
+      <button class="btn sm" id="copycode" type="button">Copy trace code</button>
+      <button class="btn sm" id="dismiss" type="button">Close</button>
+    </div>
+    <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
+  </section>
+  <section>
+    <h2>Saved traces <span class="gc" id="savedcount"></span></h2>
+    <p class="hint" id="store-note">Saved as files in .repo-map/traces on this machine (git-ignored).</p>
+    <ul class="saved-list" id="saved-list"></ul>
+    <p class="empty" id="saved-empty">No saved traces yet. Run a trace and press Save trace to keep it here.</p>
+    <details class="imp">
+      <summary>Import a trace code</summary>
+      <textarea id="importbox" placeholder="Paste a trace code (rmap1:…)"></textarea>
+      <div class="row"><button class="btn sm" id="importbtn" type="button">Show trace</button><span class="status" id="importmsg"></span></div>
+    </details>
+  </section>
+</div>
+</aside>
+</div>
+
+<script>
+/* Map data and repo config come from the local server (.repo-map/ in the repo). */
+var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},CFG=null,REPO_BOOT=null;
+async function loadMapData(){
+  const h={"x-map":"1"};
+  const [c,m]=await Promise.all([
+    fetch("/api/config",{headers:h}).then(r=>{if(!r.ok)throw new Error("config");return r.json();}),
+    fetch("/api/map",{headers:h}).then(r=>{if(!r.ok)throw new Error("map");return r.json();})]);
+  CFG=c.config;REPO_BOOT=c.repo;
+  COLS=CFG.columns.map(x=>[x.title,x.subtitle||""]);
+  const K={service:"s",topic:"t",external:"x"}, T={http:"h",event:"e",sync:"s"};
+  GROUPS=m.groups.map(g=>[g.id,g.col,g.title,g.open?1:0,g.note||""]);
+  NODES=m.nodes.map(n=>[n.id,n.group,K[n.kind]||"s",n.tag||"",n.desc||"",n.facts||[],n.title||""]);
+  m.nodes.forEach(n=>{if(n.path)PATHS[n.id]=n.path;});
+  EDGES=m.edges.map(e=>[e.from,e.to,T[e.type]||"h",e.label||"",e.inferred?1:0]);
+}
+</script>
+<script>
+async function main(){
+const T={h:"http",e:"event",s:"sync"};
+let GH_TREE="", GH_BLOB=""; // set from the repo's git remote in loadRepo()
+const TL={http:"HTTP",event:"event",sync:"sync"};
+const byId={}, groupOf={}, nodeEl={}, groupEl={};
+NODES.forEach(n=>{byId[n[0]]={id:n[0],g:n[1],k:n[2],bu:n[3],desc:n[4],facts:n[5]||[],title:n[6]||n[0]};groupOf[n[0]]=n[1];});
+const edges=EDGES.map(e=>({f:e[0],t:e[1],type:T[e[2]],label:e[3]||"",inf:!!e[4]}));
+edges.forEach(e=>{if(!byId[e.f]||!byId[e.t])console.warn("bad edge",e);});
+const out={},inc={};
+edges.forEach(e=>{(out[e.f]=out[e.f]||[]).push(e);(inc[e.t]=inc[e.t]||[]).push(e);});
+const svcCount=NODES.filter(n=>n[2]==="s").length, topicCount=NODES.filter(n=>n[2]==="t").length;
+const plural=(n,w)=>n===1||/s$/.test(w)?w:/[^aeiou]y$/.test(w)?w.slice(0,-1)+"ies":w+"s";
+document.title=CFG.name;document.getElementById("map-name").textContent=CFG.name;
+document.getElementById("repo-name").textContent=REPO_BOOT.github||"local repo";
+document.getElementById("stat").textContent=svcCount+" "+plural(svcCount,CFG.kinds.service)+" · "+topicCount+" "+plural(topicCount,CFG.kinds.topic)+" · "+edges.length+" connection"+(edges.length===1?"":"s");
+document.querySelectorAll("[data-lbl]").forEach(x=>x.textContent=CFG.edgeTypes[x.dataset.lbl]||x.textContent);
+document.querySelectorAll("[data-kind]").forEach(x=>x.textContent=CFG.kinds[x.dataset.kind]||x.textContent);
+if(CFG.footnote)document.getElementById("footnote").textContent=CFG.footnote+" Edges into a collapsed group attach to the group header.";
+const NS="repomap:"+(REPO_BOOT.github||CFG.name)+":";
+
+const LS=NS+"groups";
+let saved=null; try{saved=JSON.parse(localStorage.getItem(LS)||"null");}catch(_){}
+
+const colsEl=document.getElementById("cols");
+const chev='<svg class="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3"/></svg>';
+const car='<svg class="car" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3"/></svg>';
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+COLS.forEach((c,ci)=>{
+  const col=document.createElement("div");col.className="col";
+  col.innerHTML='<div class="colh">'+esc(c[0])+'<small>'+esc(c[1])+'</small></div>';
+  GROUPS.filter(g=>g[1]===ci).forEach(g=>{
+    const members=NODES.filter(n=>n[1]===g[0]);
+    const d=document.createElement("details");d.className="grp";d.dataset.g=g[0];
+    const isOpen=saved&&saved[g[0]]!==undefined?saved[g[0]]:!!g[3];
+    if(isOpen)d.open=true;
+    d.innerHTML='<summary>'+car+'<span>'+esc(g[2])+'</span><span class="gc">'+members.length+'</span></summary>';
+    const gl=document.createElement("div");gl.className="gl";
+    if(g[4])gl.innerHTML='<p class="gnote">'+esc(g[4])+'</p>';
+    members.forEach(m=>{gl.appendChild(makeNode(byId[m[0]]));});
+    d.appendChild(gl);col.appendChild(d);groupEl[g[0]]=d;
+  });
+  colsEl.appendChild(col);
+});
+
+function makeNode(n){
+  const el=document.createElement("div");
+  el.className="node k-"+({s:"svc",t:"topic",x:"ext"}[n.k]);el.dataset.id=n.id;
+  el.innerHTML='<button class="nh" type="button" aria-expanded="false"><span class="dot"></span><span class="nm">'+esc(n.title)+'</span>'+(n.bu?'<span class="bu" title="services/'+n.bu+'">'+(n.bu==="membership"?"mem":n.bu)+'</span>':'')+chev+'</button><div class="nb" hidden></div>';
+  nodeEl[n.id]=el;return el;
+}
+function connItem(e,dir){
+  const other=dir==="out"?e.t:e.f, o=byId[other];
+  return '<li><button class="cl" type="button" data-go="'+other+'"><i class="sw '+e.type+'"></i><b>'+esc(o.title)+'</b><span>'+esc(e.label||TL[e.type])+'</span>'+(e.inf?'<em>inferred</em>':'')+'</button></li>';
+}
+function fillBody(n){
+  const el=nodeEl[n.id], nb=el.querySelector(".nb");
+  if(nb.dataset.filled)return;
+  let h='<p>'+esc(n.desc)+'</p>';
+  if(n.facts.length)h+='<ul class="facts">'+n.facts.map(f=>'<li>'+esc(f)+'</li>').join("")+'</ul>';
+  if(PATHS[n.id]){const sp=PATHS[n.id];h+=GH_TREE?'<div class="path"><a href="'+GH_TREE+sp+'" target="_blank" rel="noopener">'+esc(sp)+' ↗</a></div>':'<div class="path">'+esc(sp)+'</div>';}
+  const o=out[n.id]||[], i=inc[n.id]||[];
+  h+='<div class="conn">';
+  if(i.length)h+='<h4>Receives from · '+i.length+'</h4><ul>'+i.map(e=>connItem(e,"in")).join("")+'</ul>';
+  if(o.length)h+='<h4>Sends to · '+o.length+'</h4><ul>'+o.map(e=>connItem(e,"out")).join("")+'</ul>';
+  if(!i.length&&!o.length)h+='<h4>No mapped connections</h4>';
+  h+='</div>';nb.innerHTML=h;nb.dataset.filled="1";
+}
+function setOpen(id,open){
+  const el=nodeEl[id], nb=el.querySelector(".nb"), b=el.querySelector(".nh");
+  if(open)fillBody(byId[id]);
+  nb.hidden=!open;el.classList.toggle("open",open);b.setAttribute("aria-expanded",String(open));
+}
+
+/* ---------- wires ---------- */
+const board=document.getElementById("board"), svg=document.getElementById("wires");
+const hidden={http:false,event:false,sync:false};
+let drawn=[];
+function anchor(id){
+  const el=nodeEl[id], d=el.closest("details");
+  if(d&&!d.open)return {el:d.querySelector("summary"),g:d.dataset.g};
+  return {el:el.querySelector(".nh"),g:null};
+}
+function ensureMarkers(){
+  const defs=svg.querySelector("defs");if(defs.childElementCount)return;
+  ["http","event","sync"].forEach(t=>{
+    defs.insertAdjacentHTML("beforeend",'<marker id="m-'+t+'" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0.5L7.5 4L0 7.5z" style="fill:var(--'+t+')"/></marker>');
+  });
+}
+function draw(){
+  ensureMarkers();
+  const br=board.getBoundingClientRect();
+  svg.setAttribute("width",board.scrollWidth);svg.setAttribute("height",board.scrollHeight);
+  svg.querySelectorAll("path.w").forEach(p=>p.remove());
+  const seen=new Map();drawn=[];
+  const rectCache=new Map();
+  const R=el=>{if(!rectCache.has(el)){const r=el.getBoundingClientRect();rectCache.set(el,{l:r.left-br.left,r:r.right-br.left,cy:r.top-br.top+r.height/2});}return rectCache.get(el);};
+  edges.forEach(e=>{
+    if(hidden[e.type])return;
+    const a=anchor(e.f), b=anchor(e.t);
+    if(a.el===b.el)return;
+    const key=[...[a.el,b.el].map(x=>x.dataset.k||(x.dataset.k=Math.random().toString(36).slice(2)))].join("|")+e.type+(e.inf?"i":"");
+    if(seen.has(key)){seen.get(key).edges.push(e);return;}
+    const s=R(a.el), t=R(b.el);
+    let x1,x2,y1=s.cy,y2=t.cy,d;
+    if(t.l>=s.r-4){x1=s.r;x2=t.l-2;const dx=Math.max(36,(x2-x1)*.5);d=`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;}
+    else if(t.r<=s.l+4){x1=s.l;x2=t.r+2;const dx=Math.max(36,(x1-x2)*.5);d=`M${x1},${y1} C${x1-dx},${y1} ${x2+dx},${y2} ${x2},${y2}`;}
+    else{x1=s.r;x2=t.r+2;const bow=Math.min(70,26+Math.abs(y2-y1)*.12);const xm=Math.max(x1,x2)+bow;d=`M${x1},${y1} C${xm},${y1} ${xm},${y2} ${x2},${y2}`;}
+    const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+    p.setAttribute("d",d);p.setAttribute("class","w "+e.type+(e.inf?" inf":""));p.setAttribute("marker-end","url(#m-"+e.type+")");
+    svg.appendChild(p);
+    const rec={p,edges:[e],ga:a.g,gb:b.g};seen.set(key,rec);drawn.push(rec);
+  });
+  applyFocus();
+}
+let raf=0;function redraw(){cancelAnimationFrame(raf);raf=requestAnimationFrame(draw);}
+
+/* ---------- focus ---------- */
+let pinned=null, hover=null;
+function activeSet(){
+  const a=hover||pinned;if(!a)return null;
+  if(a.startsWith("g:")){return new Set(NODES.filter(n=>n[1]===a.slice(2)).map(n=>n[0]));}
+  return new Set([a]);
+}
+function applyFocus(){
+  const set=activeSet();
+  board.classList.toggle("focusing",!!(set||trace));
+  document.querySelectorAll(".node.act,.node.nbr,details.grp.nbr").forEach(x=>x.classList.remove("act","nbr"));
+  if(!set&&trace){
+    drawn.forEach(r=>{const on=r.edges.some(e=>trace.pairs.has(e.f+"|"+e.t));r.p.classList.toggle("on",on);if(on)svg.appendChild(r.p);});
+    return;
+  }
+  if(!set){drawn.forEach(r=>r.p.classList.remove("on"));return;}
+  const nb=new Set();
+  drawn.forEach(r=>{
+    const on=r.edges.some(e=>set.has(e.f)||set.has(e.t));
+    r.p.classList.toggle("on",on);
+    if(on){r.edges.forEach(e=>{if(set.has(e.f)||set.has(e.t)){nb.add(e.f);nb.add(e.t);}});
+      const top=svg.lastElementChild;if(r.p!==top)svg.appendChild(r.p);}
+  });
+  nb.forEach(id=>{
+    const el=nodeEl[id], d=el.closest("details");
+    if(set.has(id))el.classList.add("act");else el.classList.add("nbr");
+    if(d&&!d.open&&!set.has(id))d.classList.add("nbr");
+  });
+  set.forEach(id=>nodeEl[id].classList.add("act"));
+}
+
+colsEl.addEventListener("click",ev=>{
+  const go=ev.target.closest(".cl");
+  if(go){goTo(go.dataset.go);return;}
+  const h=ev.target.closest(".nh");if(!h)return;
+  const id=h.parentElement.dataset.id, open=!nodeEl[id].classList.contains("open");
+  setOpen(id,open);pinned=open?id:(pinned===id?null:pinned);hover=null;redraw();
+});
+colsEl.addEventListener("mouseover",ev=>{
+  const h=ev.target.closest(".nh");const s=ev.target.closest("summary");
+  const v=h?h.parentElement.dataset.id:(s?"g:"+s.parentElement.dataset.g:null);
+  if(v!==hover){hover=v;applyFocus();}
+});
+colsEl.addEventListener("mouseleave",()=>{hover=null;applyFocus();});
+colsEl.addEventListener("focusin",ev=>{const h=ev.target.closest(".nh");if(h){hover=h.parentElement.dataset.id;applyFocus();}});
+colsEl.addEventListener("focusout",()=>{hover=null;applyFocus();});
+Object.values(groupEl).forEach(d=>d.addEventListener("toggle",()=>{saveGroups();redraw();}));
+function saveGroups(){if(trace||preTraceGroups)return;try{const o={};Object.entries(groupEl).forEach(([k,d])=>o[k]=d.open);localStorage.setItem(LS,JSON.stringify(o));}catch(_){}}
+
+function goTo(id){
+  const el=nodeEl[id], d=el.closest("details");
+  if(d&&!d.open)d.open=true;
+  setOpen(id,true);pinned=id;hover=null;
+  requestAnimationFrame(()=>{draw();el.scrollIntoView({block:"center",inline:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});el.querySelector(".nh").focus({preventScroll:true});});
+}
+
+document.getElementById("expand").onclick=()=>{Object.values(groupEl).forEach(d=>d.open=true);};
+document.getElementById("collapse").onclick=()=>{Object.values(groupEl).forEach(d=>d.open=false);};
+document.getElementById("clear").onclick=()=>{pinned=null;hover=null;setTrace(null);Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});q.value="";doSearch();redraw();};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){pinned=null;hover=null;applyFocus();}});
+document.querySelectorAll(".chip[data-type]").forEach(c=>c.addEventListener("click",()=>{
+  const t=c.dataset.type;hidden[t]=!hidden[t];c.setAttribute("aria-pressed",String(!hidden[t]));redraw();
+}));
+
+const q=document.getElementById("q");
+function doSearch(){
+  const v=q.value.trim().toLowerCase();
+  Object.values(byId).forEach(n=>{
+    const m=v&&(n.id.includes(v)||n.title.toLowerCase().includes(v)||n.desc.toLowerCase().includes(v));
+    nodeEl[n.id].classList.toggle("match",!!m);
+    if(m){const d=nodeEl[n.id].closest("details");if(d&&!d.open)d.open=true;}
+  });
+}
+q.addEventListener("input",doSearch);
+q.addEventListener("keydown",e=>{if(e.key==="Enter"){const f=document.querySelector(".node.match");if(f)goTo(f.dataset.id);}});
+
+/* ---------- traces (local: talks to server.mjs) ---------- */
+let trace=null;            // {title,prompt,summary,steps:[{id,note}],edges,gaps,refs,pairs:Set,_doc?}
+const $=id=>document.getElementById(id);
+const edgePairs=new Set(edges.map(e=>e.f+"|"+e.t));
+const api=(p,o={})=>fetch(p,{...o,headers:{"content-type":"application/json","x-map":"1",...(o.headers||{})}});
+
+function cleanRefs(r,steps){
+  if(!Array.isArray(r))return null;
+  const ids=new Set(steps.map(s=>s.id));
+  return r.map(x=>({step:String(x&&x.step||""),path:String(x&&x.path||"").replace(/^\/+/,""),start:Math.max(1,parseInt(x&&x.start)||1),end:Math.max(1,parseInt(x&&x.end)||1),why:String(x&&x.why||"").slice(0,300)}))
+    .filter(x=>ids.has(x.step)&&/^(services|packages)\//.test(x.path)).map(x=>(x.end<x.start&&(x.end=x.start),x)).slice(0,20);
+}
+function normalizeTrace(raw,prompt){
+  if(!raw||typeof raw!=="object")throw new Error("no trace");
+  const rawSteps=Array.isArray(raw.steps)?raw.steps:[];
+  const steps=rawSteps.map(s=>({id:String(s&&s.id||"").trim(),note:String(s&&s.note||"")})).filter(s=>byId[s.id]);
+  if(!steps.length)throw new Error("no known services");
+  // refs may arrive flat (saved / imported) or nested per step (fresh from Claude Code)
+  let refs=raw.refs;
+  if(!Array.isArray(refs)){refs=[];rawSteps.forEach(s=>(Array.isArray(s&&s.refs)?s.refs:[]).forEach(r=>refs.push({...r,step:s.id})));}
+  const pairs=new Set();
+  (Array.isArray(raw.edges)?raw.edges:[]).forEach(p=>{
+    if(!Array.isArray(p))return;const a=String(p[0]),b=String(p[1]);
+    if(edgePairs.has(a+"|"+b))pairs.add(a+"|"+b);else if(edgePairs.has(b+"|"+a))pairs.add(b+"|"+a);
+  });
+  for(let i=1;i<steps.length;i++){const a=steps[i-1].id,b=steps[i].id;
+    if(edgePairs.has(a+"|"+b))pairs.add(a+"|"+b);else if(edgePairs.has(b+"|"+a))pairs.add(b+"|"+a);}
+  return {title:String(raw.title||"Untitled trace").slice(0,80),prompt:String(prompt||raw.prompt||"").slice(0,2000),
+    summary:String(raw.summary||""),gaps:String(raw.gaps||""),steps,edges:[...pairs].map(k=>k.split("|")),pairs,refs:cleanRefs(refs,steps)||[]};
+}
+function plain(t){return {title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};}
+
+let preTraceGroups=null;   // group open-state before a trace took over, restored on close
+function setTrace(t){
+  if(t&&!preTraceGroups){preTraceGroups={};Object.entries(groupEl).forEach(([k,d])=>preTraceGroups[k]=d.open);}
+  if(!t&&preTraceGroups){const snap=preTraceGroups;preTraceGroups=null;trace=null;Object.entries(groupEl).forEach(([k,d])=>{d.open=!!snap[k];});}
+  trace=t;
+  document.querySelectorAll(".stepn").forEach(x=>x.remove());
+  document.querySelectorAll(".node.trn,details.grp.trg").forEach(x=>x.classList.remove("trn","trg"));
+  if(t){
+    const seen=new Set();
+    t.steps.forEach((s,i)=>{
+      const el=nodeEl[s.id];el.classList.add("trn");
+      const d=el.closest("details");if(d)d.classList.add("trg");
+      if(!seen.has(s.id)){seen.add(s.id);const b=document.createElement("span");b.className="stepn";b.textContent=i+1;el.querySelector(".nh").insertBefore(b,el.querySelector(".nm"));}
+    });
+    Object.values(groupEl).forEach(d=>{d.open=d.classList.contains("trg");});
+    Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});
+    pinned=null;
+  }
+  renderResult();renderSaved();redraw();
+}
+function reveal(id){
+  const el=nodeEl[id], d=el.closest("details");if(d&&!d.open)d.open=true;
+  requestAnimationFrame(()=>{draw();el.scrollIntoView({block:"center",inline:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});});
+}
+function renderResult(){
+  const box=$("result");box.hidden=!trace;$("codebox").hidden=true;
+  if(!trace)return;
+  $("r-title").textContent=trace.title;
+  $("r-prompt").textContent=trace.prompt?"“"+trace.prompt+"”":"";
+  $("r-sum").textContent=trace.summary;
+  $("r-gaps").textContent=trace.gaps?"Not shown clearly: "+trace.gaps:"";
+  const ol=$("r-steps");ol.innerHTML="";
+  trace.steps.forEach((s,i)=>{
+    const li=document.createElement("li");
+    li.innerHTML='<button type="button"><i class="n">'+(i+1)+'</i><b>'+esc(byId[s.id].title)+'</b><span>'+esc(s.note)+'</span></button><div class="refs"></div>';
+    li.firstChild.onclick=()=>reveal(s.id);ol.appendChild(li);
+    const box=li.querySelector(".refs");
+    (trace.refs||[]).filter(r=>r.step===s.id).forEach(r=>box.appendChild(refEl(r)));
+  });
+  const n=(trace.refs||[]).length;
+  $("codestat").innerHTML=n?'<span class="status">'+n+' code reference'+(n===1?'':'s')+' · read from your checkout</span>':'';
+  updateSaveBtn();
+}
+function updateSaveBtn(){if(!trace)return;const sv=$("save");sv.disabled=!!trace._doc||!store.ready;sv.textContent=trace._doc?"Saved":"Save trace";}
+$("dismiss").onclick=()=>setTrace(null);
+
+/* code references: read live from the local repo */
+function refEl(r){
+  const d=document.createElement("details");d.className="ref";
+  const base=r.path.split("/").pop(), url=GH_BLOB+r.path+"#L"+r.start+"-L"+r.end;
+  const short="…/"+r.path.split("/").slice(-2).join("/")+"#L"+r.start+"-L"+r.end;
+  d.innerHTML='<summary><svg class="car" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3"/></svg><span class="fn"></span><span class="fu"></span><a class="gh" target="_blank" rel="noopener">↗</a></summary><p class="why"></p><div class="code" role="region" tabindex="0"></div>';
+  d.querySelector(".fn").textContent=base;d.querySelector(".fu").textContent=short;d.querySelector(".fu").title=r.path;
+  const a=d.querySelector(".gh");if(!GH_BLOB)a.hidden=true;a.href=url;a.title=REPO.exact?"Open on GitHub":"Open on GitHub (your HEAD isn't pushed, so this points at its merge-base with main; lines may differ)";
+  a.addEventListener("click",e=>e.stopPropagation());
+  d.querySelector(".why").textContent=r.why;
+  d.addEventListener("toggle",async()=>{
+    if(!d.open||d.dataset.loaded)return;d.dataset.loaded="1";
+    const box=d.querySelector(".code");box.textContent="Loading…";
+    try{
+      const res=await api("/api/file?path="+encodeURIComponent(r.path)+"&start="+r.start+"&end="+Math.min(r.end,r.start+79));
+      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
+      const j=await res.json();box.innerHTML="";
+      j.lines.forEach((t,k)=>{const row=document.createElement("div");row.className="cl2";row.innerHTML='<span class="ln">'+(j.start+k)+'</span><span class="lc"></span>';row.lastChild.textContent=t||" ";box.appendChild(row);});
+      if(r.end>j.end&&j.end<j.total)box.insertAdjacentHTML("beforeend",'<div class="more">… '+(Math.min(r.end,j.total)-j.end)+' more lines in the file</div>');
+    }catch(err){box.textContent="Couldn't read "+r.path+" from your checkout ("+err.message+"). It may have moved since this trace was saved.";d.dataset.loaded="";}
+  });
+  return d;
+}
+
+/* trace codes (copy / paste sharing) */
+function encodeTrace(t){const s=JSON.stringify(plain(t));return "rmap1:"+btoa(unescape(encodeURIComponent(s)));}
+function decodeTrace(code){
+  const c=String(code).trim(), m=c.match(/^(rmap1|msmap1):/);if(!m)throw new Error("prefix");
+  return normalizeTrace(JSON.parse(decodeURIComponent(escape(atob(c.slice(m[0].length))))));
+}
+async function copyCode(t,btn){
+  const code=encodeTrace(t);
+  try{await navigator.clipboard.writeText(code);const o=btn.textContent;btn.textContent="Copied";setTimeout(()=>btn.textContent=o,1500);}
+  catch(_){const cb=$("codebox");cb.value=code;cb.hidden=false;cb.focus();cb.select();}
+}
+$("copycode").onclick=e=>{if(trace)copyCode(trace,e.currentTarget);};
+$("importbtn").onclick=()=>{
+  try{setTrace(decodeTrace($("importbox").value));$("importmsg").textContent="";$("importbox").value="";$("result").scrollIntoView({block:"nearest"});}
+  catch(_){$("importmsg").textContent="That isn't a valid trace code.";$("importmsg").className="status err";}
+};
+
+/* saved traces: JSON files in .repo-map/traces (git-ignored) */
+const store={ready:false,items:[]};
+function renderSaved(){
+  const ul=$("saved-list");ul.innerHTML="";
+  $("savedcount").textContent=store.items.length||"";
+  $("saved-empty").hidden=store.items.length>0;
+  store.items.forEach(it=>{
+    const li=document.createElement("li");if(trace&&trace._doc===it.key)li.classList.add("cur");
+    const when=it.createdAt?new Date(it.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"";
+    li.innerHTML='<button class="sv" type="button"><b></b><small></small></button><div class="sva"><button class="linkbtn" data-a="copy" type="button">Copy code</button><button class="linkbtn danger" data-a="del" type="button">Delete</button></div>';
+    li.querySelector("b").textContent=it.title;
+    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",it.prompt].filter(Boolean).join(" · ");
+    li.querySelector(".sv").onclick=()=>{try{const t=normalizeTrace(it,it.prompt);t._doc=it.key;setTrace(t);}catch(_){}};
+    li.querySelector('[data-a="copy"]').onclick=e=>copyCode(it,e.currentTarget);
+    const del=li.querySelector('[data-a="del"]');
+    del.onclick=async()=>{
+      if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Confirm delete";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete";},3000);return;}
+      await removeTrace(it.key);
+    };
+    ul.appendChild(li);
+  });
+}
+async function loadSaved(){
+  try{const r=await api("/api/traces");store.items=(await r.json()).traces||[];store.ready=true;}
+  catch(_){$("store-note").textContent="Couldn't read saved traces from disk.";}
+  renderSaved();updateSaveBtn();
+}
+async function saveTrace(){
+  if(!trace||trace._doc)return;
+  const sv=$("save");sv.disabled=true;sv.textContent="Saving…";
+  try{
+    const r=await api("/api/traces",{method:"POST",body:JSON.stringify({...plain(trace),createdAt:Date.now()})});
+    if(!r.ok)throw new Error();trace._doc=(await r.json()).key;await loadSaved();
+  }catch(_){sv.disabled=false;sv.textContent="Save trace";setStatus("Couldn't save this trace.",true);return;}
+  updateSaveBtn();renderSaved();
+}
+async function removeTrace(key){
+  try{
+    const r=await api("/api/traces/"+encodeURIComponent(key),{method:"DELETE"});if(!r.ok)throw new Error();
+    if(trace&&trace._doc===key){trace._doc=null;updateSaveBtn();}
+    await loadSaved();
+  }catch(_){setStatus("Couldn't delete that trace.",true);}
+}
+$("save").onclick=saveTrace;
+
+/* repo info + GitHub links */
+const REPO={exact:true};
+function loadRepo(){
+  const j=REPO_BOOT;Object.assign(REPO,j);
+  if(j.ghBase){GH_TREE=j.ghBase+"/tree/"+j.ghRef+"/";GH_BLOB=j.ghBase+"/blob/"+j.ghRef+"/";}
+  $("repoinfo").textContent="reading "+(j.branch||"detached HEAD")+" @ "+String(j.sha||"").slice(0,9)+(j.dirty?" (uncommitted changes)":"");
+  if(!j.claude){$("run").disabled=true;setStatus("Claude Code CLI wasn't found. Install it and sign in, then restart repo-map serve.",true);}
+  else{$("run").disabled=false;setStatus("");}
+}
+
+/* running a trace through Claude Code */
+
+let ctl=null, timer=0;
+function setStatus(t,err){const s=$("status");s.textContent=t;s.className="status"+(err?" err":"");}
+async function runTrace(){
+  const q=$("prompt").value.trim();if(!q||ctl)return;
+  ctl=new AbortController();
+  $("run").disabled=true;$("stop").hidden=false;
+  const t0=Date.now();let last="Starting Claude Code…";
+  const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s");tick();timer=setInterval(tick,1000);
+  try{
+    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q}),signal:ctl.signal});
+    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
+    const rd=res.body.getReader(), dec=new TextDecoder();let buf="",result=null,error=null;
+    for(;;){
+      const {value,done}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
+        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
+        if(ev.type==="progress"){last=ev.text;tick();}
+        else if(ev.type==="result")result=ev;
+        else if(ev.type==="error")error=ev.message;
+      }
+    }
+    if(error)throw new Error(error);
+    if(!result)throw new Error("Claude Code ended without an answer.");
+    setTrace(normalizeTrace(result.trace,q));
+    setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):""));
+    $("result").scrollIntoView({block:"nearest"});
+  }catch(e){
+    if(e&&e.name==="AbortError")setStatus("Stopped.");
+    else setStatus(e&&e.message&&e.message!=="no known services"?e.message:"The answer didn't name any services on this map. Try rephrasing.",true);
+  }finally{
+    clearInterval(timer);$("stop").hidden=true;$("run").disabled=!REPO.claude;ctl=null;
+  }
+}
+$("run").onclick=runTrace;
+$("stop").onclick=()=>ctl&&ctl.abort();
+$("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
+loadRepo();loadSaved();
+
+/* ---------- sidebar collapse + resize ---------- */
+(()=>{
+  const app=document.querySelector(".app"), rz=$("resizer"), tg=$("side-toggle");
+  const LSW=NS+"side", DEF=360, MIN=280;
+  const max=()=>Math.max(MIN,Math.min(760,Math.round(window.innerWidth*.6)));
+  let st={w:DEF,c:false};try{st={...st,...JSON.parse(localStorage.getItem(LSW)||"{}")};}catch(_){}
+  const save=()=>{try{localStorage.setItem(LSW,JSON.stringify(st));}catch(_){}};
+  const setW=w=>{st.w=Math.max(MIN,Math.min(max(),Math.round(w)));app.style.setProperty("--side-w",st.w+"px");rz.setAttribute("aria-valuenow",st.w);};
+  const setC=c=>{st.c=c;app.classList.toggle("collapsed",c);tg.setAttribute("aria-expanded",String(!c));tg.title=c?"Expand panel":"Collapse panel";redraw();};
+  rz.setAttribute("aria-valuemin",MIN);rz.setAttribute("aria-valuemax",760);
+  setW(st.w);setC(!!st.c);
+  tg.onclick=()=>{setC(!st.c);save();};
+  $("side-lbl").onclick=()=>{if(st.c){setC(false);save();}};
+  let dragging=false;
+  rz.addEventListener("pointerdown",e=>{dragging=true;rz.setPointerCapture(e.pointerId);document.body.classList.add("dragging");e.preventDefault();});
+  rz.addEventListener("pointermove",e=>{if(!dragging)return;setW(app.getBoundingClientRect().right-e.clientX);});
+  const end=()=>{if(!dragging)return;dragging=false;document.body.classList.remove("dragging");save();redraw();};
+  rz.addEventListener("pointerup",end);rz.addEventListener("pointercancel",end);
+  rz.addEventListener("dblclick",()=>{setW(DEF);save();redraw();});
+  rz.addEventListener("keydown",e=>{
+    const d=e.key==="ArrowLeft"?20:e.key==="ArrowRight"?-20:0;
+    if(d){e.preventDefault();setW(st.w+d);save();redraw();}
+    else if(e.key==="Home"||e.key==="Enter"){e.preventDefault();setW(DEF);save();redraw();}
+  });
+  window.addEventListener("resize",()=>{if(st.w>max())setW(st.w);});
+})();
+
+if(!NODES.length)document.getElementById("footnote").innerHTML="This map is empty. Run <code>repo-map generate</code> to draft <code>.repo-map/map.json</code> with Claude Code, then reload.";
+new ResizeObserver(redraw).observe(colsEl);
+window.addEventListener("resize",redraw);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
+draw();
+}
+loadMapData().then(main).catch(err=>{
+  document.getElementById("cols").innerHTML='<p class="foot">Couldn\'t load the map from the local server ('+String(err.message||err)+'). Start it with <code>repo-map serve</code> and reload.</p>';
+});
+</script>
+
+</body>
+</html>

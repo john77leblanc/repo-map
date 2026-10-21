@@ -1,0 +1,29 @@
+{
+  "groups": [
+    { "id": "g-people", "col": 0, "title": "People", "open": true },
+    { "id": "g-pages", "col": 1, "title": "Pages", "open": true },
+    { "id": "g-state", "col": 2, "title": "Stores", "open": true },
+    { "id": "g-api", "col": 3, "title": "API clients", "open": true },
+    { "id": "g-backends", "col": 4, "title": "Backends", "open": true }
+  ],
+  "nodes": [
+    { "id": "shopper", "group": "g-people", "kind": "external", "title": "Shopper", "desc": "Someone browsing the store and buying things." },
+    { "id": "cart-page", "group": "g-pages", "kind": "service", "path": "src/pages/cart", "desc": "Shows the items in the cart and links to checkout.", "facts": ["/cart"] },
+    { "id": "checkout-page", "group": "g-pages", "kind": "service", "path": "src/pages/checkout", "desc": "Collects the shopper's email and places the order.", "facts": ["/checkout"] },
+    { "id": "cart-store", "group": "g-state", "kind": "topic", "path": "src/stores", "title": "cart store", "desc": "In-memory cart shared by the cart and checkout pages." },
+    { "id": "orders-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "orders client", "desc": "Charges the card, then creates the order.", "facts": ["placeOrder()", "ORDERS_API_URL"] },
+    { "id": "payments-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "payments client", "desc": "Charges the shopper's card.", "facts": ["chargeCard()", "PAYMENTS_API_URL"] },
+    { "id": "orders-api", "group": "g-backends", "kind": "external", "title": "Orders API", "desc": "Stores orders." },
+    { "id": "payments-api", "group": "g-backends", "kind": "external", "title": "Payments API", "desc": "Payment processor." }
+  ],
+  "edges": [
+    { "from": "shopper", "to": "cart-page", "type": "http", "label": "visits" },
+    { "from": "cart-page", "to": "checkout-page", "type": "sync", "label": "Check out" },
+    { "from": "cart-page", "to": "cart-store", "type": "event", "label": "reads items" },
+    { "from": "checkout-page", "to": "cart-store", "type": "event", "label": "reads & clears" },
+    { "from": "checkout-page", "to": "orders-client", "type": "event", "label": "placeOrder" },
+    { "from": "orders-client", "to": "payments-client", "type": "event", "label": "chargeCard" },
+    { "from": "payments-client", "to": "payments-api", "type": "http", "label": "POST /charges" },
+    { "from": "orders-client", "to": "orders-api", "type": "http", "label": "POST /orders" }
+  ]
+}

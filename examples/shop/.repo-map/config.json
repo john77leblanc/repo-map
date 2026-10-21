@@ -1,0 +1,20 @@
+{
+    "name": "Shop Map",
+    "description": "Demo storefront for repo-map.",
+    "github": false,
+    "codeRoots": ["src/"],
+    "columns": [
+        { "title": "Outside world", "subtitle": "Who starts the flow" },
+        { "title": "Pages", "subtitle": "Routes the browser loads" },
+        { "title": "Shared state", "subtitle": "Stores used across pages" },
+        { "title": "API clients", "subtitle": "Code that talks to backends" },
+        { "title": "Backends", "subtitle": "Systems the data ends up in" }
+    ],
+    "kinds": { "service": "module", "topic": "store", "external": "outside the repo" },
+    "edgeTypes": { "http": "API call", "event": "uses", "sync": "navigation" },
+    "prompt": {
+        "context": "A small React storefront. Pages live in src/pages, shared state in src/stores, and API clients in src/api.",
+        "hints": ""
+    },
+    "footnote": "A fictional example that ships with repo-map."
+}

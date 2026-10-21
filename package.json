@@ -1,0 +1,47 @@
+{
+  "name": "@john77leblanc/repo-map",
+  "version": "0.1.0",
+  "description": "An interactive architecture map for any repo, with plain-language process tracing through the Claude Code CLI",
+  "keywords": [
+    "architecture",
+    "diagram",
+    "codebase-map",
+    "onboarding",
+    "claude-code",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "author": "Johnathan LeBlanc",
+  "homepage": "https://github.com/john77leblanc/repo-map#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/john77leblanc/repo-map.git"
+  },
+  "bugs": {
+    "url": "https://github.com/john77leblanc/repo-map/issues"
+  },
+  "type": "module",
+  "bin": {
+    "repo-map": "./bin/repo-map.mjs"
+  },
+  "files": [
+    "app",
+    "bin",
+    "lib",
+    "templates",
+    "examples",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "example": "node bin/repo-map.mjs serve --dir examples/shop"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
