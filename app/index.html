@@ -12,7 +12,7 @@
   --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#5d6977; --line:#d5dbe2; --soft:#e6eaef;
   --http:#2b63c9; --event:#c26a00; --sync:#0f8a6c; --wire:#b9c2cc;
   --ext:#7a4fc0; --topic:#c26a00; --svc:#2b63c9;
-  --focus:#18212b;
+  --focus:#18212b; --err:#c0392b;
   --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-head:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -20,11 +20,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12171d; --panel:#1b222b; --ink:#e4e9ef; --muted:#9aa6b4; --line:#2e3844; --soft:#232c37;
   --http:#6f9df2; --event:#f0a347; --sync:#3cc49f; --wire:#3b4654;
-  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; color-scheme:dark}}
+  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; --err:#ef7a68; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12171d; --panel:#1b222b; --ink:#e4e9ef; --muted:#9aa6b4; --line:#2e3844; --soft:#232c37;
   --http:#6f9df2; --event:#f0a347; --sync:#3cc49f; --wire:#3b4654;
-  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; color-scheme:dark}
+  --ext:#b08cf0; --topic:#f0a347; --svc:#6f9df2; --focus:#e4e9ef; --err:#ef7a68; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 [hidden]{display:none!important}
@@ -220,6 +220,39 @@ details.imp textarea{min-height:60px;font-family:var(--f-mono);font-size:11.5px;
 .focusing .node.trn>.nh .nm{opacity:1}
 details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+/* flowchart option + button in the trace panel */
+.opt{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;margin-right:auto}
+.opt input{margin:0;accent-color:var(--http)}
+.flowrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
+.flowbtn{display:inline-flex;align-items:center;gap:6px}
+.flowbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
+/* flowchart modal */
+dialog.fdlg{padding:0;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);width:min(1280px,calc(100vw - 32px));height:min(880px,calc(100vh - 32px));max-width:none;max-height:none;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
+.fdlg[open]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+.fhead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+.fhead h2{font-family:var(--f-head);font-size:19px;font-weight:600;margin:0}
+.fhead p{margin:2px 0 0;font-size:12.5px;color:var(--muted);max-width:70ch}
+.fhead .acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fmain{display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:0}
+.fcanvas{position:relative;overflow:auto;background:var(--bg);min-height:0}
+.fcanvas .fc{display:block;margin:0 auto}
+.fzoom{position:sticky;left:0;top:0;z-index:2;height:0;display:flex;align-items:flex-start;gap:4px;padding:12px 0 0 12px}
+#fl-svgbox{padding:48px 12px 8px}
+.fzoom .btn{padding:3px 8px;font-size:12px}
+.flegend{position:sticky;left:0;bottom:0;display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 12px;font-size:11.5px;color:var(--muted);background:linear-gradient(transparent,var(--bg) 40%)}
+.flegend svg{width:22px;height:14px;vertical-align:-3px;margin-right:4px;overflow:visible}
+.fside{border-left:1px solid var(--line);overflow:auto;padding:14px 14px 18px;min-height:0}
+.fside .empty{font-size:12.5px;color:var(--muted);margin:0}
+.fside .ft{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.fside h3{font-size:15px;margin:0 0 6px}
+.fside .fd{font-size:13px;margin:0 0 12px}
+.fside .fstep{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+.fside .fstep b{font-size:13px}
+.fside .fstep p{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.fside .refs{margin-left:0}
+.fside .fwarn{font-size:12px;color:var(--event);margin:0 0 10px}
+@media (max-width:760px){.fmain{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}.fside{border-left:0;border-top:1px solid var(--line);max-height:40vh}}
 </style>
 </head>
 <body>
@@ -271,6 +304,7 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
     <div class="noai" id="noai" hidden><b>Tracing is off on this machine.</b> <span id="noai-why"></span> Run <code>repo-map doctor</code> to see your options, or set one up with the package’s SETUP.md. You can still open a trace a teammate shared: paste its code under <a href="#importbox" id="noai-import">Import a trace code</a>.</div>
     <textarea id="prompt" placeholder="e.g. What happens when someone places an order?"></textarea>
     <div class="row">
+      <label class="opt" title="The AI tool also draws the process as a flowchart: decisions, failure paths and outcomes. Takes a little longer."><input type="checkbox" id="withflow" checked> Include a flowchart</label>
       <button class="btn primary" id="run" type="button" disabled>Trace</button>
       <button class="btn" id="stop" type="button" hidden>Stop</button>
       <span class="status" id="status" aria-live="polite">Connecting…</span>
@@ -291,6 +325,35 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 </div>
 </aside>
 </div>
+
+<dialog class="fdlg" id="flowdlg" aria-labelledby="fl-title">
+  <div class="fhead">
+    <div><h2 id="fl-title">Flowchart</h2><p id="fl-sub"></p></div>
+    <div class="acts">
+      <span class="status" id="fl-status" aria-live="polite"></span>
+      <button class="btn sm" id="fl-mermaid" type="button" title="Mermaid source, for GitHub, GitLab, Notion and other Markdown tools">Copy Mermaid</button>
+      <button class="btn sm" id="fl-svg" type="button">Download SVG</button>
+      <button class="btn sm" id="fl-redraw" type="button" title="Ask the AI tool to draw this flowchart again">Redraw</button>
+      <button class="btn sm" id="fl-close" type="button">Close</button>
+    </div>
+  </div>
+  <div class="fmain">
+    <div class="fcanvas" id="fl-canvas">
+      <div class="fzoom"><button class="btn" id="fl-out" type="button" aria-label="Zoom out">−</button><button class="btn" id="fl-fit" type="button">Fit</button><button class="btn" id="fl-in" type="button" aria-label="Zoom in">+</button></div>
+      <div id="fl-svgbox"></div>
+      <div class="flegend" aria-hidden="true">
+        <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="5"/></svg>start / end</span>
+        <span><svg viewBox="0 0 22 14"><polygon class="lg act" points="5,2 21,2 17,12 1,12"/></svg>person does</span>
+        <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="2"/></svg>system does</span>
+        <span><svg viewBox="0 0 22 14"><polygon class="lg dec" points="11,0 22,7 11,14 0,7"/></svg>decision</span>
+        <span><svg viewBox="0 0 22 14"><rect class="lg err" x="1" y="2" width="20" height="10" rx="2"/></svg>failure</span>
+        <span><svg viewBox="0 0 22 14"><rect class="lg inf" x="1" y="2" width="20" height="10" rx="2"/></svg>inferred</span>
+        <span><svg viewBox="0 0 22 14"><circle class="lg num" cx="11" cy="7" r="6"/></svg>trace step</span>
+      </div>
+    </div>
+    <aside class="fside" id="fl-side" aria-live="polite"></aside>
+  </div>
+</dialog>
 
 <script>
 /* Map data and repo config come from the local server (.repo-map/ in the repo). */
@@ -542,9 +605,10 @@ function normalizeTrace(raw,prompt){
   for(let i=1;i<steps.length;i++){const a=steps[i-1].id,b=steps[i].id;
     if(edgePairs.has(a+"|"+b))pairs.add(a+"|"+b);else if(edgePairs.has(b+"|"+a))pairs.add(b+"|"+a);}
   return {title:String(raw.title||"Untitled trace").slice(0,80),prompt:String(prompt||raw.prompt||"").slice(0,2000),
-    summary:String(raw.summary||""),gaps:String(raw.gaps||""),steps,edges:[...pairs].map(k=>k.split("|")),pairs,refs:cleanRefs(refs,steps)||[]};
+    summary:String(raw.summary||""),gaps:String(raw.gaps||""),steps,edges:[...pairs].map(k=>k.split("|")),pairs,refs:cleanRefs(refs,steps)||[],
+    flow:FLOW.normalizeFlow(raw.flow,steps.length)};
 }
-function plain(t){return {title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};}
+function plain(t){const o={title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};if(t.flow)o.flow=t.flow;return o;}
 
 let preTraceGroups=null;   // group open-state before a trace took over, restored on close
 function setTrace(t){
@@ -621,6 +685,7 @@ function traceBody(t){
   const body=document.createElement("div");body.className="tb";
   const p=document.createElement("p");p.className="rp";p.textContent=t.prompt?"“"+t.prompt+"”":"";if(t.prompt)body.appendChild(p);
   const sum=document.createElement("p");sum.className="rs";sum.textContent=t.summary;if(t.summary)body.appendChild(sum);
+  body.appendChild(flowRow(t));
   const ol=document.createElement("ol");ol.className="steps";
   t.steps.forEach((st,i)=>{
     const li=document.createElement("li");
@@ -659,7 +724,7 @@ function renderSaved(){
     li.innerHTML='<button class="th" type="button" aria-expanded="'+open+'"><svg class="car" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3"/></svg><span><b></b><small></small></span></button>';
     li.querySelector("b").textContent=it.title;
     if(it._temp)li.querySelector("b").insertAdjacentHTML("beforeend",'<span class="tbadge">not saved</span>');
-    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",open?"":it.prompt].filter(Boolean).join(" · ");
+    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",it.flow?"flowchart":"",open?"":it.prompt].filter(Boolean).join(" · ");
     li.querySelector(".th").onclick=()=>{
       if(open){setTrace(null);return;}
       if(it._temp){setTrace(store.temp);return;}
@@ -698,6 +763,182 @@ async function removeTrace(key){
   }catch(_){setStatus("Couldn't delete that trace.",true);}
 }
 
+/* ---------- flowcharts: drawn by the AI tool with a trace, shown in a modal ---------- */
+const FC_CSS=`.fc{font-family:var(--f-ui);font-size:12.5px}
+.fc .fs{fill:var(--panel);stroke:var(--muted);stroke-width:1.3}
+.fc .t-start .fs,.fc .t-end .fs{fill:var(--soft);stroke:var(--ink)}
+.fc .t-action .fs{stroke:var(--sync)}
+.fc .t-decision .fs{stroke:var(--event)}
+.fc .t-error .fs{stroke:var(--err);stroke-width:1.6}
+.fc .inf .fs{stroke-dasharray:4 3}
+.fc .fn>text{fill:var(--ink)}
+.fc .fe{fill:none;stroke:var(--muted);stroke-width:1.4}
+.fc .fe.inf{stroke-dasharray:4 3}
+.fc .fa{fill:var(--muted)}
+.fc .fa.on{fill:var(--http)}
+.fc .fl rect{fill:var(--bg)}
+.fc .fl text{fill:var(--muted);font-size:11px}
+.fc .fb circle{fill:var(--http)}
+.fc .fb text{fill:var(--panel);font-size:10px;font-weight:600}`;
+const FC_UI_CSS=`.fc .fn{cursor:pointer;outline:none}
+.fc .fn:hover .fs{stroke-width:2.2}
+.fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
+.fc .fe.on{stroke:var(--http);stroke-width:2.2}
+.fc.picking .fe:not(.on){opacity:.35}
+.flegend .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}
+.flegend .lg.act{stroke:var(--sync)} .flegend .lg.dec{stroke:var(--event)} .flegend .lg.err{stroke:var(--err)} .flegend .lg.inf{stroke-dasharray:3 2}
+.flegend .lg.num{fill:var(--http);stroke:none}`;
+document.head.insertAdjacentHTML("beforeend","<style>"+FC_CSS+"\n"+FC_UI_CSS+"</style>");
+const ICON_FLOW='<svg viewBox="0 0 16 16"><rect x="5" y="1.5" width="6" height="3.5" rx="1"/><path d="M8 5v2.2M8 7.2L11.5 10M8 7.2L4.5 10"/><rect x="1.5" y="10" width="6" height="3.5" rx="1"/><rect x="8.5" y="10" width="6" height="3.5" rx="1"/></svg>';
+
+function flowRow(t){
+  const row=document.createElement("div");row.className="flowrow";
+  if(t.flow){
+    const b=document.createElement("button");b.type="button";b.className="btn sm flowbtn";
+    b.innerHTML=ICON_FLOW+"<span>View flowchart</span>";b.title=t.flow.nodes.length+" boxes";
+    b.onclick=()=>openFlow(t);row.appendChild(b);
+  }else if(AI_BOOT.available){
+    const b=document.createElement("button");b.type="button";b.className="btn sm flowbtn";
+    b.innerHTML=ICON_FLOW+"<span>Draw flowchart</span>";
+    const st=document.createElement("span");st.className="status";
+    b.onclick=()=>drawFlow(t,b,st);row.append(b,st);
+  }
+  return row;
+}
+
+/** Ask the AI tool for a flowchart of an existing trace, save it with the trace, then show it. */
+let flowCtl=null;
+async function drawFlow(t,btn,stat){
+  if(flowCtl)return;
+  flowCtl=new AbortController();
+  btn.disabled=true;
+  const t0=Date.now();let last="Starting…";
+  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};tick();const tm=setInterval(tick,1000);
+  try{
+    const res=await api("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t)}),signal:flowCtl.signal});
+    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
+    const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
+    for(;;){
+      const {value,done}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
+        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
+        if(ev.type==="progress"){last=ev.text;tick();}else if(ev.type==="result")result=ev;else if(ev.type==="error")error=ev.message;
+      }
+    }
+    if(error)throw new Error(error);
+    const flow=result&&FLOW.normalizeFlow(result.flow,t.steps.length);
+    if(!flow)throw new Error("The AI tool ended without a usable flowchart.");
+    t.flow=flow;
+    clearInterval(tm);stat.textContent="";
+    if(t._doc){
+      const r=await api("/api/traces/"+encodeURIComponent(t._doc),{method:"PUT",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
+      if(!r.ok)setStatus("Drew the flowchart but couldn't save it to disk.",true);
+      const it=store.items.find(x=>x.key===t._doc);if(it)it.flow=flow;
+    }
+    renderSaved();openFlow(t);
+  }catch(e){
+    clearInterval(tm);
+    stat.textContent=e&&e.name==="AbortError"?"Stopped.":(e.message||"Couldn't draw the flowchart.");stat.className="status err";
+  }finally{flowCtl=null;btn.disabled=false;}
+}
+
+const fl={t:null,layout:null,scale:1,sel:null};
+const dlg=$("flowdlg");
+function openFlow(t){
+  fl.t=t;fl.sel=null;
+  $("fl-title").textContent=t.title;
+  $("fl-sub").textContent=t.prompt?"“"+t.prompt+"”":t.summary;
+  $("fl-status").textContent="";$("fl-status").className="status";
+  $("fl-redraw").hidden=!AI_BOOT.available;
+  fl.layout=FC.layoutFlow(t.flow);
+  $("fl-svgbox").innerHTML=FC.renderFlowSvg(fl.layout,{title:t.title});
+  // second arrowhead for highlighted connections
+  const defs=$("fl-svgbox").querySelector("defs");
+  defs.insertAdjacentHTML("beforeend",'<marker id="fc-arrow-on" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa on" d="M0 0.5L7.5 4L0 7.5z"/></marker>');
+  sideFlow(null);
+  if(!dlg.open)dlg.showModal();
+  requestAnimationFrame(()=>fitFlow());
+}
+function setScale(s){
+  fl.scale=Math.max(.3,Math.min(2.5,s));
+  const svgEl=$("fl-svgbox").querySelector("svg");if(!svgEl)return;
+  svgEl.setAttribute("width",Math.round(fl.layout.width*fl.scale));svgEl.setAttribute("height",Math.round(fl.layout.height*fl.scale));
+}
+function fitFlow(){
+  const c=$("fl-canvas");
+  // fit the whole chart, but not so small that labels stop being readable (scroll instead)
+  setScale(Math.max(.65,Math.min(1,(c.clientWidth-24)/fl.layout.width,(c.clientHeight-92)/fl.layout.height)));
+}
+function pickFlow(id){
+  fl.sel=id;
+  const box=$("fl-svgbox"), svgEl=box.querySelector("svg");
+  svgEl.classList.toggle("picking",!!id);
+  box.querySelectorAll(".fn").forEach(g=>g.classList.toggle("sel",g.dataset.id===id));
+  box.querySelectorAll(".fe").forEach(p=>{
+    const e=fl.layout.edges[+p.dataset.i], on=!!id&&(e.from===id||e.to===id);
+    p.classList.toggle("on",on);p.setAttribute("marker-end","url(#"+(on?"fc-arrow-on":"fc-arrow")+")");
+  });
+  sideFlow(id?fl.t.flow.nodes.find(n=>n.id===id):null);
+}
+const FLOW_KIND={start:"Start",end:"Outcome",action:"Person does",process:"System does",decision:"Decision",error:"Failure"};
+function sideFlow(n){
+  const side=$("fl-side");side.innerHTML="";
+  const t=fl.t;
+  if(!n){
+    side.innerHTML='<p class="ft">How to read it</p><p class="empty">Click a box to see what happens there and the code behind it. Numbered badges match the steps of this trace on the map. Dashed boxes and arrows are inferred from naming, docs or the map rather than code the AI tool read.</p>';
+    const inferred=t.flow.nodes.filter(x=>x.inferred).length+t.flow.edges.filter(x=>x.inferred).length;
+    if(inferred)side.insertAdjacentHTML("beforeend",'<p class="fwarn" style="margin-top:10px">'+inferred+' part'+(inferred===1?' is':'s are')+' inferred. Check them before relying on this chart.</p>');
+    if(t.gaps)side.insertAdjacentHTML("beforeend",'<p class="empty" style="margin-top:10px">Not shown clearly: '+esc(t.gaps)+'</p>');
+    return;
+  }
+  side.insertAdjacentHTML("beforeend",'<p class="ft">'+esc(FLOW_KIND[n.type]||"Step")+(n.inferred?" · inferred":"")+'</p><h3></h3><p class="fd"></p>');
+  side.querySelector("h3").textContent=n.label;
+  const fd=side.querySelector(".fd");if(n.detail)fd.textContent=n.detail;else fd.remove();
+  const outs=t.flow.edges.filter(e=>e.from===n.id);
+  if(n.type==="decision"&&outs.length){
+    const ul=document.createElement("p");ul.className="fd";
+    ul.innerHTML=outs.map(e=>'<b>'+esc(e.label||"then")+'</b> → '+esc((t.flow.nodes.find(x=>x.id===e.to)||{}).label||"")).join("<br>");
+    side.appendChild(ul);
+  }
+  const st=n.step&&t.steps[n.step-1];
+  if(st){
+    const box=document.createElement("div");box.className="fstep";
+    box.innerHTML='<b></b><p></p><div class="refs"></div><div class="row"><button class="btn sm" type="button">Show on map</button></div>';
+    box.querySelector("b").textContent="Step "+n.step+" · "+byId[st.id].title;
+    box.querySelector("p").textContent=st.note;
+    const refs=box.querySelector(".refs");(t.refs||[]).filter(r=>r.step===st.id).forEach(r=>refs.appendChild(refEl(r)));
+    box.querySelector("button").onclick=()=>{dlg.close();reveal(st.id);};
+    side.appendChild(box);
+  }
+}
+$("fl-svgbox").addEventListener("click",ev=>{const g=ev.target.closest(".fn");pickFlow(g&&g.dataset.id!==fl.sel?g.dataset.id:null);});
+$("fl-svgbox").addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){const g=ev.target.closest(".fn");if(g){ev.preventDefault();pickFlow(g.dataset.id);}}});
+$("fl-close").onclick=()=>dlg.close();
+dlg.addEventListener("click",ev=>{if(ev.target===dlg)dlg.close();});
+$("fl-in").onclick=()=>setScale(fl.scale*1.2);
+$("fl-out").onclick=()=>setScale(fl.scale/1.2);
+$("fl-fit").onclick=fitFlow;
+$("fl-canvas").addEventListener("wheel",ev=>{if(!(ev.ctrlKey||ev.metaKey))return;ev.preventDefault();setScale(fl.scale*(ev.deltaY<0?1.1:1/1.1));},{passive:false});
+$("fl-mermaid").onclick=async e=>{
+  const b=e.currentTarget, src=FLOW.flowToMermaid(fl.t.flow,fl.t.title);
+  try{await navigator.clipboard.writeText(src);b.textContent="Copied";setTimeout(()=>b.textContent="Copy Mermaid",1500);}
+  catch(_){$("fl-status").textContent="Couldn't copy to the clipboard.";$("fl-status").className="status err";}
+};
+$("fl-svg").onclick=()=>{
+  // a standalone file: resolve the theme's colours and fonts into the SVG
+  const cs=getComputedStyle(document.documentElement);
+  const css=FC_CSS.replace(/var\((--[\w-]+)\)/g,(_,v)=>cs.getPropertyValue(v).trim());
+  const bg=cs.getPropertyValue("--bg").trim();
+  const src=FC.renderFlowSvg(fl.layout,{title:fl.t.title}).replace(/^<svg([^>]*)>/,(m,a)=>'<svg'+a+'><style>'+css+'</style><rect width="100%" height="100%" fill="'+bg+'"/>');
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([src],{type:"image/svg+xml"}));
+  a.download=(fl.t.title||"flowchart").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+".svg";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+$("fl-redraw").onclick=()=>{const t=fl.t;drawFlow(t,$("fl-redraw"),$("fl-status"));};
+
 /* repo info + GitHub links */
 const REPO={exact:true};
 function loadRepo(){
@@ -706,7 +947,7 @@ function loadRepo(){
   $("repoinfo").textContent="reading "+(j.branch||"detached HEAD")+" @ "+String(j.sha||"").slice(0,9)+(j.dirty?" (uncommitted changes)":"");
   REPO.ai=AI_BOOT.available;
   if(!AI_BOOT.available){
-    $("run").disabled=true;$("prompt").disabled=true;setStatus("");
+    $("run").disabled=true;$("prompt").disabled=true;$("withflow").closest(".opt").hidden=true;setStatus("");
     $("noai").hidden=false;$("noai-why").textContent=AI_BOOT.reason||"";
     $("noai-import").onclick=e=>{e.preventDefault();const d=document.querySelector("details.imp");d.open=true;$("importbox").focus();};
   }else{
@@ -726,7 +967,7 @@ async function runTrace(){
   const t0=Date.now();let last="Starting "+(AI_BOOT.label||"AI tool")+"…";
   const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s");tick();timer=setInterval(tick,1000);
   try{
-    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q}),signal:ctl.signal});
+    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked}),signal:ctl.signal});
     if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
     const rd=res.body.getReader(), dec=new TextDecoder();let buf="",result=null,error=null;
     for(;;){
@@ -754,6 +995,8 @@ async function runTrace(){
   }
 }
 $("run").onclick=runTrace;
+(()=>{const k=NS+"flow",cb=$("withflow");try{const v=localStorage.getItem(k);if(v!==null)cb.checked=v==="1";}catch(_){}
+  cb.onchange=()=>{try{localStorage.setItem(k,cb.checked?"1":"0");}catch(_){}};})();
 $("stop").onclick=()=>ctl&&ctl.abort();
 $("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
 /* is the map out of date? compare map.json's recorded commit with HEAD */
@@ -854,7 +1097,8 @@ window.addEventListener("resize",redraw);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
 draw();
 }
-loadMapData().then(main).catch(err=>{
+var FLOW=null, FC=null;   // lib/flow.mjs and app/flowchart.mjs, served by the local server
+Promise.all([loadMapData(),import("/lib/flow.mjs").then(m=>{FLOW=m;}),import("/app/flowchart.mjs").then(m=>{FC=m;})]).then(main).catch(err=>{
   document.getElementById("cols").innerHTML='<p class="foot">Couldn\'t load the map from the local server ('+String(err.message||err)+'). Start it with <code>repo-map serve</code> and reload.</p>';
 });
 </script>

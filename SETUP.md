@@ -307,7 +307,7 @@ It tells you which AI tool traces will use and why. For the API provider, it als
 
 The map still works for them: browsing, search, hover tracing, descriptions and GitHub links. The trace box explains that tracing is off on their machine.
 
-To share a trace, anyone who has an AI tool can run it, press **Copy trace code**, and send the code (`rmap1:…`). The other person pastes it under **Import a trace code** to see the numbered path and the code panels, read from their own checkout.
+To share a trace, anyone who has an AI tool can run it, press **Copy trace code**, and send the code (`rmap1:…`). The other person pastes it under **Import a trace code** to see the numbered path and the code panels, read from their own checkout. The trace's flowchart travels with the code, so they can open it too; only drawing a new one needs an AI tool.
 
 ## 7. Troubleshooting
 

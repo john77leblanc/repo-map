@@ -4,6 +4,7 @@ An interactive architecture map for any repo, with plain-language process tracin
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
 - **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files.
+- **See the logic as a flowchart.** Each trace can come with a flowchart of the process: what the person does, what the system does, the decisions it makes and every outcome, including failure paths. Boxes link back to the trace steps and their code. Copy it as Mermaid or download it as SVG for docs and PRs.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
 - **Stay current.** The map knows which commit it describes, flags when the code has moved on, and updates itself from just the diff.
 
@@ -113,6 +114,12 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 - `col` indexes `config.columns`. Groups with `"open": false` start collapsed, and edges into them attach to the group header.
 - `path` is the node's folder in the repo. Nodes without one (outside systems) get no code references.
 - `inferred: true` draws the edge dashed and tells the AI tool the link came from docs or naming rather than code.
+
+### Flowcharts
+
+With **Include a flowchart** ticked (the default), the AI tool also returns a flowchart with each trace. Traces saved without one have a **Draw flowchart** button, which asks the AI tool to draw it from the trace's steps and code. The chart opens in a window over the map: click a box for its detail, the trace step behind it and that step's code, or **Show on map** to jump there.
+
+Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (no extra dependencies), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
 
 ## Safety
 

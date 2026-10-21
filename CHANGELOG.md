@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- **Flowcharts for traces.** With **Include a flowchart** ticked (the default, remembered per browser), the AI tool also draws the process's logic: what the person does, what the system does, the decisions and their outcomes, failure paths and retry loops. Boxes are linked to trace steps, and anything inferred rather than read in code is dashed.
+- The flowchart opens in a window from the trace: zoom and fit, click a box for its detail, its trace step and that step's code, or **Show on map**. **Copy Mermaid** and **Download SVG** export it; **Redraw** asks for a new one.
+- Traces saved before this, or without a flowchart, get a **Draw flowchart** button that draws one from the trace's steps and code and saves it with the trace.
+- Flowcharts are saved in the trace file and included in trace codes. Layout is built in; no new dependencies.
+
 ## 0.3.1
 
 - **Sharper focus.** Inside groups that stay visible, cards that aren't involved fade too.
