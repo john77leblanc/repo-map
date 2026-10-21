@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- **Sharper focus.** Inside groups that stay visible, cards that aren't involved fade too.
+- Highlighted connections are drawn above the cards, so a faded group no longer dims the lines that cross it.
+- Added space between the right-most column and the traces sidebar.
+
 ## 0.3.0
 
 - **Know when the map is out of date.** `generate` and `update` record the commit the map describes (`commit` in `map.json`). On load, the map compares it with your checkout and shows a banner when files under the code folders have changed since, listing them. Changes elsewhere (docs, CI config) are ignored.

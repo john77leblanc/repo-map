@@ -50,19 +50,22 @@ h1{font-family:var(--f-head);font-weight:600;font-size:26px;letter-spacing:.01em
 .sw.inf{background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
 .kd{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:2px}
 .legend .note{margin-left:6px}
-.scroller{overflow-x:auto;overflow-y:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:4px 40px}
-.board{position:relative;min-width:1460px}
-#wires{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
-#wires path.w{fill:none;stroke-width:1.3;opacity:.38;transition:opacity .15s,stroke-width .15s}
-#wires path.w.http{stroke:var(--http)} #wires path.w.event{stroke:var(--event)} #wires path.w.sync{stroke:var(--sync)}
-#wires path.w.inf{stroke-dasharray:4 3}
-#wires marker path{stroke:none}
-.focusing #wires path.w{opacity:.07}
-.focusing #wires path.w.on{opacity:1;stroke-width:2.2}
+.scroller{overflow-x:auto;overflow-y:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:env(safe-area-inset-right,0px);padding-block:4px 40px}
+.board{position:relative;display:inline-block;vertical-align:top;box-sizing:border-box;min-width:max(1460px,100%);padding-right:40px} /* gap before the sidebar; padding here survives horizontal scroll */
+.wires{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
+#wires-top{z-index:2}
+.wires path.w{fill:none;stroke-width:1.3;opacity:.38;transition:opacity .15s,stroke-width .15s}
+.wires path.w.http{stroke:var(--http)} .wires path.w.event{stroke:var(--event)} .wires path.w.sync{stroke:var(--sync)}
+.wires path.w.inf{stroke-dasharray:4 3}
+.wires marker path{stroke:none}
+.focusing .wires path.w{opacity:.07}
+.focusing .wires path.w.on{opacity:1;stroke-width:2.2}
 /* fade groups that aren't part of the focus so the lines behind them show through */
 details.grp{transition:opacity .15s}
 .focusing details.grp.dimg{opacity:.28}
 .focusing details.grp.dimg:hover{opacity:.6}
+.node{transition:opacity .15s}
+.focusing .node.dimn{opacity:.3}
 .cols{position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,minmax(240px,1fr));column-gap:84px;align-items:start}
 .colh{font-family:var(--f-head);font-weight:600;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:0 2px 8px;border-bottom:1px solid var(--line);margin-bottom:12px}
 .colh small{display:block;font-family:var(--f-ui);text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;margin-top:2px}
@@ -248,8 +251,9 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 <div class="stale" id="stale" hidden role="status"></div>
 <div class="scroller" id="scroller">
   <div class="board" id="board">
-    <svg id="wires" aria-hidden="true"><defs></defs></svg>
+    <svg id="wires" class="wires" aria-hidden="true"><defs></defs></svg>
     <div class="cols" id="cols"></div>
+    <svg id="wires-top" class="wires" aria-hidden="true"></svg>
   </div>
 </div>
 <p class="foot" id="footnote">Edges into a collapsed group attach to the group header.</p>
@@ -381,7 +385,7 @@ function setOpen(id,open){
 }
 
 /* ---------- wires ---------- */
-const board=document.getElementById("board"), svg=document.getElementById("wires");
+const board=document.getElementById("board"), svg=document.getElementById("wires"), svgTop=document.getElementById("wires-top");
 const hidden={http:false,event:false,sync:false};
 let drawn=[];
 function anchor(id){
@@ -398,8 +402,8 @@ function ensureMarkers(){
 function draw(){
   ensureMarkers();
   const br=board.getBoundingClientRect();
-  svg.setAttribute("width",board.scrollWidth);svg.setAttribute("height",board.scrollHeight);
-  svg.querySelectorAll("path.w").forEach(p=>p.remove());
+  [svg,svgTop].forEach(v=>{v.setAttribute("width",board.scrollWidth);v.setAttribute("height",board.scrollHeight);});
+  board.querySelectorAll(".wires path.w").forEach(p=>p.remove());
   const seen=new Map();drawn=[];
   const rectCache=new Map();
   const R=el=>{if(!rectCache.has(el)){const r=el.getBoundingClientRect();rectCache.set(el,{l:r.left-br.left,r:r.right-br.left,cy:r.top-br.top+r.height/2});}return rectCache.get(el);};
@@ -430,18 +434,22 @@ function activeSet(){
   if(a.startsWith("g:")){return new Set(NODES.filter(n=>n[1]===a.slice(2)).map(n=>n[0]));}
   return new Set([a]);
 }
+/* Fade groups with nothing relevant; inside kept groups, fade the unrelated cards.
+   Highlighted wires move to a layer above the cards so faded groups don't dim them. */
 function dimGroups(relevant){
   Object.entries(groupEl).forEach(([g,d])=>{
     const keep=!relevant||NODES.some(n=>n[1]===g&&relevant.has(n[0]));
     d.classList.toggle("dimg",!keep);
   });
+  NODES.forEach(n=>{nodeEl[n[0]].classList.toggle("dimn",!!relevant&&!relevant.has(n[0])&&!groupEl[n[1]].classList.contains("dimg"));});
+  drawn.forEach(r=>{const on=!!relevant&&r.p.classList.contains("on"), host=on?svgTop:svg;if(r.p.parentNode!==host)host.appendChild(r.p);});
 }
 function applyFocus(){
   const set=activeSet();
   board.classList.toggle("focusing",!!(set||trace));
   document.querySelectorAll(".node.act,.node.nbr,details.grp.nbr").forEach(x=>x.classList.remove("act","nbr"));
   if(!set&&trace){
-    drawn.forEach(r=>{const on=r.edges.some(e=>trace.pairs.has(e.f+"|"+e.t));r.p.classList.toggle("on",on);if(on)svg.appendChild(r.p);});
+    drawn.forEach(r=>{const on=r.edges.some(e=>trace.pairs.has(e.f+"|"+e.t));r.p.classList.toggle("on",on);});
     dimGroups(new Set(trace.steps.map(s=>s.id)));
     return;
   }
@@ -450,8 +458,7 @@ function applyFocus(){
   drawn.forEach(r=>{
     const on=r.edges.some(e=>set.has(e.f)||set.has(e.t));
     r.p.classList.toggle("on",on);
-    if(on){r.edges.forEach(e=>{if(set.has(e.f)||set.has(e.t)){nb.add(e.f);nb.add(e.t);}});
-      const top=svg.lastElementChild;if(r.p!==top)svg.appendChild(r.p);}
+    if(on)r.edges.forEach(e=>{if(set.has(e.f)||set.has(e.t)){nb.add(e.f);nb.add(e.t);}});
   });
   nb.forEach(id=>{
     const el=nodeEl[id], d=el.closest("details");
