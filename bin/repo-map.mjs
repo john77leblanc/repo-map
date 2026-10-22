@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { agentsSummary, checkApi, detectProvider } from '../lib/ai/index.mjs';
 import { MAP_DIR, globalAiFile, findRepoRoot, loadConfig, loadMap, withDefaults } from '../lib/config.mjs';
 import { AI_PRESETS, aiPatch, writeAiSettings } from '../lib/settings.mjs';
+import { describeLinks, docsStatus, linkDocs, loadDocs } from '../lib/docs.mjs';
 import { generateMap } from '../lib/generate.mjs';
 import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
@@ -37,8 +38,11 @@ Commands
               command, auto or none.  \`repo-map ai show\` prints the effective settings
   doctor      List the AI tools found, with their models and effort levels, and check
               the ones traces and the map will use
-  generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists)
+  generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists),
+              then link the repo's documentation to its cards
   update      Bring map.json up to date with the code changed since it was last evaluated
+  docs        Link the repo's documentation (docs, agent guidance, code comments) to the
+              map's cards again (.repo-map/docs.json)
   validate    Check map.json for unknown ids, groups, kinds and missing paths
   serve       Start the map on http://localhost:<port> (default)
 
@@ -70,11 +74,17 @@ ai
 generate
   --force             Overwrite map.json instead of writing map.draft.json
   --if-missing        Do nothing when map.json already has nodes (safe to re-run)
+  --no-docs           Don't link documentation afterwards
 
 update
   --check             Only report whether the map is out of date (exit code 1 if it is)
   --mark              Record the current commit as evaluated, without changing the map
   --force             Update even when very many files changed
+  --no-docs           Don't relink documentation, even when documents changed
+
+docs
+  --check             Only report whether documents changed since they were linked
+                      (exit code 1 if they did, or were never linked)
 
 doctor
   --json              Print the result as JSON, with every tool found (exit code 1 when tracing is off)
@@ -115,6 +125,8 @@ function parseArgs(argv) {
             opts[BOOL_FLAGS[a]] = true;
         } else if (a === '--no-open') {
             opts.open = false;
+        } else if (a === '--no-docs') {
+            opts.docs = false;
         } else if (a === '-v' || a === '--version') {
             opts.cmd = 'version';
         } else if (a === '-h' || a === '--help') {
@@ -239,20 +251,67 @@ async function cmdGenerate(opts) {
         root,
         config,
         force: opts.force,
+        docs: opts.docs !== false,
         onProgress: (text) => process.stdout.write(`  ${text}\n`),
-        onStart: (run) => process.on('SIGINT', () => {
-            run.kill();
-            process.exit(130);
-        }),
+        onStart: stopOnSigint,
     });
     const { counts, errors, warnings } = result.check;
     console.log(`\nWrote ${path.relative(root, result.target)}: ${counts.groups} groups, ${counts.nodes} nodes, ${counts.edges} edges in ${result.seconds}s${result.spend ? ` (${result.spend})` : ''}.`);
     if (errors.length || warnings.length) {
         console.log(`${errors.length} errors, ${warnings.length} warnings. Run \`repo-map validate\` for details.`);
     }
+    reportDocs(result);
     if (result.draft) {
-        console.log('Review it against map.json, then rename it to map.json (or rerun with --force).');
+        console.log('Review it against map.json, then rename it to map.json (or rerun with --force). Then link its docs with `repo-map docs`.');
     }
+}
+
+/** Ctrl+C stops the AI run in progress. */
+function stopOnSigint(run) {
+    process.on('SIGINT', () => {
+        run.kill();
+        process.exit(130);
+    });
+}
+
+function reportDocs(result) {
+    if (result.docs) {
+        console.log(describeLinks(result.docs));
+    } else if (result.docsError) {
+        console.log(`Couldn’t link documentation: ${result.docsError} Try again with \`repo-map docs\`.`);
+    }
+}
+
+async function cmdDocs(opts) {
+    const root = resolveRoot(opts);
+    const config = await loadConfig(root);
+    const st = await docsStatus(root, config);
+    if (opts.check) {
+        if (!st.linked) {
+            console.log('Documentation isn’t linked to the map yet. Run `repo-map docs`.');
+        } else if (st.changed) {
+            console.log(`${st.changed} document${st.changed === 1 ? '' : 's'} changed since the docs were linked${st.commit ? ` at ${st.commit.slice(0, 9)}` : ''}:`);
+            st.files.slice(0, 20).forEach((f) => console.log(`  ${f}`));
+        } else {
+            console.log('Doc links are up to date.');
+        }
+        process.exitCode = st.linked && !st.changed ? 0 : 1;
+        return;
+    }
+    const provider = await detectProvider(config, 'generate');
+    checkRunFlags(provider, opts);
+    if (provider.available) {
+        console.log(`Linking documentation to the map's cards with ${provider.label} (read-only)…`);
+    }
+    const result = await linkDocs({
+        root,
+        config,
+        map: await loadMap(root),
+        onProgress: (text) => process.stdout.write(`  ${text}\n`),
+        onStart: stopOnSigint,
+    });
+    console.log(`\n${describeLinks(result)}`);
+    console.log(`Saved to ${MAP_DIR}/docs.json. Commit it with map.json.`);
 }
 
 function describeStatus(st) {
@@ -292,17 +351,16 @@ async function cmdUpdate(opts) {
         root,
         config,
         force: opts.force,
+        docs: opts.docs !== false,
         onProgress: (text) => process.stdout.write(`  ${text}\n`),
-        onStart: (run) => process.on('SIGINT', () => {
-            run.kill();
-            process.exit(130);
-        }),
+        onStart: stopOnSigint,
     });
     const c = result.counts;
     console.log(`\nUpdated ${MAP_DIR}/map.json in ${result.seconds}s${result.spend ? ` (${result.spend})` : ''}: ${c.added} added, ${c.updated} changed, ${c.removed} removed.`);
     if (result.summary) {
         console.log(result.summary);
     }
+    reportDocs(result);
     console.log(`Previous version saved as ${MAP_DIR}/map.prev.json. Review the change with \`git diff ${MAP_DIR}/map.json\`.`);
 }
 
@@ -377,7 +435,7 @@ To enable tracing, set up any one of these (details in SETUP.md):
 async function cmdValidate(opts) {
     const root = resolveRoot(opts);
     const config = await loadConfig(root);
-    const { errors, warnings, counts } = validateMap(root, config, await loadMap(root));
+    const { errors, warnings, counts } = validateMap(root, config, await loadMap(root), await loadDocs(root));
     warnings.forEach((w) => console.log(`warn   ${w}`));
     errors.forEach((e) => console.log(`error  ${e}`));
     console.log(`${counts.groups} groups, ${counts.nodes} nodes, ${counts.edges} edges · ${errors.length} errors, ${warnings.length} warnings`);
@@ -409,7 +467,7 @@ async function main() {
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;
     }
-    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, generate: cmdGenerate, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
+    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, generate: cmdGenerate, docs: cmdDocs, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

@@ -24,7 +24,9 @@ bin/repo-map.mjs     CLI: init, generate, validate, doctor, serve
 lib/config.mjs       loads .repo-map/config.json, map.json and the layered AI settings
 lib/server.mjs       local HTTP server: config, map, file reads, traces, saved traces
 lib/repo.mjs         git info and safe, read-only file access (codeRoots / blocked)
-lib/prompts.mjs      prompts for traces and generate
+lib/prompts.mjs      prompts for traces, flowcharts, generate, update and the docs pass
+lib/docs.mjs         docs pass: links documents, agent guidance and code comments to cards (docs.json)
+lib/guidance.mjs     reads the repo's AGENTS.md / CLAUDE.md / … for every prompt
 lib/validate.mjs     map.json checks
 lib/json.mjs         pulls the JSON object out of a model's reply
 lib/ai/agents.mjs    registry: detects each agent (claude, codex, gemini, api, ollama, lmstudio, command),

@@ -128,3 +128,68 @@ test('updateMap sends only the diff and applies the returned patch', async () =>
         server.close();
     }
 });
+
+test('updateMap relinks docs only when documents changed, and drops links to removed cards', async () => {
+    const { dir, g, head } = gitRepo();
+    writeFileSync(path.join(dir, 'docs', 'api.md'), '# API\n\nHow the client works.\n');
+    writeFileSync(path.join(dir, '.repo-map', 'docs.json'), JSON.stringify({ commit: head, links: { api: [{ path: 'docs/api.md', start: 1, end: 3, kind: 'doc' }], web: [{ path: 'docs/api.md', start: 1, end: 1, kind: 'doc' }] } }));
+    const prompts = [];
+    const server = createServer((req, res) => {
+        let body = '';
+        req.on('data', (d) => {
+            body += d;
+        });
+        req.on('end', () => {
+            res.setHeader('content-type', 'application/json');
+            if (req.method === 'GET') {
+                res.end(JSON.stringify({ data: [{ id: 'm' }] }));
+                return;
+            }
+            const prompt = JSON.parse(body).messages.find((m) => m.role === 'user').content;
+            prompts.push(prompt);
+            const reply = /connecting the documentation/.test(prompt)
+                ? { links: [{ node: 'api', path: 'docs/api.md', start: 1, end: 3, title: 'API', why: 'w' }] }
+                : { summary: 'Removed the web pages.', nodes: { remove: ['web'], update: [{ id: 'api', desc: 'Changed.' }] } };
+            res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(reply) } }] }));
+        });
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    try {
+        writeFileSync(path.join(dir, '.repo-map', 'local.json'), JSON.stringify({ provider: 'api', api: { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, model: 'm' } }));
+        const config = await loadConfig(dir);
+        const docsJson = () => JSON.parse(readFileSync(path.join(dir, '.repo-map', 'docs.json'), 'utf8'));
+
+        // commit the doc, and record that commit as the one the docs were linked at
+        g('add', '-A');
+        g('commit', '-qm', 'docs file');
+        writeFileSync(path.join(dir, '.repo-map', 'docs.json'), JSON.stringify({ ...docsJson(), commit: g('rev-parse', 'HEAD') }));
+        // then a code-only change
+        writeFileSync(path.join(dir, 'src', 'api', 'client.js'), 'export const client = 2;\n');
+        g('add', '-A');
+        g('commit', '-qm', 'code');
+        const first = await updateMap({ root: dir, config });
+        assert.equal(first.docs, undefined, 'no documents changed: no docs pass');
+        assert.equal(prompts.length, 1);
+        assert.deepEqual(Object.keys(docsJson().links), ['api'], 'links to the removed card are dropped');
+
+        writeFileSync(path.join(dir, 'docs', 'api.md'), '# API\n\nHow the client works now.\n');
+        writeFileSync(path.join(dir, 'src', 'api', 'client.js'), 'export const client = 3;\n');
+        g('add', '-A');
+        g('commit', '-qm', 'docs and code');
+        const second = await updateMap({ root: dir, config });
+        assert.equal(second.docs.counts.links, 1);
+        assert.equal(prompts.length, 3);
+        assert.match(prompts[2], /docs\/api\.md/);
+        assert.equal(docsJson().commit, g('rev-parse', 'HEAD'));
+
+        // --no-docs skips it
+        writeFileSync(path.join(dir, 'docs', 'api.md'), '# API\n\nAgain.\n');
+        writeFileSync(path.join(dir, 'src', 'api', 'client.js'), 'export const client = 4;\n');
+        g('add', '-A');
+        g('commit', '-qm', 'again');
+        assert.equal((await updateMap({ root: dir, config, docs: false })).docs, undefined);
+        assert.equal(prompts.length, 4);
+    } finally {
+        server.close();
+    }
+});

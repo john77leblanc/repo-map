@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0
+
+- **Documentation on the cards.** After drawing the map, a second pass with the map's AI tool links sections of the repo's docs, its agent guidance (AGENTS.md, CLAUDE.md, GEMINI.md, Copilot and Cursor rules) and substantial code comments to the cards they explain. Open a card and they're listed first, agent guidance on top, before the code; each opens in place with its lines read live. Saved in `.repo-map/docs.json` (commit it).
+- **Agent guidance goes to every AI run.** AGENTS.md and friends are given to map, update, docs, trace and flowchart runs as context, following `@file` imports once.
+- **The Map tab.** A second sidebar tab for the map itself: status and changed files, **Update map** (moved here from the banner), **Redraw map**, **Relink docs**, each with progress and Stop, and the map's own tool, model and effort, saved for you in `.repo-map/local.json`. The banner above the map is now one line that opens it.
+- **Spinners** wherever the page waits on an AI tool: traces, flowcharts, map jobs and the tool list.
+- The trace menu and the Map tab's menu share one list of tools and one picker.
+- New `repo-map docs` (`--check` for CI), `generate --no-docs`, `update --no-docs`, and a `docs` block in config.json (which documents to read, whether to include code comments). `validate` warns about doc links to cards that are gone.
+- Documents are readable by the code viewer and the AI tools even outside `codeRoots`; `.env`, `.repo-map/` and blocked folders still never are.
+- **Redraw** keeps the previous map as `map.prev.json`, like updates do. Updates relink docs when documents changed or cards were added.
+- Costs under a cent show as "<$0.01"; progress shows repo-relative paths on Windows.
+- Fixed on Windows: reading files when the repo path was given as a relative path, and three tests that assumed a POSIX shell.
+
 ## 0.5.0
 
 - **Choose the AI tool, model and effort per trace.** A menu beside the **Trace** button lists every AI tool repo-map finds on your machine (Claude Code, Codex, Gemini, a configured API, a running Ollama or LM Studio, a custom command), each with its models and effort levels, plus **Custom model…** for any model id. The choice is remembered per repo in your browser and also used for **Draw flowchart**. Each saved trace records what made it.

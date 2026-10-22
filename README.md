@@ -5,6 +5,7 @@ An interactive architecture map for any repo, with plain-language process tracin
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
 - **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. A menu beside the **Trace** button lists every AI tool found on your machine with its models and effort levels, so a quick question can use a fast model and a hard one a stronger model.
 - **See the logic as a flowchart.** Each trace can come with a flowchart of the process: what the person does, what the system does, the decisions it makes and every outcome, including failure paths. Boxes link back to the trace steps and their code. Copy it as Mermaid or download it as SVG for docs and PRs.
+- **Read the docs where the code is.** When the map is drawn, a second pass links sections of your docs, your agent guidance (AGENTS.md, CLAUDE.md…) and substantial code comments to the cards they explain. Open a card and its docs are listed first, agent guidance on top, readable in place.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
 - **Stay current.** The map knows which commit it describes, flags when the code has moved on, and updates itself from just the diff.
 
@@ -40,7 +41,7 @@ Add a script so teammates only need `npm install` and `npm run map`:
 
 Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignore`). Saved traces and personal AI settings stay out of git.
 
-**Keeping it current:** the map remembers the commit it was drawn from. When files in the code folders change, a banner shows what changed, and **Update map** sends only the diff to your AI tool to patch the map. From a terminal, use `repo-map update`. Commit the updated `map.json` like any other change.
+**Keeping it current:** the map remembers the commit it was drawn from. When files in the code folders change, a notice says so, and the **Map** tab in the sidebar shows what changed and offers **Update map**, which sends only the diff to your AI tool to patch the map (and relinks docs if documents changed). The same tab has **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
 
 The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
 
@@ -54,7 +55,8 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 |------------|--------------|
 | *(none)* or `start` | Set up anything that's missing (asking only when it has to), then open the map |
 | `init`     | Create `.repo-map/` with a starter `config.json` |
-| `generate` | Draft `map.json` with your AI tool (read-only) |
+| `generate` | Draft `map.json` with your AI tool (read-only), then link documentation to its cards (`--no-docs` to skip) |
+| `docs`     | Link documentation, agent guidance and code comments to the map's cards again (`.repo-map/docs.json`); `--check` for scripts |
 | `ai <tool>` | Choose the default AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`, with optional `--model` and `--effort`; `--for generate` sets the one that draws the map; `ai show` prints the settings in effect |
 | `doctor`   | List the AI tools found, with their models and effort levels, and check the ones traces and the map will use (`--json` for scripts) |
 | `update`   | Bring the map up to date with code changed since it was last evaluated (only the diff is sent); `--check` for scripts |
@@ -72,7 +74,8 @@ Each repo keeps one folder:
 .repo-map/
   config.json   how to read the repo
   map.json      the drawn graph
-  .gitignore    traces/, map.draft.json, map.raw.txt
+  docs.json     documentation linked to its cards
+  .gitignore    traces/, local.json, map.draft.json, map.prev.json, map.raw.txt
   traces/       saved traces (local only)
 ```
 
@@ -91,6 +94,7 @@ Each repo keeps one folder:
 | `prompt`        | `context` (what the repo is, where code lives) and `hints` (quirks worth knowing), given to the AI tool |
 | `footnote`      | Note shown under the map |
 | `tracesDir`     | Where saved traces go |
+| `docs`          | Which documents the docs pass reads: `{ "include": ["**/*.md", "**/*.mdx", "**/*.rst", "**/*.adoc"], "exclude": ["CHANGELOG.md", "**/CHANGELOG.md"], "comments": true, "maxFiles": 200 }`. `comments` also links substantial doc comments in each card's folder. Documents are readable by the code viewer and the AI tool even outside `codeRoots` |
 | `ai`            | Team default AI tool: `{ "provider": "auto" }`, plus optional `"effort"` and `"generate": { "provider", "model", "effort" }` for drawing the map. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). Personal overrides go in `.repo-map/local.json` (git-ignored) or `~/.config/repo-map/ai.json` |
 
 The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend might use *service* / *Kafka topic* / *outside the repo*; a frontend *package* / *store* / *backend or vendor*.
@@ -115,6 +119,22 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 - `path` is the node's folder in the repo. Nodes without one (outside systems) get no code references.
 - `inferred: true` draws the edge dashed and tells the AI tool the link came from docs or naming rather than code.
 
+### docs.json
+
+Written by the docs pass (`generate`, `repo-map docs`, **Relink docs**), and committed with `map.json`:
+
+```json
+{ "commit": "…", "links": { "checkout-page": [
+  { "path": "AGENTS.md", "start": 12, "end": 30, "title": "Checkout", "why": "Why cards are charged before orders exist", "kind": "guide" }
+] } }
+```
+
+`kind` is `guide` (agent guidance), `doc` or `comment`, and cards list them in that order, before their code. Links are checked when written: only cards on the map, readable files and real line ranges.
+
+### Agent guidance
+
+If the repo has `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules` or `.cursor/rules/*.mdc`, repo-map gives them to every AI run (map, update, docs, traces, flowcharts) as context about the codebase, alongside `prompt.context`. Lines that only import another file (`@AGENTS.md`) are followed once. They are context only: AI runs stay read-only.
+
 ### Flowcharts
 
 With **Include a flowchart** ticked (the default), the AI tool also returns a flowchart with each trace. Traces saved without one have a **Draw flowchart** button, which asks the AI tool to draw it from the trace's steps and code. The chart opens in a window over the map: click a box for its detail, the trace step behind it and that step's code, or **Show on map** to jump there.
@@ -127,6 +147,8 @@ Box types: *start*, *end*, *action* (the person does something), *process* (the 
 - The API requires a custom header, so other websites open in your browser can't call it.
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
+- Documents (`docs` in config.json, and agent guidance files) are readable outside `codeRoots`, with the same rules: never `.env*`, `.repo-map/` or `blocked` folders.
+- The Map tab can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.
 - The trace menu can only choose among the tools repo-map detected, their effort levels, and model ids that look like model ids. The browser can never set a command, its arguments or a URL.
 - API models (OpenAI-compatible, including local) only get repo-map's own read-only tools, which go through the same `codeRoots` and `blocked` rules as the code viewer.
 - `command` tools (Codex, Gemini, others) read files on their own; use their read-only or sandbox modes. repo-map can't restrict a third-party CLI.

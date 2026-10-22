@@ -86,6 +86,21 @@ test('generate --if-missing skips when a map exists, and validate passes', () =>
     assert.equal(s.run('validate').status, 0);
 });
 
+test('docs --check reports whether documentation is linked, with an exit code', () => {
+    const s = sandbox();
+    s.run('init', '--roots', 'src');
+    const first = s.run('docs', '--check');
+    assert.equal(first.status, 1);
+    assert.match(first.stdout, /isn’t linked/);
+    writeFileSync(path.join(s.repo, '.repo-map', 'docs.json'), JSON.stringify({ links: { app: [{ path: 'README.md', start: 1, end: 1, kind: 'doc' }] } }));
+    const second = s.run('docs', '--check');
+    assert.equal(second.status, 0);
+    assert.match(second.stdout, /up to date/);
+    // validate warns about links to cards that aren't on the map
+    writeFileSync(path.join(s.repo, '.repo-map', 'map.json'), JSON.stringify({ groups: [{ id: 'g', col: 1, title: 'App' }], nodes: [{ id: 'other', group: 'g', kind: 'service', path: 'src' }], edges: [] }));
+    assert.match(s.run('validate').stdout, /unknown node app/);
+});
+
 test('unknown flags fail loudly', () => {
     const s = sandbox();
     const r = s.run('init', '--nmae', 'x');

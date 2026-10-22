@@ -301,7 +301,7 @@ repo-map ai none
 
 ## Keeping the map up to date
 
-`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a banner lists the files and offers **Update map**.
+`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a notice above the map links to the **Map** tab in the sidebar, which lists the files and offers **Update map**.
 
 An update sends your AI tool the current map plus **only the git diff** since that commit (capped in size; it can read whole files when it needs more), and asks for a small patch: nodes, groups and connections to add, change or remove. repo-map applies the patch, checks the result with the same rules as `validate`, records the new commit, and keeps the previous version as `.repo-map/map.prev.json`. If the patch would leave the map broken, nothing is written.
 
@@ -314,7 +314,31 @@ repo-map update --mark     # record the current commit without changing the map
 repo-map generate --force  # redraw the whole map instead (for big refactors)
 ```
 
-After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: the banner offers **Mark as current**, which does the same as `update --mark`.
+After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: the Map tab offers **Mark as current**, which does the same as `update --mark`.
+
+### The Map tab
+
+The sidebar's **Map** tab holds everything about the map itself:
+
+- **Status**: up to date or not, the files that changed, and whether documents changed since the docs were linked.
+- **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
+- **Map agent**: the tool, model and effort that draw and update the map and link its docs, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
+
+### Documentation on the cards
+
+After drawing the map, `generate` runs a second pass with the map's tool that reads the repo's documents and links their sections to the cards they explain:
+
+- **Agent guidance** (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, Copilot and Cursor rules), listed first on each card. These files are also given to every AI run as context about the repo.
+- **Docs**: `README`s, `docs/`, ADRs and other markdown, per `docs` in config.json.
+- **Code comments**: substantial module headers and doc blocks in each card's own folder (`"docs": { "comments": false }` turns this off).
+
+The links are saved in `.repo-map/docs.json`; commit it with `map.json`. An update relinks docs when documents changed or cards were added, and drops links to removed cards. To relink by hand:
+
+```shell
+repo-map docs              # link docs to the cards again
+repo-map docs --check      # exits 1 when documents changed since they were linked
+repo-map generate --no-docs   # draw the map without the docs pass
+```
 
 ## 5. Check your setup with `repo-map doctor`
 

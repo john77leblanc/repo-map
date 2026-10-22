@@ -233,6 +233,32 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .pickin{display:block;box-sizing:border-box;width:100%;margin-top:6px;font-family:var(--f-mono);background:var(--bg)}
 .pickin[aria-invalid="true"]{border-color:var(--event)}
 .pick .iconbtn{width:26px;height:26px}
+/* sidebar tabs: Traces | Map */
+.tabs{display:flex;gap:2px}
+.tabs button{all:unset;cursor:pointer;padding:4px 8px;border-radius:5px;color:var(--muted)}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);background:var(--soft)}
+.tabs button:focus-visible{outline:2px solid var(--http);outline-offset:1px}
+.tdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--event);margin-left:6px;vertical-align:2px}
+.pane{display:flex;flex-direction:column;gap:22px}
+.pane[hidden]{display:none}
+.app.collapsed .tabs button{padding:6px 2px}
+/* the Map panel */
+.mfiles{margin:-4px 0 10px;font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+#ms-docs:empty{display:none}
+/* waiting on an agent: a spinner before the status text */
+@keyframes rm-spin{to{transform:rotate(360deg)}}
+@keyframes rm-pulse{50%{opacity:.3}}
+.status.busy::before{content:"";display:inline-block;box-sizing:border-box;width:11px;height:11px;margin-right:7px;vertical-align:-1px;border:1.6px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rm-spin .8s linear infinite}
+.iconbtn.busy svg{animation:rm-spin .8s linear infinite}
+@media (prefers-reduced-motion: reduce){.status.busy::before{border-right-color:currentColor;animation:rm-pulse 1.4s ease-in-out infinite}.iconbtn.busy svg{animation:rm-pulse 1.4s ease-in-out infinite}}
+/* documentation linked to a card (docs.json), listed before its code */
+.docs{display:flex;flex-direction:column;gap:5px;margin:0 0 8px}
+.docs h4{font-family:var(--f-head);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 0;font-weight:600}
+.kb{flex:none;font-family:var(--f-ui);font-size:10px;font-weight:500;letter-spacing:.02em;border:1px solid currentColor;border-radius:4px;padding:0 4px;color:var(--muted)}
+.kb.guide{color:var(--http)}
+.dcount{flex:none;display:inline-flex;align-items:center;gap:2px;font-family:var(--f-mono);font-size:10px;color:var(--muted);margin-left:6px}
+.dcount svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:1.6}
 .flowrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
 .flowbtn{display:inline-flex;align-items:center;gap:6px}
 .flowbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
@@ -305,9 +331,13 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
   <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize traces panel" tabindex="0" title="Drag to resize · double-click to reset"></div>
   <div class="side-in">
   <div class="side-bar">
-    <span class="lbl" id="side-lbl">Traces</span>
+    <div class="lbl tabs" id="side-lbl" role="tablist" aria-label="Panel">
+      <button type="button" role="tab" id="tab-traces" aria-controls="pane-traces" aria-selected="true">Traces</button>
+      <button type="button" role="tab" id="tab-map" aria-controls="pane-map" aria-selected="false" tabindex="-1">Map<span class="tdot" id="tab-map-dot" hidden title="Needs attention"></span></button>
+    </div>
     <button class="iconbtn" id="side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Collapse panel"><svg viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
   </div>
+  <div class="pane" id="pane-traces" role="tabpanel" aria-labelledby="tab-traces">
   <section>
     <h2>Trace a process</h2>
     <p class="hint" id="trace-hint">Describe a flow in plain words. Your AI tool reads this map and your local checkout, then highlights the parts involved and the code behind each step.</p>
@@ -325,7 +355,7 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
     <input class="pickin" id="pick-custom" type="text" placeholder="Model id, e.g. gpt-5" aria-label="Model id" spellcheck="false" autocomplete="off" hidden>
     <div class="row">
       <label class="opt" title="The AI tool also draws the process as a flowchart: decisions, failure paths and outcomes. Takes a little longer."><input type="checkbox" id="withflow" checked> Include a flowchart</label>
-      <span class="status" id="status" aria-live="polite">Connecting…</span>
+      <span class="status busy" id="status" aria-live="polite">Connecting…</span>
     </div>
   </section>
   <section>
@@ -340,6 +370,38 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
       <div class="row"><button class="btn sm" id="importbtn" type="button">Add trace</button><span class="status" id="importmsg"></span></div>
     </details>
   </section>
+  </div>
+  <div class="pane" id="pane-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+  <section>
+    <h2>This map</h2>
+    <p class="hint" id="ms-text">Checking…</p>
+    <p class="mfiles" id="ms-files" hidden></p>
+    <p class="hint" id="ms-docs"></p>
+    <div class="row">
+      <button class="btn sm primary" id="ms-update" type="button" hidden>Update map</button>
+      <button class="btn sm" id="ms-mark" type="button" hidden>Mark as current</button>
+      <button class="btn sm" id="ms-redraw" type="button" title="Explore the whole repo again and replace map.json. The current map is kept as .repo-map/map.prev.json. Takes several minutes.">Redraw map</button>
+      <button class="btn sm" id="ms-docs-go" type="button" title="Read the repo's documentation, agent guidance and code comments again, and link them to the cards (.repo-map/docs.json).">Relink docs</button>
+    </div>
+    <div class="row">
+      <span class="status" id="job-status" aria-live="polite"></span>
+      <button class="btn sm" id="job-stop" type="button" hidden>Stop</button>
+    </div>
+  </section>
+  <section>
+    <h2>Map agent</h2>
+    <p class="hint">The AI tool, model and effort that draw and update the map and link its documentation. Saved for you in this repo (<code>.repo-map/local.json</code>).</p>
+    <div class="row">
+      <span class="pick" id="mpick">
+        <select id="mpick-agent" aria-label="AI tool and model for the map"></select>
+        <select id="mpick-effort" aria-label="Effort for the map" title="How hard the AI tool works on the map. Higher is slower and uses more of your plan or credits." hidden></select>
+        <button class="iconbtn" id="mpick-refresh" type="button" title="Look for AI tools and models again" aria-label="Look for AI tools and models again"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg></button>
+      </span>
+    </div>
+    <input class="pickin" id="mpick-custom" type="text" placeholder="Model id, e.g. gpt-5" aria-label="Model id for the map" spellcheck="false" autocomplete="off" hidden>
+    <p class="status" id="mpick-status" aria-live="polite"></p>
+  </section>
+  </div>
 </div>
 </aside>
 </div>
@@ -375,7 +437,7 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
 
 <script>
 /* Map data and repo config come from the local server (.repo-map/ in the repo). */
-var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},CFG=null,REPO_BOOT=null,AI_BOOT=null;
+var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},DOCS={},CFG=null,REPO_BOOT=null,AI_BOOT=null;
 async function loadMapData(){
   const h={"x-map":"1"};
   const [c,m]=await Promise.all([
@@ -387,6 +449,7 @@ async function loadMapData(){
   GROUPS=m.groups.map(g=>[g.id,g.col,g.title,g.open?1:0,g.note||""]);
   NODES=m.nodes.map(n=>[n.id,n.group,K[n.kind]||"s",n.tag||"",n.desc||"",n.facts||[],n.title||""]);
   m.nodes.forEach(n=>{if(n.path)PATHS[n.id]=n.path;});
+  DOCS=m.docs&&typeof m.docs==="object"?m.docs:{};
   EDGES=m.edges.map(e=>[e.from,e.to,T[e.type]||"h",e.label||"",e.inferred?1:0]);
 }
 </script>
@@ -439,8 +502,22 @@ COLS.forEach((c,ci)=>{
 function makeNode(n){
   const el=document.createElement("div");
   el.className="node k-"+({s:"svc",t:"topic",x:"ext"}[n.k]);el.dataset.id=n.id;
-  el.innerHTML='<button class="nh" type="button" aria-expanded="false"><span class="dot"></span><span class="nm">'+esc(n.title)+'</span>'+(n.bu?'<span class="bu" title="services/'+n.bu+'">'+(n.bu==="membership"?"mem":n.bu)+'</span>':'')+chev+'</button><div class="nb" hidden></div>';
+  const nd=(DOCS[n.id]||[]).length;
+  const dc=nd?'<span class="dcount" title="'+nd+' linked documentation section'+(nd===1?'':'s')+'"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1h4l2 2v6H2z M6 1v2h2"/></svg>'+nd+'</span>':'';
+  el.innerHTML='<button class="nh" type="button" aria-expanded="false"><span class="dot"></span><span class="nm">'+esc(n.title)+'</span>'+dc+(n.bu?'<span class="bu" title="services/'+n.bu+'">'+(n.bu==="membership"?"mem":n.bu)+'</span>':'')+chev+'</button><div class="nb" hidden></div>';
   nodeEl[n.id]=el;return el;
+}
+const DOC_KIND={guide:"Agent guide",doc:"Doc",comment:"Code comment"};
+/** A linked doc section in a card: like a trace's code reference, titled by its section. */
+function docEl(l){
+  const d=refEl({path:l.path,start:l.start,end:l.end,why:l.why});
+  const fn=d.querySelector(".fn");fn.textContent=l.title||l.path.split("/").pop();fn.title=l.path;
+  d.querySelector(".fu").textContent=l.path+"#L"+l.start+"-L"+l.end;
+  const kb=document.createElement("span");kb.className="kb "+l.kind;kb.textContent=DOC_KIND[l.kind]||"Doc";
+  d.querySelector("summary").insertBefore(kb,d.querySelector(".gh"));
+  // GitHub renders markdown; ?plain=1 makes the line anchors work
+  const a=d.querySelector(".gh");if(/\.(md|mdx|mdc)$/i.test(l.path))a.href=a.href.replace("#L","?plain=1#L");
+  return d;
 }
 function connItem(e,dir){
   const other=dir==="out"?e.t:e.f, o=byId[other];
@@ -451,6 +528,9 @@ function fillBody(n){
   if(nb.dataset.filled)return;
   let h='<p>'+esc(n.desc)+'</p>';
   if(n.facts.length)h+='<ul class="facts">'+n.facts.map(f=>'<li>'+esc(f)+'</li>').join("")+'</ul>';
+  const docs=DOCS[n.id]||[];
+  // documentation first (agent guidance, then docs, then code comments), before the code
+  if(docs.length)h+='<div class="docs"><h4>Docs · '+docs.length+'</h4></div>';
   if(PATHS[n.id]){const sp=PATHS[n.id];h+=GH_TREE?'<div class="path"><a href="'+GH_TREE+sp+'" target="_blank" rel="noopener">'+esc(sp)+' ↗</a></div>':'<div class="path">'+esc(sp)+'</div>';}
   const o=out[n.id]||[], i=inc[n.id]||[];
   h+='<div class="conn">';
@@ -458,6 +538,8 @@ function fillBody(n){
   if(o.length)h+='<h4>Sends to · '+o.length+'</h4><ul>'+o.map(e=>connItem(e,"out")).join("")+'</ul>';
   if(!i.length&&!o.length)h+='<h4>No mapped connections</h4>';
   h+='</div>';nb.innerHTML=h;nb.dataset.filled="1";
+  const box=nb.querySelector(".docs");
+  if(box)docs.forEach(l=>{try{box.appendChild(docEl(l));}catch(_){}});
 }
 function setOpen(id,open){
   const el=nodeEl[id], nb=el.querySelector(".nb"), b=el.querySelector(".nh");
@@ -838,26 +920,15 @@ async function drawFlow(t,btn,stat){
   if(flowCtl)return;
   flowCtl=new AbortController();
   btn.disabled=true;
-  const t0=Date.now();let last="Starting…";
-  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};tick();const tm=setInterval(tick,1000);
+  const t0=Date.now();let last="Starting "+pickLabel()+"…";
+  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};
+  stat.className="status busy";tick();const tm=setInterval(tick,1000);
   try{
-    const res=await api("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t),...currentPick()}),signal:flowCtl.signal});
-    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
-    const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
-    for(;;){
-      const {value,done}=await rd.read();if(done)break;
-      buf+=dec.decode(value,{stream:true});let i;
-      while((i=buf.indexOf("\n"))>=0){
-        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
-        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
-        if(ev.type==="progress"){last=ev.text;tick();}else if(ev.type==="result")result=ev;else if(ev.type==="error")error=ev.message;
-      }
-    }
-    if(error)throw new Error(error);
+    const result=await runStream("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t),...currentPick()}),signal:flowCtl.signal},text=>{last=text;tick();});
     const flow=result&&FLOW.normalizeFlow(result.flow,t.steps.length);
     if(!flow)throw new Error("The AI tool ended without a usable flowchart.");
     t.flow=flow;
-    clearInterval(tm);stat.textContent="";
+    clearInterval(tm);stat.textContent="";stat.className="status";
     if(t._doc){
       const r=await api("/api/traces/"+encodeURIComponent(t._doc),{method:"PUT",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
       if(!r.ok)setStatus("Drew the flowchart but couldn't save it to disk.",true);
@@ -984,207 +1055,337 @@ function loadRepo(){
 
 /* running a trace through the configured AI tool */
 
+/**
+ * Read an ndjson stream from the server (traces, flowcharts, map jobs):
+ * onProgress(text) for each progress event; resolves with the result event,
+ * throws with the error event's message.
+ */
+async function runStream(url,opts,onProgress){
+  const res=await api(url,opts);
+  if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
+  const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
+  for(;;){
+    const {value,done}=await rd.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});let i;
+    while((i=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
+      let ev;try{ev=JSON.parse(line);}catch(_){continue;}
+      if(ev.type==="progress")onProgress(ev.text);else if(ev.type==="result")result=ev;else if(ev.type==="error")error=ev.message;
+    }
+  }
+  if(error)throw new Error(error);
+  return result;
+}
+const spend=r=>r&&(r.cost?" · "+(r.cost<0.01?"<$0.01":"$"+r.cost.toFixed(2)):r.tokens?" · "+r.tokens.toLocaleString()+" tokens":r.spend?" · "+r.spend:"")||"";
+
 let ctl=null, timer=0;
-function setStatus(t,err){const s=$("status");s.textContent=t;s.className="status"+(err?" err":"");}
+/** The trace status line; `busy` shows a spinner while an agent is working. */
+function setStatus(t,err,busy){const s=$("status");s.textContent=t;s.className="status"+(err?" err":"")+(busy?" busy":"");}
 async function runTrace(){
   const q=$("prompt").value.trim();if(!q||ctl)return;
   ctl=new AbortController();
   $("run").disabled=true;$("stop").hidden=false;
   const t0=Date.now();let last="Starting "+pickLabel()+"…";
-  const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s");tick();timer=setInterval(tick,1000);
+  const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s",false,true);tick();timer=setInterval(tick,1000);
   try{
-    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked,...currentPick()}),signal:ctl.signal});
-    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
-    const rd=res.body.getReader(), dec=new TextDecoder();let buf="",result=null,error=null;
-    for(;;){
-      const {value,done}=await rd.read();if(done)break;
-      buf+=dec.decode(value,{stream:true});let i;
-      while((i=buf.indexOf("\n"))>=0){
-        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
-        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
-        if(ev.type==="progress"){last=ev.text;tick();}
-        else if(ev.type==="result")result=ev;
-        else if(ev.type==="error")error=ev.message;
-      }
-    }
-    if(error)throw new Error(error);
+    const result=await runStream("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked,...currentPick()}),signal:ctl.signal},text=>{last=text;tick();});
     if(!result)throw new Error(pickLabel()+" ended without an answer. Run repo-map doctor to check your setup.");
     const t=normalizeTrace({...result.trace,used:result.used},q);
-    setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):result.tokens?" · "+result.tokens.toLocaleString()+" tokens":""));
+    clearInterval(timer);
+    setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+spend(result));
     await keepTrace(t);
     $("prompt").value="";
   }catch(e){
+    clearInterval(timer);
     if(e&&e.name==="AbortError")setStatus("Stopped.");
     else setStatus(e&&e.message&&e.message!=="no known services"?e.message:"The answer didn't name any services on this map. Try rephrasing.",true);
   }finally{
     clearInterval(timer);$("stop").hidden=true;$("run").disabled=!REPO.ai;ctl=null;
   }
 }
-/* ---------- choosing the AI tool, model and effort for a trace ----------
-   The server lists every tool it found (/api/agents). The choice is remembered
-   in this browser per repo, and sent with each trace; the server checks it. */
-const pick={agents:[],def:null,off:false,sel:null,opts:[]};
+
+/* ---------- AI tools: one shared list behind every tool/model/effort picker ----------
+   The server lists every tool it found (/api/agents), with models and effort
+   levels. Pickers subscribe to it; ↻ in any picker refreshes them all. */
 const MODEL_ID=/^[\w.:\/@+-]{1,120}$/;
-const liveAgent=id=>pick.agents.find(a=>a.id===id&&a.available);
+const AGENTS={
+  data:null,subs:[],loading:null,
+  load(refresh){
+    if(this.loading)return this.loading;
+    this.subs.forEach(s=>s.busy(true));
+    this.loading=(async()=>{
+      try{const r=await api("/api/agents"+(refresh?"?refresh=1":""));if(r.ok)this.data=await r.json();}catch(_){}
+      this.loading=null;
+      this.subs.forEach(s=>{s.busy(false);s.update(this.data);});
+    })();
+    return this.loading;
+  },
+  subscribe(s){this.subs.push(s);if(this.data)s.update(this.data);},
+};
+const liveAgent=id=>AGENTS.data&&(AGENTS.data.agents||[]).find(a=>a.id===id&&a.available);
 function effortsOf(a,model){const m=a.models.find(x=>x.id===model);return (m&&m.efforts)||a.efforts||[];}
-function pickLabel(){
-  const s=pick.sel,a=s&&liveAgent(s.agent);
-  if(!a)return AI_BOOT.label||"AI tool";
-  return [a.label,s.model||a.defaultModel,s.effort].filter(Boolean).join(" · ");
-}
-/** What to send with a trace: {} means "the configured default". */
-function currentPick(){
-  const s=pick.sel;if(!s||!liveAgent(s.agent))return {};
-  return {agent:s.agent,...(s.model?{model:s.model}:{}),...(s.effort?{effort:s.effort}:{})};
-}
-function savePick(){try{localStorage.setItem(NS+"pick",JSON.stringify(pick.sel));}catch(_){}}
-function loadPick(){try{return JSON.parse(localStorage.getItem(NS+"pick")||"null");}catch(_){return null;}}
-function renderPick(){
-  const sel=$("pick-agent"),s=pick.sel;sel.innerHTML="";pick.opts=[];
-  const add=(parent,text,agent,model,custom)=>{const o=new Option(text,String(pick.opts.length));pick.opts.push({agent,model,custom});parent.appendChild(o);return o;};
-  let chosen=null;
-  pick.agents.forEach(a=>{
-    const g=document.createElement("optgroup");g.label=a.label;
-    if(!a.available){
-      g.label=a.label+" (unavailable)";g.disabled=true;
-      const o=new Option(a.reason||"Not available","");o.disabled=true;g.appendChild(o);sel.appendChild(g);return;
-    }
-    const def=add(g,a.label+" · "+(a.defaultModel||"default model"),a.id,"");
-    const known=new Set(a.models.map(m=>m.id));
-    a.models.forEach(m=>{if(m.id===a.defaultModel)return;const o=add(g,a.label+" · "+(m.label||m.id),a.id,m.id);if(s&&s.agent===a.id&&s.model===m.id)chosen=o;});
-    const cust=add(g,a.label+" · custom model…",a.id,"",true);
-    if(s&&s.agent===a.id){
-      if(!s.model||s.model===a.defaultModel)chosen=chosen||def;
-      else if(!known.has(s.model))chosen=cust;
-    }
-    sel.appendChild(g);
-  });
-  if(chosen)chosen.selected=true;
-  const o=pick.opts[Number(sel.value)]||{};
-  const inp=$("pick-custom");inp.hidden=!o.custom;
-  if(o.custom&&s)inp.value=s.model||"";
-  renderEffort();
-  pickTitles();
-}
-function pickTitles(){
-  $("pick-agent").title="AI tool and model for this trace: "+pickLabel();
-  $("trace-hint").textContent="Describe a flow in plain words. "+pickLabel()+" reads this map and your local checkout, then highlights the parts involved and the code behind each step.";
-}
-function renderEffort(){
-  const s=pick.sel,a=s&&liveAgent(s.agent),eff=$("pick-effort");
-  const list=a?effortsOf(a,s.model||a.defaultModel):[];
-  eff.innerHTML="";eff.hidden=!list.length;
-  if(!list.length){if(s)s.effort="";return;}
-  eff.appendChild(new Option("effort","")).title="The tool’s default effort";
-  list.forEach(e=>eff.appendChild(new Option(e,e)));
-  if(s.effort&&!list.includes(s.effort))s.effort="";
-  eff.value=s.effort||"";
-}
-$("pick-agent").onchange=()=>{
-  const o=pick.opts[Number($("pick-agent").value)];if(!o)return;
-  const prev=pick.sel||{};
-  pick.sel={agent:o.agent,model:o.custom?(prev.agent===o.agent?prev.model:""):o.model,effort:prev.agent===o.agent?prev.effort:""};
-  const inp=$("pick-custom");inp.hidden=!o.custom;inp.removeAttribute("aria-invalid");
-  if(o.custom){inp.value=pick.sel.model||"";inp.focus();}
-  savePick();renderEffort();
-  pickTitles();
-};
-$("pick-custom").oninput=()=>{
-  const inp=$("pick-custom"),v=inp.value.trim(),ok=!v||(MODEL_ID.test(v)&&!v.startsWith("-"));
-  inp.setAttribute("aria-invalid",ok?"false":"true");
-  if(ok&&pick.sel){pick.sel.model=v;savePick();renderEffort();pickTitles();}
-};
-$("pick-effort").onchange=()=>{if(pick.sel){pick.sel.effort=$("pick-effort").value;savePick();pickTitles();}};
-async function loadAgents(refresh){
-  let j;
-  try{const r=await api("/api/agents"+(refresh?"?refresh=1":""));if(!r.ok)throw new Error();j=await r.json();}catch(_){return;}
-  pick.agents=j.agents||[];pick.def=j.default;pick.off=!!j.off;
-  const any=pick.agents.some(a=>a.available)&&!pick.off;
-  const saved=pick.sel||loadPick();
-  pick.sel=saved&&liveAgent(saved.agent)?{agent:saved.agent,model:saved.model||"",effort:saved.effort||""}
-    :pick.def?{...pick.def}
-    :any?{agent:pick.agents.find(a=>a.available).id,model:"",effort:""}:null;
-  $("pick").hidden=!any;$("pick-custom").hidden=true;
-  if(!any)return;
-  // the configured default may be unavailable while another tool works: tracing is still on
-  if(!AI_BOOT.available){
-    AI_BOOT.available=true;REPO.ai=true;
-    $("run").disabled=!!ctl;$("prompt").disabled=false;$("withflow").closest(".opt").hidden=false;$("noai").hidden=true;
-    renderSaved();
+/** "Codex CLI · gpt-6-luna · low" for a { agent, model, effort } choice ('' when that tool isn't available). */
+function choiceLabel(s){const a=s&&liveAgent(s.agent);return a?[a.label,s.model||a.defaultModel,s.effort].filter(Boolean).join(" · "):"";}
+
+/**
+ * A tool · model + effort picker bound to elements named <prefix>, <prefix>-agent,
+ * <prefix>-effort, <prefix>-custom and <prefix>-refresh.
+ *   initial(data)  the choice to show first ({agent,model,effort}, or null for "inherit")
+ *   save(sel)      store a change (sel is null when "inherit" is chosen)
+ *   inherit(data)  optional: label of the choice used when nothing is picked; adds that option first
+ *   visible(data)  whether to show the picker at all
+ *   onData(data)   optional: called with each new tool list
+ */
+function createPicker(o){
+  const el=k=>$(o.prefix+(k?"-"+k:""));
+  const P={sel:null,opts:[],ready:false};
+  function render(){
+    const data=AGENTS.data,sel=el("agent"),s=P.sel;sel.innerHTML="";P.opts=[];
+    const add=(parent,text,agent,model,custom)=>{const op=new Option(text,String(P.opts.length));P.opts.push({agent,model,custom});parent.appendChild(op);return op;};
+    let chosen=null;
+    if(o.inherit){const op=add(sel,o.inherit(data),null,"");if(!s)chosen=op;}
+    (data.agents||[]).forEach(a=>{
+      const g=document.createElement("optgroup");g.label=a.label;
+      if(!a.available){
+        g.label=a.label+" (unavailable)";g.disabled=true;
+        const op=new Option(a.reason||"Not available","");op.disabled=true;g.appendChild(op);sel.appendChild(g);return;
+      }
+      const def=add(g,a.label+" · "+(a.defaultModel||"default model"),a.id,"");
+      const known=new Set(a.models.map(m=>m.id));
+      a.models.forEach(m=>{if(m.id===a.defaultModel)return;const op=add(g,a.label+" · "+(m.label||m.id),a.id,m.id);if(s&&s.agent===a.id&&s.model===m.id)chosen=op;});
+      const cust=add(g,a.label+" · custom model…",a.id,"",true);
+      if(s&&s.agent===a.id){
+        if(!s.model||s.model===a.defaultModel)chosen=chosen||def;
+        else if(!known.has(s.model))chosen=cust;
+      }
+      sel.appendChild(g);
+    });
+    if(chosen)chosen.selected=true;
+    const cur=P.opts[Number(sel.value)]||{};
+    const inp=el("custom");inp.hidden=!cur.custom;
+    if(cur.custom&&s)inp.value=s.model||"";
+    renderEffort();titles();
   }
-  renderPick();
+  function renderEffort(){
+    const s=P.sel,a=s&&liveAgent(s.agent),eff=el("effort");
+    const list=a?effortsOf(a,s.model||a.defaultModel):[];
+    eff.innerHTML="";eff.hidden=!list.length;
+    if(!list.length){if(s)s.effort="";return;}
+    eff.appendChild(new Option("effort","")).title="The tool’s default effort";
+    list.forEach(e=>eff.appendChild(new Option(e,e)));
+    if(s.effort&&!list.includes(s.effort))s.effort="";
+    eff.value=s.effort||"";
+  }
+  function titles(){el("agent").title=(o.title||"AI tool and model")+": "+P.label();if(o.onChange)o.onChange(P);}
+  function changed(){renderEffort();titles();o.save(P.sel);}
+  el("agent").onchange=()=>{
+    const cur=P.opts[Number(el("agent").value)];if(!cur)return;
+    const prev=P.sel||{};
+    P.sel=cur.agent?{agent:cur.agent,model:cur.custom?(prev.agent===cur.agent?prev.model:""):cur.model,effort:prev.agent===cur.agent?prev.effort:""}:null;
+    const inp=el("custom");inp.hidden=!cur.custom;inp.removeAttribute("aria-invalid");
+    if(cur.custom){inp.value=P.sel.model||"";inp.focus();}
+    if(cur.custom&&!P.sel.model){renderEffort();titles();return;} // saved once a model is typed
+    changed();
+  };
+  let typing=0;
+  el("custom").oninput=()=>{
+    const inp=el("custom"),v=inp.value.trim(),ok=!!v&&MODEL_ID.test(v)&&!v.startsWith("-");
+    inp.setAttribute("aria-invalid",ok||!v?"false":"true");
+    if(ok&&P.sel){P.sel.model=v;renderEffort();titles();clearTimeout(typing);typing=setTimeout(()=>o.save(P.sel),500);}
+  };
+  el("effort").onchange=()=>{if(P.sel){P.sel.effort=el("effort").value;titles();o.save(P.sel);}};
+  el("refresh").onclick=()=>AGENTS.load(true);
+  P.update=data=>{
+    if(!data)return;
+    if(!P.ready||(P.sel&&!liveAgent(P.sel.agent))){P.sel=o.initial(data);P.ready=true;}
+    if(o.onData)o.onData(data);
+    el().hidden=!o.visible(data);
+    if(!el().hidden)render();
+  };
+  P.busy=on=>{const b=el("refresh");b.classList.toggle("busy",on);b.disabled=on;};
+  P.label=()=>choiceLabel(P.sel)||(o.inherit&&AGENTS.data?o.inherit(AGENTS.data):"")||AI_BOOT.label||"AI tool";
+  /** What to send with a request: {} means "the configured default". */
+  P.pick=()=>{const s=P.sel;if(!s||!liveAgent(s.agent))return {};return {agent:s.agent,...(s.model?{model:s.model}:{}),...(s.effort?{effort:s.effort}:{})};};
+  AGENTS.subscribe(P);
+  return P;
 }
-$("pick-refresh").onclick=async()=>{const b=$("pick-refresh");b.disabled=true;await loadAgents(true);b.disabled=false;};
+
+/* the trace picker: remembered in this browser, per repo */
+const tracePick=createPicker({
+  prefix:"pick",
+  title:"AI tool and model for this trace",
+  initial(data){
+    let saved=null;try{saved=JSON.parse(localStorage.getItem(NS+"pick")||"null");}catch(_){}
+    if(saved&&liveAgent(saved.agent))return {agent:saved.agent,model:saved.model||"",effort:saved.effort||""};
+    if(data.default)return {...data.default};
+    const a=(data.agents||[]).find(x=>x.available);return a?{agent:a.id,model:"",effort:""}:null;
+  },
+  save(sel){try{localStorage.setItem(NS+"pick",JSON.stringify(sel));}catch(_){}},
+  visible:data=>(data.agents||[]).some(a=>a.available)&&!data.off,
+  onData(data){
+    // the configured default may be unavailable while another tool works: tracing is still on
+    if((data.agents||[]).some(a=>a.available)&&!data.off&&!AI_BOOT.available){
+      AI_BOOT.available=true;REPO.ai=true;
+      $("run").disabled=!!ctl;$("prompt").disabled=false;$("withflow").closest(".opt").hidden=false;$("noai").hidden=true;
+      renderSaved();
+    }
+  },
+  onChange(P){$("trace-hint").textContent="Describe a flow in plain words. "+P.label()+" reads this map and your local checkout, then highlights the parts involved and the code behind each step.";},
+});
+function currentPick(){return tracePick.pick();}
+function pickLabel(){return tracePick.label();}
 
 $("run").onclick=runTrace;
 (()=>{const k=NS+"flow",cb=$("withflow");try{const v=localStorage.getItem(k);if(v!==null)cb.checked=v==="1";}catch(_){}
   cb.onchange=()=>{try{localStorage.setItem(k,cb.checked?"1":"0");}catch(_){}};})();
 $("stop").onclick=()=>ctl&&ctl.abort();
 $("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
-/* is the map out of date? compare map.json's recorded commit with HEAD */
-let upCtl=null;
-async function loadMapStatus(){
-  const box=$("stale");
-  let st;
-  try{st=await (await api("/api/map/status")).json();}catch(_){return;}
-  const short=x=>String(x||"").slice(0,9);
-  const plural=(n,w)=>n+" "+w+(n===1?"":"s");
-  box.className="stale";box.hidden=true;box.innerHTML="";
-  if(st.state==="stale"){
-    const ago=st.commitsSince?" ("+plural(st.commitsSince,"commit")+" ago)":"";
-    box.innerHTML='<span><b>This map is out of date.</b> '+plural(st.changed,"file")+' in the code folders changed since it was evaluated at <code>'+short(st.commit)+'</code>'+ago+'.</span>'
-      +'<span class="acts"><span class="status" id="up-status"></span><button class="btn sm" id="up-stop" type="button" hidden>Stop</button><button class="btn sm primary" id="up-go" type="button">Update map</button></span>'
-      +'<span class="files" title="'+esc(st.files.join("\n"))+'">'+esc(st.files.slice(0,6).join("  ·  "))+(st.changed>6?"  · …":"")+'</span>';
-    box.hidden=false;
-    const go=$("up-go");
-    if(!AI_BOOT.available){go.disabled=true;go.title="Needs an AI tool: run repo-map doctor";$("up-status").textContent="Needs an AI tool.";}
-    if(st.tooBig){$("up-status").textContent="Too many changes for a quick update: run repo-map generate --force.";go.disabled=true;}
-    go.onclick=runUpdate;$("up-stop").onclick=()=>upCtl&&upCtl.abort();
-  }else if(st.state==="unrecorded"){
-    box.innerHTML='<span>This map has no recorded commit, so repo-map can’t tell when it goes out of date.</span><span class="acts"><button class="btn sm" id="up-mark" type="button">Mark as current</button></span>';
-    box.hidden=false;
-    $("up-mark").onclick=async()=>{try{await api("/api/map/mark",{method:"POST"});loadMapStatus();}catch(_){}};
-  }else if(st.state==="unknown"){
-    box.innerHTML='<span>'+esc(st.reason)+' To refresh it, run <code>repo-map generate --force</code>.</span>';box.hidden=false;
-  }else if(st.state==="starter"){
-    box.innerHTML='<span>This is a starter map built from your folders.'+(AI_BOOT.available?' Draft a full one with <code>repo-map generate</code>.':' Fill it in by hand in <code>.repo-map/map.json</code>, or set up an AI tool to draft it.')+'</span>';box.hidden=false;
-  }
+/* ---------- sidebar tabs: Traces | Map ---------- */
+const TABS=["traces","map"];
+function showTab(name,focus){
+  TABS.forEach(t=>{
+    const on=t===name,b=$("tab-"+t);
+    b.setAttribute("aria-selected",String(on));b.tabIndex=on?0:-1;$("pane-"+t).hidden=!on;
+    if(on&&focus)b.focus();
+  });
+  try{localStorage.setItem(NS+"tab",name);}catch(_){}
 }
-async function runUpdate(){
-  if(upCtl)return;
-  upCtl=new AbortController();
-  const go=$("up-go"),stop=$("up-stop"),stat=$("up-status");
-  go.disabled=true;stop.hidden=false;
-  const t0=Date.now();let last="Starting…";
-  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};tick();const tm=setInterval(tick,1000);
-  try{
-    const res=await api("/api/map/update",{method:"POST",signal:upCtl.signal});
-    if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
-    const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
-    for(;;){
-      const {value,done}=await rd.read();if(done)break;
-      buf+=dec.decode(value,{stream:true});let i;
-      while((i=buf.indexOf("\n"))>=0){
-        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line)continue;
-        let ev;try{ev=JSON.parse(line);}catch(_){continue;}
-        if(ev.type==="progress"){last=ev.text;tick();}else if(ev.type==="result")result=ev;else if(ev.type==="error")error=ev.message;
-      }
-    }
-    if(error)throw new Error(error);
-    if(!result)throw new Error("The update ended without an answer.");
-    clearInterval(tm);
-    const c=result.counts||{added:0,updated:0,removed:0};
-    $("stale").className="stale ok";
-    $("stale").innerHTML='<span><b>Map updated.</b> '+c.added+' added, '+c.updated+' changed, '+c.removed+' removed'+(result.summary?'. '+esc(result.summary):'')+' Reloading…</span>';
-    setTimeout(()=>location.reload(),1800);
-  }catch(e){
-    clearInterval(tm);
-    stat.textContent=e&&e.name==="AbortError"?"Stopped.":(e.message||"Update failed.");stat.className="status err";
-    go.disabled=false;stop.hidden=true;
-  }finally{upCtl=null;}
+TABS.forEach((t,i)=>{
+  const b=$("tab-"+t);
+  b.onclick=()=>showTab(t);
+  b.onkeydown=e=>{
+    if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+    e.preventDefault();showTab(TABS[(i+(e.key==="ArrowRight"?1:TABS.length-1))%TABS.length],true);
+  };
+});
+(()=>{let t="traces";try{t=localStorage.getItem(NS+"tab")||t;}catch(_){}showTab(TABS.includes(t)?t:"traces");})();
+/** Open the Map tab (and the panel, if it's collapsed). */
+function openMapTab(){
+  if(document.querySelector(".app").classList.contains("collapsed"))$("side-lbl").click();
+  showTab("map",true);
 }
 
-loadRepo();loadSaved();loadMapStatus();loadAgents();
+/* ---------- the Map panel: status, map jobs, and the map's tool/model/effort ---------- */
+const shortSha=x=>String(x||"").slice(0,9);
+const nOf=(n,w)=>n+" "+w+(n===1?"":"s");
+let mapSt=null, jobCtl=null;
+
+/** The map's picker: saved for this person in this repo (.repo-map/local.json, ai.generate). */
+const mapPick=createPicker({
+  prefix:"mpick",
+  title:"AI tool and model for the map",
+  initial:data=>data.generateSet&&data.generate?{...data.generate}:null,
+  inherit:data=>"Same as traces"+(data.default?" · "+choiceLabel(data.default):""),
+  visible:()=>true,
+  async save(sel){
+    const st=$("mpick-status");st.className="status busy";st.textContent="Saving…";
+    try{
+      const r=await api("/api/settings/generate",{method:"PUT",body:JSON.stringify(sel||{})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||"HTTP "+r.status);
+      st.className="status";st.textContent=sel?"Saved for you in this repo: "+choiceLabel(sel)+".":"The map uses the same tool as traces.";
+    }catch(e){st.className="status err";st.textContent="Couldn’t save: "+e.message;}
+  },
+  onData(data){
+    const st=$("mpick-status");
+    if(!data.generate&&data.generateReason&&!st.textContent){st.className="status err";st.textContent=data.generateReason;}
+    renderMapPanel();
+  },
+});
+
+async function loadMapStatus(){
+  try{mapSt=await (await api("/api/map/status")).json();}catch(_){return;}
+  renderMapPanel();renderBanner();
+}
+
+function renderMapPanel(){
+  const st=mapSt;if(!st)return;
+  const text=$("ms-text"),files=$("ms-files"),docs=$("ms-docs");
+  const up=$("ms-update"),mark=$("ms-mark"),redraw=$("ms-redraw"),relink=$("ms-docs-go");
+  const ago=st.commitsSince?" ("+nOf(st.commitsSince,"commit")+" ago)":"";
+  const says={
+    current:"Up to date with the code"+(st.commit?" at <code>"+shortSha(st.commit)+"</code>":"")+".",
+    stale:"<b>Out of date.</b> "+nOf(st.changed||0,"file")+" in the code folders changed since it was evaluated at <code>"+shortSha(st.commit)+"</code>"+ago+".",
+    unrecorded:"This map has no recorded commit, so repo-map can’t tell when it goes out of date.",
+    unknown:esc(st.reason||"")+" Redraw it to start tracking again.",
+    starter:"This is a starter map built from your folders. Draw the full map to see how the code fits together.",
+    empty:"There is no map yet.",
+    nogit:"This folder isn’t a git repository, so changes can’t be tracked.",
+  };
+  text.innerHTML=says[st.state]||"";
+  files.hidden=st.state!=="stale"||!st.files||!st.files.length;
+  if(!files.hidden)files.textContent=st.files.slice(0,12).join("  ·  ")+(st.changed>12?"  · …":"");
+  const hasMap=st.state!=="starter"&&st.state!=="empty";
+  const d=st.docs||{};
+  docs.textContent=!hasMap?""
+    :!d.linked?"Documentation isn’t linked to the cards yet."
+    :d.changed?nOf(d.changed,"document")+" changed since the docs were linked: "+d.files.slice(0,4).join(", ")+(d.changed>4?", …":"")+"."
+    :"Docs linked to the cards"+(d.generatedAt?" on "+new Date(d.generatedAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"")+".";
+  up.hidden=st.state!=="stale";
+  mark.hidden=st.state!=="unrecorded";
+  redraw.textContent=hasMap?"Redraw map":"Draw the full map";
+  relink.textContent=d.linked?"Relink docs":"Link docs";relink.hidden=!hasMap;
+  // jobs need the map's AI tool
+  const g=AGENTS.data&&AGENTS.data.generate;
+  const noAi=AGENTS.data&&!g?(AGENTS.data.generateReason||"Needs an AI tool: run repo-map doctor"):"";
+  [up,redraw,relink].forEach(b=>{b.disabled=!!jobCtl||!!noAi;b.title=noAi||b.dataset.title||b.title;});
+  if(st.tooBig&&!up.hidden){up.disabled=true;up.title="Too many changes for a quick update: redraw the map instead.";}
+  $("tab-map-dot").hidden=!(st.state==="stale"||st.state==="starter"||(hasMap&&d.linked&&d.changed));
+}
+["ms-update","ms-redraw","ms-docs-go"].forEach(id=>{const b=$(id);b.dataset.title=b.title;});
+
+/** The notice above the map: one line, and a button into the Map panel. */
+function renderBanner(){
+  const st=mapSt,box=$("stale");
+  box.className="stale";box.hidden=true;box.innerHTML="";
+  const show=(html,btn)=>{
+    box.innerHTML='<span>'+html+'</span><span class="acts"><button class="btn sm'+(btn.primary?' primary':'')+'" id="stale-go" type="button">'+btn.label+'</button></span>';
+    box.hidden=false;$("stale-go").onclick=openMapTab;
+  };
+  if(st.state==="stale")show("<b>This map is out of date.</b> "+nOf(st.changed,"file")+" changed since <code>"+shortSha(st.commit)+"</code>.",{label:"Review & update",primary:true});
+  else if(st.state==="starter")show("This is a starter map built from your folders.",{label:"Draw the full map"});
+  else if(st.state==="unrecorded")show("This map has no recorded commit, so repo-map can’t tell when it goes out of date.",{label:"Map panel"});
+  else if(st.state==="unknown")show(esc(st.reason||""),{label:"Map panel"});
+}
+
+/* map jobs: one at a time (the server enforces it too); Stop closes the request, which stops the AI run */
+const JOB_URL={update:"/api/map/update",generate:"/api/map/generate",docs:"/api/docs/link"};
+function jobDone(kind,r){
+  const docs=r.docs?" Linked "+nOf(r.docs.counts.links,"doc section")+" to "+nOf(r.docs.counts.cards,"card")+".":r.docsError?" Couldn’t link docs: "+r.docsError:"";
+  if(kind==="update"){const c=r.counts||{added:0,updated:0,removed:0};return "Map updated: "+c.added+" added, "+c.updated+" changed, "+c.removed+" removed."+(r.summary?" "+r.summary:"")+docs;}
+  if(kind==="generate"){const c=(r.check&&r.check.counts)||{};return "Map redrawn: "+nOf(c.nodes||0,"card")+", "+nOf(c.edges||0,"connection")+"."+docs;}
+  return "Linked "+nOf(r.counts.links,"doc section")+" to "+nOf(r.counts.cards,"card")+".";
+}
+async function runJob(kind){
+  if(jobCtl)return;
+  jobCtl=new AbortController();renderMapPanel();
+  const stat=$("job-status"),stop=$("job-stop");stop.hidden=false;
+  const t0=Date.now();let last="Starting…";
+  const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};
+  stat.className="status busy";tick();const tm=setInterval(tick,1000);
+  try{
+    const r=await runStream(JOB_URL[kind],{method:"POST",signal:jobCtl.signal},text=>{last=text;tick();});
+    if(!r)throw new Error("The job ended without an answer.");
+    clearInterval(tm);stat.className="status";
+    stat.textContent=jobDone(kind,r)+spend(r)+" Reloading…";
+    setTimeout(()=>location.reload(),2200);
+  }catch(e){
+    clearInterval(tm);
+    stat.textContent=e&&e.name==="AbortError"?"Stopped.":(e.message||"That didn’t work.");stat.className="status"+(e&&e.name==="AbortError"?"":" err");
+  }finally{jobCtl=null;stop.hidden=true;renderMapPanel();}
+}
+$("job-stop").onclick=()=>jobCtl&&jobCtl.abort();
+$("ms-update").onclick=()=>runJob("update");
+$("ms-docs-go").onclick=()=>runJob("docs");
+// Redrawing replaces map.json (the old one is kept as map.prev.json): click twice when a map exists
+$("ms-redraw").onclick=()=>{
+  const b=$("ms-redraw"),hasMap=mapSt&&mapSt.state!=="starter"&&mapSt.state!=="empty";
+  if(hasMap&&b.dataset.arm!=="1"){b.dataset.arm="1";b.textContent="Confirm redraw";setTimeout(()=>{b.dataset.arm="";renderMapPanel();},3000);return;}
+  b.dataset.arm="";runJob("generate");
+};
+$("ms-mark").onclick=async()=>{try{await api("/api/map/mark",{method:"POST"});loadMapStatus();}catch(_){}};
+
+loadRepo();loadSaved();loadMapStatus();AGENTS.load();
 
 /* ---------- sidebar collapse + resize ---------- */
 (()=>{

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -147,17 +147,16 @@ test('api provider explains a rejected key', async () => {
 
 test('command provider pipes the prompt to any CLI and reads its answer', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'repo-map-cmd-'));
-    const bin = path.join(dir, 'fake-ai');
-    writeFileSync(bin, '#!/usr/bin/env node\nlet s="";process.stdin.on("data",d=>s+=d).on("end",()=>{console.error("thinking");console.log(JSON.stringify({echo:s.trim(),arg:process.argv[2]||""}));});\n');
-    chmodSync(bin, 0o755);
-    const run = runCommand({ root: EXAMPLE, prompt: 'hello', settings: { bin, args: ['--flag'], label: 'Fake AI' }, timeoutMs: 10000 });
+    // node runs the fake CLIs, so this works the same on every OS
+    const script = path.join(dir, 'fake-ai.mjs');
+    writeFileSync(script, 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{console.error("thinking");console.log(JSON.stringify({echo:s.trim(),arg:process.argv[2]||""}));});\n');
+    const run = runCommand({ root: EXAMPLE, prompt: 'hello', settings: { bin: process.execPath, args: [script, '--flag'], label: 'Fake AI' }, timeoutMs: 10000 });
     const out = await run.promise;
     assert.deepEqual(JSON.parse(out.text), { echo: 'hello', arg: '--flag' });
 
-    const fail = path.join(dir, 'fake-fail');
-    writeFileSync(fail, '#!/bin/sh\necho "Error: not logged in. Please run fake login" >&2\nexit 1\n');
-    chmodSync(fail, 0o755);
-    await assert.rejects(runCommand({ root: EXAMPLE, prompt: 'x', settings: { bin: fail, label: 'Fake AI', authHint: 'Run `fake login`.' }, timeoutMs: 10000 }).promise,
+    const fail = path.join(dir, 'fake-fail.mjs');
+    writeFileSync(fail, 'console.error("Error: not logged in. Please run fake login");process.exit(1);\n');
+    await assert.rejects(runCommand({ root: EXAMPLE, prompt: 'x', settings: { bin: process.execPath, args: [fail], label: 'Fake AI', authHint: 'Run `fake login`.' }, timeoutMs: 10000 }).promise,
         (err) => err.code === 'auth' && /Run `fake login`/.test(err.message));
 });
 
