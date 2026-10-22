@@ -3,7 +3,7 @@
 An interactive architecture map for any repo, with plain-language process tracing through the AI tool you already use: Claude Code, Codex, Gemini, OpenAI or any OpenAI-compatible API, including local models like Ollama.
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
-- **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files.
+- **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. A menu beside the **Trace** button lists every AI tool found on your machine with its models and effort levels, so a quick question can use a fast model and a hard one a stronger model.
 - **See the logic as a flowchart.** Each trace can come with a flowchart of the process: what the person does, what the system does, the decisions it makes and every outcome, including failure paths. Boxes link back to the trace steps and their code. Copy it as Mermaid or download it as SVG for docs and PRs.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
 - **Stay current.** The map knows which commit it describes, flags when the code has moved on, and updates itself from just the diff.
@@ -55,14 +55,14 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 | *(none)* or `start` | Set up anything that's missing (asking only when it has to), then open the map |
 | `init`     | Create `.repo-map/` with a starter `config.json` |
 | `generate` | Draft `map.json` with your AI tool (read-only) |
-| `ai <tool>` | Choose the AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`; `ai show` prints the settings in effect |
-| `doctor`   | Show which AI tool traces will use and check that it works (`--json` for scripts) |
+| `ai <tool>` | Choose the default AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`, with optional `--model` and `--effort`; `--for generate` sets the one that draws the map; `ai show` prints the settings in effect |
+| `doctor`   | List the AI tools found, with their models and effort levels, and check the ones traces and the map will use (`--json` for scripts) |
 | `update`   | Bring the map up to date with code changed since it was last evaluated (only the diff is sent); `--check` for scripts |
 | `validate` | Report unknown ids, groups, kinds and missing paths; exits 1 on errors, so it fits in CI |
 | `serve`    | Start the map without any setup steps |
 
-Options: `--dir <repo root>`, `--port <n>` (or `REPO_MAP_PORT`), `--force`, `--model <id>`, `--version`, `--help`.
-`--provider` and `--model` (or `REPO_MAP_AI_PROVIDER` and `REPO_MAP_MODEL`) pick the AI tool and model for one run. See [SETUP.md](SETUP.md#where-ai-settings-go) for personal settings files.
+Options: `--dir <repo root>`, `--port <n>` (or `REPO_MAP_PORT`), `--force`, `--model <id>`, `--effort <level>`, `--version`, `--help`.
+`--provider`, `--model` and `--effort` (or `REPO_MAP_AI_PROVIDER`, `REPO_MAP_MODEL` and `REPO_MAP_EFFORT`) pick the AI tool, model and effort for one run. See [SETUP.md](SETUP.md#where-ai-settings-go) for personal settings files.
 
 ## How a repo describes itself
 
@@ -91,7 +91,7 @@ Each repo keeps one folder:
 | `prompt`        | `context` (what the repo is, where code lives) and `hints` (quirks worth knowing), given to the AI tool |
 | `footnote`      | Note shown under the map |
 | `tracesDir`     | Where saved traces go |
-| `ai`            | Team default AI tool: `{ "provider": "auto" }`. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). Personal overrides go in `.repo-map/local.json` (git-ignored) or `~/.config/repo-map/ai.json` |
+| `ai`            | Team default AI tool: `{ "provider": "auto" }`, plus optional `"effort"` and `"generate": { "provider", "model", "effort" }` for drawing the map. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). Personal overrides go in `.repo-map/local.json` (git-ignored) or `~/.config/repo-map/ai.json` |
 
 The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend might use *service* / *Kafka topic* / *outside the repo*; a frontend *package* / *store* / *backend or vendor*.
 
@@ -127,6 +127,7 @@ Box types: *start*, *end*, *action* (the person does something), *process* (the 
 - The API requires a custom header, so other websites open in your browser can't call it.
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
+- The trace menu can only choose among the tools repo-map detected, their effort levels, and model ids that look like model ids. The browser can never set a command, its arguments or a URL.
 - API models (OpenAI-compatible, including local) only get repo-map's own read-only tools, which go through the same `codeRoots` and `blocked` rules as the code viewer.
 - `command` tools (Codex, Gemini, others) read files on their own; use their read-only or sandbox modes. repo-map can't restrict a third-party CLI.
 - API keys are read from environment variables and never written to any config file. Each trace is billed to whichever account the tool uses; cost or token counts are shown when it finishes.

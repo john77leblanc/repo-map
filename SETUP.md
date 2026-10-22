@@ -63,9 +63,12 @@ Choose one AI tool. The setting is saved in `~/.config/repo-map/ai.json` and app
 npx repo-map ai claude                                  # Claude Code (installed and signed in)
 npx repo-map ai openai --model gpt-4.1                  # then: export REPO_MAP_API_KEY=sk-...
 npx repo-map ai ollama --model qwen2.5-coder:14b        # local model, no key
-npx repo-map ai codex                                   # or: ai gemini
+npx repo-map ai codex --effort medium                   # or: ai gemini
 npx repo-map ai none                                    # map only, no tracing
+npx repo-map ai claude --model opus --effort high --for generate   # optional: a stronger model just for drawing the map
 ```
+
+You can still switch tool, model and effort for any single trace from the menu beside the **Trace** button.
 
 Then:
 
@@ -83,7 +86,9 @@ npx repo-map validate         # fails the build if map.json references unknown n
 npx repo-map update --check   # optional: fails when the map hasn't been updated for code changes
 ```
 
-`npx repo-map doctor --json` prints a machine-readable status, `{ "ready": true, "provider": "claude", … }`, and exits 1 when tracing isn't available.
+`npx repo-map doctor --json` prints a machine-readable status, `{ "ready": true, "provider": "claude", "map": { … }, "agents": [ … ] }`, and exits 1 when tracing isn't available.
+
+To draw or update the map with a particular tool in a script, pass it for that run: `npx repo-map generate --provider claude --model opus --effort high`.
 
 The rest of this guide explains each step in more detail.
 
@@ -157,19 +162,32 @@ repo-map serve       # opens on http://localhost:4477
 
 ## 4. Choose an AI tool
 
-repo-map works with three kinds of AI tool:
+repo-map works with these AI tools:
 
-| Provider  | What it is | Reads code with | Cost |
-|-----------|------------|-----------------|------|
-| `claude`  | Claude Code CLI | its own read-only tools (`Read`, `Grep`, `Glob`) | your Claude plan or API usage |
-| `api`     | Any OpenAI-compatible API: OpenAI, OpenRouter, Azure OpenAI, or a local server like Ollama, LM Studio or vLLM | repo-map's read-only tools (`list_files`, `search_code`, `read_file`) | per token, or free when local |
-| `command` | Any CLI that takes a prompt and prints an answer. Presets for Codex CLI and Gemini CLI | whatever the CLI does on its own | depends on the tool |
+| Provider   | What it is | Reads code with | Models listed from | Effort |
+|------------|------------|-----------------|--------------------|--------|
+| `claude`   | Claude Code CLI | its own read-only tools (`Read`, `Grep`, `Glob`) | `claude --help` (aliases like `opus`, `sonnet`) | `--effort`: low … max |
+| `codex`    | Codex CLI | its read-only sandbox | Codex's own model cache (`~/.codex/models_cache.json`) | reasoning effort, per model |
+| `gemini`   | Gemini CLI | whatever the CLI does on its own | a short built-in list | none |
+| `api`      | Any OpenAI-compatible API: OpenAI, OpenRouter, Azure OpenAI, vLLM… | repo-map's read-only tools (`list_files`, `search_code`, `read_file`) | the server (`GET /models`) | `reasoning_effort`: low, medium, high |
+| `ollama`, `lmstudio` | A local Ollama or LM Studio server | repo-map's read-only tools | the server (`GET /models`) | none |
+| `command`  | Any CLI that takes a prompt and prints an answer | whatever the CLI does on its own | `command.models`, if you set it | `command.efforts`, if you set it |
 
-With `"provider": "auto"` (the default), repo-map uses the first one that's ready:
+With `"provider": "auto"` (the default), repo-map uses the first one that's ready: Claude Code, then a configured API, a configured command, Codex, Gemini, Ollama and LM Studio.
 
-1. **Claude Code**, if `claude` is on your `PATH`
-2. **The API**, if a model is set and a key is present (or the base URL points to a local server)
-3. **A command**, if one is configured
+### Choosing per trace, and a different tool for the map
+
+The setting above is only the **default**. In the browser, the menu beside the **Trace** button lists every tool repo-map found on your machine, with its models and effort levels; pick one for the next trace (or flowchart). The choice is remembered in that browser. **Custom model…** takes any model id the tool accepts. ↻ looks for tools again, for example after you start Ollama.
+
+Drawing and updating the map reads much more code than a trace, so it can use its own tool, model and effort. `repo-map` asks about this the first time; to change it later:
+
+```shell
+repo-map ai claude --model opus --effort high --for generate
+```
+
+That writes `"generate": { "provider": "claude", "model": "opus", "effort": "high" }` next to your trace default. Empty fields fall back to the trace default, and `--provider`, `--model` and `--effort` on a command override both for that run.
+
+Each tool's model and effort lists can be replaced in settings, e.g. `"gemini": { "models": ["gemini-2.5-pro"] }` or `"api": { "efforts": ["low", "high"] }`. Run `repo-map doctor` to see what was found.
 
 ### Where AI settings go
 
@@ -178,7 +196,7 @@ The AI tool is usually a personal choice, so you don't have to change the shared
 1. `"ai"` in `.repo-map/config.json`: the team default (committed)
 2. `~/.config/repo-map/ai.json`: your default for every repo
 3. `.repo-map/local.json`: your override for this repo (git-ignored)
-4. Environment variables and flags: `REPO_MAP_AI_PROVIDER` / `--provider`, `REPO_MAP_MODEL` / `--model`, `REPO_MAP_API_BASE_URL`, `REPO_MAP_CLAUDE_BIN`
+4. Environment variables and flags: `REPO_MAP_AI_PROVIDER` / `--provider`, `REPO_MAP_MODEL` / `--model`, `REPO_MAP_EFFORT` / `--effort`, `REPO_MAP_API_BASE_URL`, `REPO_MAP_CLAUDE_BIN`
 
 `local.json` and `ai.json` take the same shape as the `"ai"` block. API keys never go in these files: they're read from an environment variable.
 
@@ -188,12 +206,12 @@ The quickest way to save a choice is `repo-map ai <tool>`, shown under each tool
 
 1. Install the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
 2. Run `claude` once in a terminal and sign in.
-3. That's it: `auto` picks it up. To use it explicitly: `repo-map ai claude [--model <id>]`.
+3. That's it: `auto` picks it up. To use it explicitly: `repo-map ai claude [--model <id>] [--effort <level>]`.
 
 Optional settings:
 
 ```json
-{ "provider": "claude", "claude": { "model": "", "maxTurns": 40, "bin": "claude" } }
+{ "provider": "claude", "effort": "", "claude": { "model": "", "maxTurns": 40, "bin": "claude" } }
 ```
 
 ### OpenAI (or another hosted, OpenAI-compatible API)
@@ -236,9 +254,11 @@ Nothing leaves your machine, and there's no per-token cost.
    ```shell
    repo-map ai ollama --model qwen2.5-coder:14b
    ```
-   That writes `{ "provider": "api", "api": { "baseUrl": "http://localhost:11434/v1", "model": "qwen2.5-coder:14b" } }`. For LM Studio, use `repo-map ai lmstudio --model <id>`.
+   That writes `{ "provider": "ollama", "ollama": { "model": "qwen2.5-coder:14b" } }`. For LM Studio, use `repo-map ai lmstudio --model <id>`. `--model` is optional for both: without it, the first model the server lists is used.
 
-No key is needed for `localhost`. LM Studio's default base URL is `http://localhost:1234/v1`.
+No key is needed. The default base URLs are `http://localhost:11434/v1` (Ollama) and `http://localhost:1234/v1` (LM Studio); change them with `--base-url`. For vLLM or another local server, use `repo-map ai api --base-url <url> --model <id>`.
+
+A running Ollama or LM Studio shows up in the trace menu even when it isn't your default.
 
 Smaller local models give rougher traces and maps. If answers come back malformed or miss obvious steps, try a larger model.
 
@@ -248,9 +268,11 @@ Smaller local models give rougher traces and maps. If answers come back malforme
 repo-map ai codex        # or: repo-map ai gemini
 ```
 
-That writes `{ "provider": "command", "command": { "preset": "codex" } }`. Sign in to the CLI first (`codex login`, or run `gemini` once).
+That writes `{ "provider": "codex", "codex": {} }` (add `--model` and `--effort` to set them). Sign in to the CLI first (`codex login`, or run `gemini` once). Settings from older versions, `{ "provider": "command", "command": { "preset": "codex" } }`, still work.
 
-These presets are starting points from each tool's documentation and haven't been tested against every version. CLI flags change between releases, so if one doesn't work, set the command yourself (next section).
+repo-map passes the model as `-m <model>` to both, and Codex's effort as `-c model_reasoning_effort=<level>`. Codex lists the models your account can use, and each one's effort levels, from the cache it keeps in `~/.codex` (or `$CODEX_HOME`); run Codex once if the list is empty.
+
+These presets are starting points from each tool's documentation and haven't been tested against every version. CLI flags change between releases, so if one doesn't work, set the command yourself (next section). On Windows, CLIs installed by npm are `.cmd` scripts; repo-map starts them through `cmd.exe`, which only works when the prompt goes in on stdin (Codex does; the Gemini preset passes it as an argument).
 
 ### Any other CLI
 
@@ -267,6 +289,7 @@ These presets are starting points from each tool's documentation and haven't bee
 ```
 
 - **`promptVia: "stdin"`** pipes the prompt in. **`"arg"`** passes it as an argument instead; put `"{prompt}"` in `args` to choose its position.
+- **`modelArgs`** and **`effortArgs`** (e.g. `["--model", "{model}"]`) pass the chosen model and effort; put `"{options}"` in `args` to choose where they go. List what the trace menu should offer in **`models`** and **`efforts`**. The model and effort are also in the environment as `REPO_MAP_MODEL` and `REPO_MAP_EFFORT`.
 - The tool must print its answer to stdout and exit 0. repo-map finds the JSON in the answer.
 - The tool needs to read files in the repo on its own. Run it in a read-only or sandboxed mode if it has one: repo-map can't restrict what a third-party CLI does.
 

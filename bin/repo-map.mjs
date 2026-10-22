@@ -13,9 +13,9 @@
 import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkApi, detectProvider } from '../lib/ai/index.mjs';
+import { agentsSummary, checkApi, detectProvider } from '../lib/ai/index.mjs';
 import { MAP_DIR, globalAiFile, findRepoRoot, loadConfig, loadMap, withDefaults } from '../lib/config.mjs';
-import { AI_PRESETS, writeAiSettings } from '../lib/settings.mjs';
+import { AI_PRESETS, aiPatch, writeAiSettings } from '../lib/settings.mjs';
 import { generateMap } from '../lib/generate.mjs';
 import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
@@ -35,7 +35,8 @@ Commands
   init        Create .repo-map/ with a starter config.json (re-run with flags to update it)
   ai <tool>   Choose the AI tool: claude, openai, api, ollama, lmstudio, codex, gemini,
               command, auto or none.  \`repo-map ai show\` prints the effective settings
-  doctor      Show which AI tool traces will use, and check that it works
+  doctor      List the AI tools found, with their models and effort levels, and check
+              the ones traces and the map will use
   generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists)
   update      Bring map.json up to date with the code changed since it was last evaluated
   validate    Check map.json for unknown ids, groups, kinds and missing paths
@@ -43,8 +44,10 @@ Commands
 
 Common options
   --dir <path>        Repo root (default: nearest folder with .repo-map/, else the current folder)
-  --provider <p>      AI tool for this run only: auto, claude, command, api or none
+  --provider <p>      AI tool for this run only: auto, claude, codex, gemini, api, ollama,
+                      lmstudio, command or none
   --model <id>        Model for this run (with \`ai\`: the model to save)
+  --effort <level>    Effort for this run, in the tool's own terms, e.g. high (with \`ai\`: to save)
   -v, --version       Print the version
   -h, --help          Show this help
 
@@ -61,6 +64,8 @@ ai
   --base-url <url>    API base URL (api/openai/ollama/lmstudio)
   --key-env <VAR>     Environment variable holding the API key (default REPO_MAP_API_KEY)
   --bin <path>        CLI to run (claude/codex/gemini/command)
+  --for generate      Save as the tool/model/effort for drawing and updating the map,
+                      instead of the default for traces
 
 generate
   --force             Overwrite map.json instead of writing map.draft.json
@@ -72,7 +77,7 @@ update
   --force             Update even when very many files changed
 
 doctor
-  --json              Print the result as JSON (exit code 1 when tracing is off)
+  --json              Print the result as JSON, with every tool found (exit code 1 when tracing is off)
 
 start / serve
   --port <n>          Port (default 4477, or REPO_MAP_PORT; start moves on if it's taken)
@@ -84,7 +89,7 @@ Scripted setup examples are in SETUP.md.`;
 const VALUE_FLAGS = {
     '--dir': 'dir', '--port': 'port', '--model': 'model', '--provider': 'provider',
     '--name': 'name', '--roots': 'roots', '--context': 'context', '--github': 'github',
-    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin',
+    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for',
 };
 const BOOL_FLAGS = {
     '--force': 'force', '--if-missing': 'ifMissing', '--json': 'json', '--yes': 'yes',
@@ -173,29 +178,40 @@ async function cmdAi(opts) {
     if (!tool || tool === 'show') {
         const root = resolveRoot(opts, { mustExist: false });
         const config = existsSync(path.join(root, MAP_DIR, 'config.json')) ? await loadConfig(root) : withDefaults({}, { globalAi: await readGlobalAi() });
-        const p = await detectProvider(config);
-        const { provider, claude, command, api, timeoutMs } = config.ai;
-        console.log(JSON.stringify({ provider, resolved: p.available ? p.id : 'none', label: p.label, available: p.available, reason: p.reason || undefined, claude, command, api, timeoutMs }, null, 2));
+        const [p, g] = await Promise.all([detectProvider(config), detectProvider(config, 'generate')]);
+        const summary = (x) => ({ resolved: x.available ? x.id : 'none', label: x.label, available: x.available, model: x.model || undefined, effort: x.effort || undefined, reason: x.reason || undefined });
+        const { provider, effort, generate, claude, codex, gemini, api, ollama, lmstudio, command, timeoutMs } = config.ai;
+        console.log(JSON.stringify({ provider, effort, generate, traces: summary(p), map: summary(g), claude, codex, gemini, api, ollama, lmstudio, command, timeoutMs }, null, 2));
         return;
     }
-    const preset = AI_PRESETS[tool];
-    if (!preset) {
+    if (!AI_PRESETS[tool]) {
         throw new Error(`Unknown AI tool "${tool}". Use one of: ${Object.keys(AI_PRESETS).join(', ')}.`);
     }
-    if (['api', 'openai', 'ollama', 'lmstudio'].includes(tool) && !opts.model) {
+    if (['api', 'openai'].includes(tool) && !opts.model) {
         throw new Error(`repo-map ai ${tool} needs --model <id>.`);
     }
     if (tool === 'command' && !opts.bin) {
         throw new Error('repo-map ai command needs --bin <cli>.');
     }
+    const task = opts.for || 'trace';
+    if (!['trace', 'generate'].includes(task)) {
+        throw new Error('--for takes "generate" (drawing and updating the map) or "trace".');
+    }
     const scope = opts.repo ? 'repo' : opts.local ? 'local' : 'global';
     const root = scope === 'global' ? null : resolveRoot(opts);
-    const { file } = await writeAiSettings({ root, scope, patch: preset(opts) });
-    console.log(`Saved AI settings (${tool}) to ${file}`);
+    const { file } = await writeAiSettings({ root, scope, patch: aiPatch(tool, opts, task) });
+    console.log(`Saved AI settings (${tool}${task === 'generate' ? ', for drawing and updating the map' : ''}) to ${file}`);
     if (['api', 'openai'].includes(tool) && !opts.baseUrl?.match(/localhost|127\.0\.0\.1/)) {
         console.log(`The API key is read from $${opts.keyEnv || 'REPO_MAP_API_KEY'} (never stored in files).`);
     }
     console.log('Check it with: repo-map doctor');
+}
+
+/** --effort is passed through settings, where one a tool doesn't offer is dropped quietly. Say so instead. */
+function checkRunFlags(p, opts) {
+    if (p.available && opts.effort && p.effort !== opts.effort) {
+        throw new Error(`${p.label} doesn’t offer effort "${opts.effort}". \`repo-map doctor\` lists each tool’s levels.`);
+    }
 }
 
 async function readGlobalAi() {
@@ -214,7 +230,8 @@ async function cmdGenerate(opts) {
         console.log(`${MAP_DIR}/map.json already has ${existing.nodes.length} nodes; skipping (--if-missing).`);
         return;
     }
-    const provider = await detectProvider(config);
+    const provider = await detectProvider(config, 'generate');
+    checkRunFlags(provider, opts);
     if (provider.available) {
         console.log(`Exploring ${root} with ${provider.label} (read-only). This can take several minutes…`);
     }
@@ -270,6 +287,7 @@ async function cmdUpdate(opts) {
         return;
     }
     console.log(describeStatus(st));
+    checkRunFlags(await detectProvider(config, 'generate'), opts);
     const result = await updateMap({
         root,
         config,
@@ -293,29 +311,55 @@ async function cmdDoctor(opts) {
     const config = await loadConfig(root);
     const ai = config.ai;
     const ok = (b) => (b ? 'ok  ' : 'no  ');
+    const [p, g, found] = await Promise.all([detectProvider(config), detectProvider(config, 'generate'), agentsSummary(config, { refresh: true })]);
+    // API-style agents can be checked without spending tokens (GET /models)
+    const check = async (x) => (x.available && x.settings ? checkApi(x.settings) : undefined);
+    const [api, mapApi] = await Promise.all([check(p), g.id === p.id && g.model === p.model ? undefined : check(g)]);
     if (opts.json) {
-        const p = await detectProvider(config);
-        const api = p.available && p.id === 'api' ? await checkApi(ai.api) : undefined;
         const ready = p.available && (!api || api.ok);
-        console.log(JSON.stringify({ ready, provider: p.id, label: p.label, auto: Boolean(p.auto), reason: p.reason || undefined, api }, null, 2));
+        const map = { provider: g.id, label: g.label, model: g.model || undefined, effort: g.effort || undefined, available: g.available, reason: g.reason || undefined, api: mapApi };
+        console.log(JSON.stringify({ ready, provider: p.id, label: p.label, model: p.model || undefined, effort: p.effort || undefined, auto: Boolean(p.auto), reason: p.reason || undefined, api, map, agents: found.agents }, null, 2));
         process.exitCode = ready ? 0 : 1;
         return;
     }
     console.log(`repo-map doctor · ${root}\n`);
     console.log(`Node ${process.versions.node}`);
-    console.log(`Settings: provider "${ai.provider}"  (sources: .repo-map/config.json, ${globalAiFile()}, .repo-map/local.json, REPO_MAP_* env vars)\n`);
-    const p = await detectProvider(config);
+    console.log(`Settings: provider "${ai.provider}"${ai.generate.provider ? `, map: "${ai.generate.provider}"` : ''}  (sources: .repo-map/config.json, ${globalAiFile()}, .repo-map/local.json, REPO_MAP_* env vars)\n`);
+
+    console.log('AI tools found:');
+    if (!found.agents.length) {
+        console.log('    none');
+    }
+    for (const a of found.agents) {
+        console.log(`${ok(a.available)}${a.available ? a.label : a.reason}`);
+        if (a.available && a.models.length) {
+            const ids = a.models.map((m) => m.id);
+            console.log(`      models: ${ids.slice(0, 12).join(', ')}${ids.length > 12 ? ` and ${ids.length - 12} more` : ''}`);
+        }
+        const efforts = [...new Set([...a.efforts, ...a.models.flatMap((m) => m.efforts || [])])];
+        if (a.available && efforts.length) {
+            console.log(`      effort: ${efforts.join(', ')}${a.models.some((m) => m.efforts) ? ' (depends on the model)' : ''}`);
+        }
+    }
+    console.log('');
+
     if (p.available) {
         console.log(`${ok(true)}Traces will use ${p.label}${p.auto ? ' (picked automatically)' : ''}${p.detail ? `: ${p.detail}` : ''}`);
-        if (p.id === 'api') {
-            const check = await checkApi(ai.api);
-            console.log(`${ok(check.ok)}API ${check.detail}`);
-            if (!check.ok) {
+        if (api) {
+            console.log(`${ok(api.ok)}API ${api.detail}`);
+            if (!api.ok) {
                 process.exitCode = 1;
             }
         } else {
             console.log('    Installed. Sign-in and usage limits are checked on the first trace.');
         }
+        console.log(g.available
+            ? `${ok(true)}The map will be drawn and updated with ${g.label}`
+            : `${ok(false)}Drawing the map: ${g.reason}`);
+        if (mapApi) {
+            console.log(`${ok(mapApi.ok)}API ${mapApi.detail}`);
+        }
+        console.log('    In the browser, the menu beside the Trace button switches tool, model and effort per trace.');
     } else {
         console.log(`${ok(false)}${p.reason}`);
         (p.tried || []).slice(1).forEach((t) => console.log(`    also: ${t}`));
@@ -323,10 +367,9 @@ async function cmdDoctor(opts) {
 You can still browse the map and open trace codes from teammates.
 To enable tracing, set up any one of these (details in SETUP.md):
   • Claude Code:   install it and run \`claude\` once to sign in
-  • OpenAI API:    export REPO_MAP_API_KEY=sk-...   and set ai.api.model
-  • Local model:   run Ollama, then in .repo-map/local.json
-                   {"provider":"api","api":{"baseUrl":"http://localhost:11434/v1","model":"qwen2.5-coder:14b"}}
-  • Codex/Gemini:  {"provider":"command","command":{"preset":"codex"}}   (or "gemini")`);
+  • Codex/Gemini:  install it and sign in, then  repo-map ai codex   (or gemini)
+  • OpenAI API:    export REPO_MAP_API_KEY=sk-...   then  repo-map ai openai --model <id>
+  • Local model:   run Ollama or LM Studio, then  repo-map ai ollama   (or lmstudio)`);
         process.exitCode = 1;
     }
 }
@@ -359,6 +402,9 @@ async function main() {
     // Flags become env overrides so every layer (and serve's per-request config reads) sees them
     if (opts.model) {
         process.env.REPO_MAP_MODEL = opts.model;
+    }
+    if (opts.effort) {
+        process.env.REPO_MAP_EFFORT = opts.effort;
     }
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;

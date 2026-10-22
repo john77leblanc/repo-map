@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+- **Choose the AI tool, model and effort per trace.** A menu beside the **Trace** button lists every AI tool repo-map finds on your machine (Claude Code, Codex, Gemini, a configured API, a running Ollama or LM Studio, a custom command), each with its models and effort levels, plus **Custom model…** for any model id. The choice is remembered per repo in your browser and also used for **Draw flowchart**. Each saved trace records what made it.
+- Models are listed live where the tool can say: `claude --help`, Codex's local model cache (with each model's own effort levels), and `GET /models` for APIs and local servers. Lists can be overridden in settings (`ai.<tool>.models`, `ai.<tool>.efforts`).
+- **A separate tool for drawing the map.** `ai.generate` sets the tool, model and effort for `generate` and `update`; empty fields fall back to the trace default. First-run setup asks about it, and `repo-map ai <tool> --for generate` sets it.
+- New `--effort` flag and `REPO_MAP_EFFORT`, saved as `"effort"` by `repo-map ai`. `--provider`, `--model` and `--effort` now apply to every task in that run.
+- New providers `codex`, `gemini`, `ollama` and `lmstudio`. Settings from 0.4 (`"command"` with a codex/gemini preset, `"api"` pointed at localhost) keep working.
+- `repo-map doctor` lists every tool found with its models and effort levels, and checks the map's tool too.
+- Fixed: Codex and Gemini ignored the configured model (it was only passed as an environment variable). It is now passed as `-m`.
+- Fixed: on Windows, CLIs installed by npm (`.cmd` scripts, e.g. Codex) couldn't be started.
+
 ## 0.4.0
 
 - **Flowcharts for traces.** With **Include a flowchart** ticked (the default, remembered per browser), the AI tool also draws the process's logic: what the person does, what the system does, the decisions and their outcomes, failure paths and retry loops. Boxes are linked to trace steps, and anything inferred rather than read in code is dashed.

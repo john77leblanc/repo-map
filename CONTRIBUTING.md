@@ -27,7 +27,9 @@ lib/repo.mjs         git info and safe, read-only file access (codeRoots / block
 lib/prompts.mjs      prompts for traces and generate
 lib/validate.mjs     map.json checks
 lib/json.mjs         pulls the JSON object out of a model's reply
-lib/ai/index.mjs     picks the AI provider (auto / claude / command / api / none) and runs it
+lib/ai/agents.mjs    registry: detects each agent (claude, codex, gemini, api, ollama, lmstudio, command),
+                     lists its models and effort levels, validates picks, runs a selection
+lib/ai/index.mjs     picks the agent for a task (trace / generate) and runs it
 lib/ai/claude.mjs    Claude Code CLI runner
 lib/ai/command.mjs   generic CLI runner and presets (codex, gemini)
 lib/ai/api.mjs       OpenAI-compatible Chat Completions runner with a tool-call loop
@@ -41,7 +43,7 @@ test/                node:test suites
 
 ### Adding an AI provider
 
-Each runner takes `{ root, config, prompt, settings, timeoutMs, maxTurns, onProgress }` and returns `{ promise, kill }`. The promise resolves to `{ text, cost?, turns?, tokens? }`, or rejects with an `Error` whose `code` is one of `missing`, `auth`, `access`, `limit`, `model`, `timeout`, `turns` or `failed`. Use `classifyFailure()` from `lib/ai/errors.mjs` for the message. Wire it into `detectProvider` and `runAi` in `lib/ai/index.mjs`, document it in SETUP.md, and add a test with a fake server or script (see `test/ai.test.mjs`).
+Each runner takes `{ root, config, prompt, settings, timeoutMs, maxTurns, onProgress }` and returns `{ promise, kill }`. The promise resolves to `{ text, cost?, turns?, tokens? }`, or rejects with an `Error` whose `code` is one of `missing`, `auth`, `access`, `limit`, `model`, `timeout`, `turns` or `failed`. Use `classifyFailure()` from `lib/ai/errors.mjs` for the message. Add it to the registry in `lib/ai/agents.mjs`: a detect function returning `{ id, kind, label, available, reason, settings, models, efforts, defaultModel }`, an entry in `listAgents`, `AUTO_ORDER` and `PROVIDERS` (`lib/config.mjs`), and a case in `runSelection` if it needs a new runner. Pass the model and effort to the tool as flags, never through a shell. Document it in SETUP.md, and add a test with a fake server or script (see `test/ai.test.mjs`).
 
 Runners must stay read-only: no tools that write files, run shell commands or browse.
 

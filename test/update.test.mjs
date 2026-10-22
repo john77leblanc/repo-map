@@ -99,6 +99,10 @@ test('updateMap sends only the diff and applies the returned patch', async () =>
             body += d;
         });
         req.on('end', () => {
+            if (req.method === 'GET') {
+                res.end(JSON.stringify({ data: [{ id: 'm' }] })); // GET /models
+                return;
+            }
             prompt = JSON.parse(body).messages.find((m) => m.role === 'user').content;
             const patch = { summary: 'Added the billing module.', nodes: { add: [{ id: 'billing', group: 'g', kind: 'service', path: 'src/billing', desc: 'Charges cards.' }] }, edges: { add: [{ from: 'api', to: 'billing', type: 'event' }] } };
             res.setHeader('content-type', 'application/json');

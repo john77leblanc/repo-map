@@ -41,16 +41,23 @@ test('ai saves settings to the chosen scope', () => {
     const s = sandbox();
     s.run('init');
     assert.equal(s.run('ai', 'ollama', '--model', 'qwen2.5-coder:14b').status, 0);
-    assert.deepEqual(s.readGlobal(), { provider: 'api', api: { model: 'qwen2.5-coder:14b', baseUrl: 'http://localhost:11434/v1' } });
+    assert.deepEqual(s.readGlobal(), { provider: 'ollama', ollama: { model: 'qwen2.5-coder:14b' }, effort: '' });
 
-    assert.equal(s.run('ai', 'codex', '--local').status, 0);
-    assert.deepEqual(s.read('.repo-map/local.json'), { provider: 'command', command: { preset: 'codex' } });
+    // a separate tool, model and effort for drawing the map; the trace default is kept
+    assert.equal(s.run('ai', 'claude', '--model', 'opus', '--effort', 'high', '--for', 'generate').status, 0);
+    assert.deepEqual(s.readGlobal(), { provider: 'ollama', ollama: { model: 'qwen2.5-coder:14b' }, effort: '', generate: { provider: 'claude', model: 'opus', effort: 'high' } });
+    assert.notEqual(s.run('ai', 'claude', '--for', 'everything').status, 0);
+
+    assert.equal(s.run('ai', 'codex', '--local', '--effort', 'low').status, 0);
+    assert.deepEqual(s.read('.repo-map/local.json'), { provider: 'codex', codex: {}, effort: 'low' });
 
     assert.equal(s.run('ai', 'claude', '--repo').status, 0);
     assert.equal(s.read('.repo-map/config.json').ai.provider, 'claude');
 
     const shown = JSON.parse(s.run('ai', 'show').stdout);
-    assert.equal(shown.provider, 'command'); // local.json wins over global and repo
+    assert.equal(shown.provider, 'codex'); // local.json wins over global and repo
+    assert.equal(shown.effort, 'low');
+    assert.deepEqual(shown.generate, { provider: 'claude', model: 'opus', effort: 'high' });
 
     assert.notEqual(s.run('ai', 'openai').status, 0); // needs --model
     assert.notEqual(s.run('ai', 'wizard').status, 0);

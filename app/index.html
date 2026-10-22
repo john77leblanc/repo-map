@@ -223,6 +223,16 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* flowchart option + button in the trace panel */
 .opt{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;margin-right:auto}
 .opt input{margin:0;accent-color:var(--http)}
+/* AI tool / model / effort picker beside the Trace button */
+#run{margin-left:auto}
+.pick{display:flex;gap:6px;align-items:center;flex:1 1 200px;min-width:0}
+.pick select,.pickin{font:inherit;font-size:12.5px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);min-width:0}
+.pick select:focus-visible,.pickin:focus-visible{outline:2px solid var(--http);outline-offset:1px}
+#pick-agent{flex:1 1 auto;text-overflow:ellipsis}
+#pick-effort{flex:none;max-width:84px}
+.pickin{display:block;box-sizing:border-box;width:100%;margin-top:6px;font-family:var(--f-mono);background:var(--bg)}
+.pickin[aria-invalid="true"]{border-color:var(--event)}
+.pick .iconbtn{width:26px;height:26px}
 .flowrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
 .flowbtn{display:inline-flex;align-items:center;gap:6px}
 .flowbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
@@ -304,9 +314,17 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
     <div class="noai" id="noai" hidden><b>Tracing is off on this machine.</b> <span id="noai-why"></span> Run <code>repo-map doctor</code> to see your options, or set one up with the package’s SETUP.md. You can still open a trace a teammate shared: paste its code under <a href="#importbox" id="noai-import">Import a trace code</a>.</div>
     <textarea id="prompt" placeholder="e.g. What happens when someone places an order?"></textarea>
     <div class="row">
-      <label class="opt" title="The AI tool also draws the process as a flowchart: decisions, failure paths and outcomes. Takes a little longer."><input type="checkbox" id="withflow" checked> Include a flowchart</label>
+      <span class="pick" id="pick" hidden>
+        <select id="pick-agent" aria-label="AI tool and model" title="AI tool and model for this trace"></select>
+        <select id="pick-effort" aria-label="Effort" title="How hard the AI tool works on this trace. Higher is slower and uses more of your plan or credits." hidden></select>
+        <button class="iconbtn" id="pick-refresh" type="button" title="Look for AI tools and models again" aria-label="Look for AI tools and models again"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg></button>
+      </span>
       <button class="btn primary" id="run" type="button" disabled>Trace</button>
       <button class="btn" id="stop" type="button" hidden>Stop</button>
+    </div>
+    <input class="pickin" id="pick-custom" type="text" placeholder="Model id, e.g. gpt-5" aria-label="Model id" spellcheck="false" autocomplete="off" hidden>
+    <div class="row">
+      <label class="opt" title="The AI tool also draws the process as a flowchart: decisions, failure paths and outcomes. Takes a little longer."><input type="checkbox" id="withflow" checked> Include a flowchart</label>
       <span class="status" id="status" aria-live="polite">Connecting…</span>
     </div>
   </section>
@@ -606,9 +624,15 @@ function normalizeTrace(raw,prompt){
     if(edgePairs.has(a+"|"+b))pairs.add(a+"|"+b);else if(edgePairs.has(b+"|"+a))pairs.add(b+"|"+a);}
   return {title:String(raw.title||"Untitled trace").slice(0,80),prompt:String(prompt||raw.prompt||"").slice(0,2000),
     summary:String(raw.summary||""),gaps:String(raw.gaps||""),steps,edges:[...pairs].map(k=>k.split("|")),pairs,refs:cleanRefs(refs,steps)||[],
-    flow:FLOW.normalizeFlow(raw.flow,steps.length)};
+    flow:FLOW.normalizeFlow(raw.flow,steps.length),used:cleanUsed(raw.used)};
 }
-function plain(t){const o={title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};if(t.flow)o.flow=t.flow;return o;}
+/** Which AI tool, model and effort made a trace (shown in the list; travels in trace codes as information only). */
+function cleanUsed(u){
+  if(!u||typeof u!=="object")return null;
+  const s=(v,n)=>String(v||"").slice(0,n);
+  return {agent:s(u.agent,40),model:s(u.model,120),effort:s(u.effort,32),label:s(u.label,160)};
+}
+function plain(t){const o={title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};if(t.flow)o.flow=t.flow;if(t.used)o.used=t.used;return o;}
 
 let preTraceGroups=null;   // group open-state before a trace took over, restored on close
 function setTrace(t){
@@ -698,6 +722,7 @@ function traceBody(t){
   body.appendChild(ol);
   const n=(t.refs||[]).length;
   if(n){const c=document.createElement("div");c.className="codestat";c.innerHTML='<span class="status">'+n+' code reference'+(n===1?'':'s')+' · read from your checkout</span>';body.appendChild(c);}
+  if(t.used&&t.used.label){const u=document.createElement("div");u.className="codestat";u.innerHTML='<span class="status"></span>';u.firstChild.textContent="Traced with "+t.used.label;body.appendChild(u);}
   if(t.gaps){const g=document.createElement("p");g.className="gaps";g.textContent="Not shown clearly: "+t.gaps;body.appendChild(g);}
   const acts=document.createElement("div");acts.className="sva";
   acts.innerHTML='<button class="linkbtn" data-a="copy" type="button">Copy trace code</button>'+(t._doc?'<button class="linkbtn danger" data-a="del" type="button">Delete</button>':'<button class="linkbtn" data-a="save" type="button">Retry saving</button>');
@@ -725,6 +750,7 @@ function renderSaved(){
     li.querySelector("b").textContent=it.title;
     if(it._temp)li.querySelector("b").insertAdjacentHTML("beforeend",'<span class="tbadge">not saved</span>');
     li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",it.flow?"flowchart":"",open?"":it.prompt].filter(Boolean).join(" · ");
+    if(it.used&&it.used.label)li.querySelector(".th").title="Traced with "+it.used.label;
     li.querySelector(".th").onclick=()=>{
       if(open){setTrace(null);return;}
       if(it._temp){setTrace(store.temp);return;}
@@ -815,7 +841,7 @@ async function drawFlow(t,btn,stat){
   const t0=Date.now();let last="Starting…";
   const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};tick();const tm=setInterval(tick,1000);
   try{
-    const res=await api("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t)}),signal:flowCtl.signal});
+    const res=await api("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t),...currentPick()}),signal:flowCtl.signal});
     if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
     const rd=res.body.getReader(),dec=new TextDecoder();let buf="",result=null,error=null;
     for(;;){
@@ -964,10 +990,10 @@ async function runTrace(){
   const q=$("prompt").value.trim();if(!q||ctl)return;
   ctl=new AbortController();
   $("run").disabled=true;$("stop").hidden=false;
-  const t0=Date.now();let last="Starting "+(AI_BOOT.label||"AI tool")+"…";
+  const t0=Date.now();let last="Starting "+pickLabel()+"…";
   const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s");tick();timer=setInterval(tick,1000);
   try{
-    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked}),signal:ctl.signal});
+    const res=await api("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked,...currentPick()}),signal:ctl.signal});
     if(!res.ok||!res.body)throw new Error((await res.json().catch(()=>({}))).error||"HTTP "+res.status);
     const rd=res.body.getReader(), dec=new TextDecoder();let buf="",result=null,error=null;
     for(;;){
@@ -982,8 +1008,8 @@ async function runTrace(){
       }
     }
     if(error)throw new Error(error);
-    if(!result)throw new Error((AI_BOOT.label||"The AI tool")+" ended without an answer. Run repo-map doctor to check your setup.");
-    const t=normalizeTrace(result.trace,q);
+    if(!result)throw new Error(pickLabel()+" ended without an answer. Run repo-map doctor to check your setup.");
+    const t=normalizeTrace({...result.trace,used:result.used},q);
     setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+(result.cost?" · $"+result.cost.toFixed(2):result.tokens?" · "+result.tokens.toLocaleString()+" tokens":""));
     await keepTrace(t);
     $("prompt").value="";
@@ -994,6 +1020,102 @@ async function runTrace(){
     clearInterval(timer);$("stop").hidden=true;$("run").disabled=!REPO.ai;ctl=null;
   }
 }
+/* ---------- choosing the AI tool, model and effort for a trace ----------
+   The server lists every tool it found (/api/agents). The choice is remembered
+   in this browser per repo, and sent with each trace; the server checks it. */
+const pick={agents:[],def:null,off:false,sel:null,opts:[]};
+const MODEL_ID=/^[\w.:\/@+-]{1,120}$/;
+const liveAgent=id=>pick.agents.find(a=>a.id===id&&a.available);
+function effortsOf(a,model){const m=a.models.find(x=>x.id===model);return (m&&m.efforts)||a.efforts||[];}
+function pickLabel(){
+  const s=pick.sel,a=s&&liveAgent(s.agent);
+  if(!a)return AI_BOOT.label||"AI tool";
+  return [a.label,s.model||a.defaultModel,s.effort].filter(Boolean).join(" · ");
+}
+/** What to send with a trace: {} means "the configured default". */
+function currentPick(){
+  const s=pick.sel;if(!s||!liveAgent(s.agent))return {};
+  return {agent:s.agent,...(s.model?{model:s.model}:{}),...(s.effort?{effort:s.effort}:{})};
+}
+function savePick(){try{localStorage.setItem(NS+"pick",JSON.stringify(pick.sel));}catch(_){}}
+function loadPick(){try{return JSON.parse(localStorage.getItem(NS+"pick")||"null");}catch(_){return null;}}
+function renderPick(){
+  const sel=$("pick-agent"),s=pick.sel;sel.innerHTML="";pick.opts=[];
+  const add=(parent,text,agent,model,custom)=>{const o=new Option(text,String(pick.opts.length));pick.opts.push({agent,model,custom});parent.appendChild(o);return o;};
+  let chosen=null;
+  pick.agents.forEach(a=>{
+    const g=document.createElement("optgroup");g.label=a.label;
+    if(!a.available){
+      g.label=a.label+" (unavailable)";g.disabled=true;
+      const o=new Option(a.reason||"Not available","");o.disabled=true;g.appendChild(o);sel.appendChild(g);return;
+    }
+    const def=add(g,a.label+" · "+(a.defaultModel||"default model"),a.id,"");
+    const known=new Set(a.models.map(m=>m.id));
+    a.models.forEach(m=>{if(m.id===a.defaultModel)return;const o=add(g,a.label+" · "+(m.label||m.id),a.id,m.id);if(s&&s.agent===a.id&&s.model===m.id)chosen=o;});
+    const cust=add(g,a.label+" · custom model…",a.id,"",true);
+    if(s&&s.agent===a.id){
+      if(!s.model||s.model===a.defaultModel)chosen=chosen||def;
+      else if(!known.has(s.model))chosen=cust;
+    }
+    sel.appendChild(g);
+  });
+  if(chosen)chosen.selected=true;
+  const o=pick.opts[Number(sel.value)]||{};
+  const inp=$("pick-custom");inp.hidden=!o.custom;
+  if(o.custom&&s)inp.value=s.model||"";
+  renderEffort();
+  pickTitles();
+}
+function pickTitles(){
+  $("pick-agent").title="AI tool and model for this trace: "+pickLabel();
+  $("trace-hint").textContent="Describe a flow in plain words. "+pickLabel()+" reads this map and your local checkout, then highlights the parts involved and the code behind each step.";
+}
+function renderEffort(){
+  const s=pick.sel,a=s&&liveAgent(s.agent),eff=$("pick-effort");
+  const list=a?effortsOf(a,s.model||a.defaultModel):[];
+  eff.innerHTML="";eff.hidden=!list.length;
+  if(!list.length){if(s)s.effort="";return;}
+  eff.appendChild(new Option("effort","")).title="The tool’s default effort";
+  list.forEach(e=>eff.appendChild(new Option(e,e)));
+  if(s.effort&&!list.includes(s.effort))s.effort="";
+  eff.value=s.effort||"";
+}
+$("pick-agent").onchange=()=>{
+  const o=pick.opts[Number($("pick-agent").value)];if(!o)return;
+  const prev=pick.sel||{};
+  pick.sel={agent:o.agent,model:o.custom?(prev.agent===o.agent?prev.model:""):o.model,effort:prev.agent===o.agent?prev.effort:""};
+  const inp=$("pick-custom");inp.hidden=!o.custom;inp.removeAttribute("aria-invalid");
+  if(o.custom){inp.value=pick.sel.model||"";inp.focus();}
+  savePick();renderEffort();
+  pickTitles();
+};
+$("pick-custom").oninput=()=>{
+  const inp=$("pick-custom"),v=inp.value.trim(),ok=!v||(MODEL_ID.test(v)&&!v.startsWith("-"));
+  inp.setAttribute("aria-invalid",ok?"false":"true");
+  if(ok&&pick.sel){pick.sel.model=v;savePick();renderEffort();pickTitles();}
+};
+$("pick-effort").onchange=()=>{if(pick.sel){pick.sel.effort=$("pick-effort").value;savePick();pickTitles();}};
+async function loadAgents(refresh){
+  let j;
+  try{const r=await api("/api/agents"+(refresh?"?refresh=1":""));if(!r.ok)throw new Error();j=await r.json();}catch(_){return;}
+  pick.agents=j.agents||[];pick.def=j.default;pick.off=!!j.off;
+  const any=pick.agents.some(a=>a.available)&&!pick.off;
+  const saved=pick.sel||loadPick();
+  pick.sel=saved&&liveAgent(saved.agent)?{agent:saved.agent,model:saved.model||"",effort:saved.effort||""}
+    :pick.def?{...pick.def}
+    :any?{agent:pick.agents.find(a=>a.available).id,model:"",effort:""}:null;
+  $("pick").hidden=!any;$("pick-custom").hidden=true;
+  if(!any)return;
+  // the configured default may be unavailable while another tool works: tracing is still on
+  if(!AI_BOOT.available){
+    AI_BOOT.available=true;REPO.ai=true;
+    $("run").disabled=!!ctl;$("prompt").disabled=false;$("withflow").closest(".opt").hidden=false;$("noai").hidden=true;
+    renderSaved();
+  }
+  renderPick();
+}
+$("pick-refresh").onclick=async()=>{const b=$("pick-refresh");b.disabled=true;await loadAgents(true);b.disabled=false;};
+
 $("run").onclick=runTrace;
 (()=>{const k=NS+"flow",cb=$("withflow");try{const v=localStorage.getItem(k);if(v!==null)cb.checked=v==="1";}catch(_){}
   cb.onchange=()=>{try{localStorage.setItem(k,cb.checked?"1":"0");}catch(_){}};})();
@@ -1062,7 +1184,7 @@ async function runUpdate(){
   }finally{upCtl=null;}
 }
 
-loadRepo();loadSaved();loadMapStatus();
+loadRepo();loadSaved();loadMapStatus();loadAgents();
 
 /* ---------- sidebar collapse + resize ---------- */
 (()=>{

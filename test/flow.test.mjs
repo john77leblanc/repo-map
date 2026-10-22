@@ -130,6 +130,10 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
         let b = '';
         req.on('data', (c) => { b += c; });
         req.on('end', () => {
+            if (req.method === 'GET') {
+                res.end(JSON.stringify({ data: [{ id: 'fake' }] })); // GET /models
+                return;
+            }
             const prompt = JSON.parse(b).messages.map((m) => m.content).join('\n');
             const out = prompt.startsWith('You are drawing a flowchart')
                 ? { flow: CHECKOUT }
@@ -170,6 +174,21 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
     assert.equal(saved.flow.nodes.length, 7);
     assert.equal(readdirSync(path.join(dir, '.repo-map', 'traces')).length, 1);
     assert.equal((await fetch(`${base}/api/traces/00000000-0000-0000-0000-000000000000`, { method: 'PUT', headers: H, body: '{}' })).status, 404);
+
+    // the picker: agents with their models, and picks checked before anything runs
+    const agents = await (await fetch(`${base}/api/agents`, { headers: H })).json();
+    const api = agents.agents.find((a) => a.id === 'api');
+    assert.equal(api.available, true);
+    assert.ok(api.models.some((m) => m.id === 'fake'));
+    assert.deepEqual(agents.default, { agent: 'api', model: 'fake', effort: '' });
+    assert.equal(JSON.stringify(agents).includes('baseUrl'), false, 'no settings leak to the browser');
+    const post = (body) => fetch(`${base}/api/trace`, { method: 'POST', headers: H, body: JSON.stringify({ prompt: 'Place an order', ...body }) });
+    assert.equal((await post({ agent: 'api', model: '--dangerous' })).status, 400);
+    assert.equal((await post({ agent: 'not-a-tool' })).status, 400);
+    assert.equal((await post({ agent: 'api', effort: 'ludicrous' })).status, 400);
+    const picked = await lastResult(await post({ agent: 'api', model: 'other-model' }));
+    assert.equal(picked.type, 'result');
+    assert.deepEqual({ ...picked.used, label: undefined }, { agent: 'api', model: 'other-model', effort: '', label: undefined });
 
     const mod = await fetch(`${base}/app/flowchart.mjs`);
     assert.equal(mod.status, 200);
