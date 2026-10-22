@@ -38,10 +38,13 @@ lib/ai/api.mjs       OpenAI-compatible Chat Completions runner with a tool-call 
 lib/ai/tools.mjs     read-only repo tools given to API models
 lib/ai/errors.mjs    turns provider failures into causes people can act on
 app/index.html       the whole UI (single file, no build step)
+lib/trace-outputs.mjs shared output availability and legacy trace compatibility
 templates/           starter config for `repo-map init`
 examples/shop/       small fictional repo used by `npm run example` and the tests
 test/                node:test suites
 ```
+
+The UI has a trace-centered sidebar: Settings and collapse controls, New trace, and saved trace cards with title, prompt, and Architecture / Flowchart buttons. Outputs open on the main canvas; Settings has a separate dialog. Flowcharts use the main canvas; both diagrams expose details and code on selection. A saved trace's optional `outputs: { architecture, flowchart }` records its available outputs. Legacy traces expose architecture and any valid flowchart. `pendingFlow: true` keeps an incomplete flowchart discoverable for retry. Supporting trace steps remain present for flowchart-only results. The shared output helper is browser-safe and served through the module whitelist in `lib/server.mjs`.
 
 ### Adding an AI provider
 

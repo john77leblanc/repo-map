@@ -128,7 +128,7 @@ details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--fo
 .app.collapsed .iconbtn svg{transform:rotate(180deg)}
 .app.collapsed .side-in{padding:14px 7px;align-items:center;overflow:hidden}
 .app.collapsed .side-in>:not(.side-bar){display:none}
-.app.collapsed .side-bar{flex-direction:column-reverse;gap:12px;margin:0}
+.app.collapsed .side-bar{flex-direction:column;gap:12px;margin:0}
 .app.collapsed .side-bar .lbl{writing-mode:vertical-rl;cursor:pointer}
 .resizer{position:absolute;left:-5px;height:100%;top:0;bottom:0;width:10px;cursor:col-resize;z-index:5;touch-action:none}
 .resizer::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
@@ -223,17 +223,17 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* flowchart option + button in the trace panel */
 .opt{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;margin-right:auto}
 .opt input{margin:0;accent-color:var(--http)}
-/* AI tool / model / effort picker beside the Trace button */
+/* AI tool / model / effort pickers in Settings */
 #run{margin-left:auto}
 .pick{display:flex;gap:6px;align-items:center;flex:1 1 200px;min-width:0}
 .pick select,.pickin{font:inherit;font-size:12.5px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);min-width:0}
 .pick select:focus-visible,.pickin:focus-visible{outline:2px solid var(--http);outline-offset:1px}
-#pick-agent{flex:1 1 auto;text-overflow:ellipsis}
+#tpick-agent{flex:1 1 auto;text-overflow:ellipsis}
 #pick-effort{flex:none;max-width:84px}
 .pickin{display:block;box-sizing:border-box;width:100%;margin-top:6px;font-family:var(--f-mono);background:var(--bg)}
 .pickin[aria-invalid="true"]{border-color:var(--event)}
 .pick .iconbtn{width:26px;height:26px}
-/* sidebar tabs: Traces | Map */
+/* Sidebar panes */
 .tabs{display:flex;gap:2px}
 .tabs button{all:unset;cursor:pointer;padding:4px 8px;border-radius:5px;color:var(--muted)}
 .tabs button:hover{color:var(--ink)}
@@ -262,10 +262,7 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .flowrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
 .flowbtn{display:inline-flex;align-items:center;gap:6px}
 .flowbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
-/* flowchart modal */
-dialog.fdlg{padding:0;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);width:min(1280px,calc(100vw - 32px));height:min(880px,calc(100vh - 32px));max-width:none;max-height:none;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
-dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
-.fdlg[open]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+/* flowchart workspace */
 .fhead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--line)}
 .fhead h2{font-family:var(--f-head);font-size:19px;font-weight:600;margin:0}
 .fhead p{margin:2px 0 0;font-size:12.5px;color:var(--muted);max-width:70ch}
@@ -289,6 +286,47 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
 .fside .refs{margin-left:0}
 .fside .fwarn{font-size:12px;color:var(--event);margin:0 0 10px}
 @media (max-width:760px){.fmain{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}.fside{border-left:0;border-top:1px solid var(--line);max-height:40vh}}
+
+/* Workspace shell */
+[hidden]{display:none!important}
+.app{grid-template-columns:var(--side-w) minmax(0,1fr)}
+.app.collapsed{grid-template-columns:44px minmax(0,1fr)}
+.side{grid-column:1;grid-row:1;border-left:0;border-right:1px solid var(--line)}
+.main{grid-column:2;grid-row:1;padding:0;min-height:100vh}
+.top{padding:24px 28px 16px;gap:16px}.side-in{padding:20px 16px;gap:22px}.resizer{left:auto;right:-5px}
+.diagram-key{padding:0 28px 12px;color:var(--muted);font-size:12px}.diagram-key summary{cursor:pointer;width:fit-content}.diagram-key .legend{padding:12px 0 0}
+.output-options{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px}.output-options legend{font-weight:500;margin-bottom:6px}.output-options .hint{flex-basis:100%}
+.trace-outputs{margin-top:12px}
+.trace-actions{display:grid;grid-template-columns:max-content 28px minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:12px}
+.trace-actions .status{min-width:0;overflow-wrap:anywhere}
+#composer{padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:24px}
+.arch-stage{display:grid;grid-template-columns:minmax(0,1fr) auto;min-height:70vh}
+#arch-details{width:310px;padding:18px;border-left:1px solid var(--line);background:var(--panel);max-height:calc(100vh - 180px);overflow:auto;position:sticky;top:0;box-sizing:border-box}
+#arch-details h3{font-size:17px;margin:16px 0 8px}#arch-details .refs{margin-top:18px}#arch-details .cl{width:100%}#arch-details p{font-size:13px}
+.trace-context{padding:12px 28px;border-block:1px solid var(--line);background:var(--panel)}.trace-context:empty{display:none}.trace-context h2{font-size:17px;margin:0 0 4px}.trace-context p{font-size:13px;color:var(--muted);margin:0}
+.fdlg{background:var(--bg);color:var(--ink)}.fhead{padding:18px 24px}.fmain{min-height:65vh;height:calc(100vh - 260px)}.fcanvas{min-height:400px}
+.fmain.details-closed{grid-template-columns:minmax(0,1fr)}
+.flegend{display:block}.flegend summary{cursor:pointer}.flegend>div{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:8px}
+#flow-empty{padding:48px 28px;max-width:600px}
+#settings-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(680px,calc(100vw - 32px));max-height:90vh;padding:0}
+#settings-dialog::backdrop{background:rgba(0,0,0,.35)}#pane-map{padding:24px;display:grid;gap:24px}#pane-map h2{font-size:16px;margin:0 0 8px}.fside{font-size:13px}
+@media(max-width:1000px){
+ .app,.app.collapsed{grid-template-columns:260px minmax(0,1fr)}.side{position:sticky;order:0;border-top:0}.side-in{height:100vh}.app.collapsed{grid-template-columns:44px minmax(0,1fr)}
+ .app.collapsed .side-bar{flex-direction:column}.app.collapsed .side-bar .lbl{writing-mode:vertical-rl}.top{padding:18px;flex-wrap:wrap}.arch-stage{grid-template-columns:minmax(0,1fr)}
+ #arch-details{position:fixed;bottom:0;top:auto;right:0;width:min(420px,100vw);max-height:65vh;z-index:20;border:1px solid var(--line);box-shadow:0 -8px 32px #0002}
+}
+@media(max-width:760px){
+ .app,.app.collapsed{display:flex;flex-direction:column}.side{position:static;width:100%;border-right:0;border-bottom:1px solid var(--line)}.side-in{height:auto;max-height:55vh} .app.collapsed .side-in{padding:10px 16px}.app.collapsed .side-bar{flex-direction:row}.app.collapsed .side-bar .lbl{writing-mode:horizontal-tb}.main{width:100%}.fmain{height:75vh}.fhead{flex-wrap:wrap;padding:16px}.fside{max-height:35vh}
+}
+.trace-card{padding:12px}
+.trace-card h3{font-family:var(--f-head);font-size:15px;line-height:1.35;margin:0 0 6px;overflow-wrap:anywhere}
+.trace-card .trace-prompt{font-size:12.5px;color:var(--muted);margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.trace-card .trace-output-actions{display:flex;flex-wrap:wrap;gap:8px}
+.trace-output-actions [aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
+.trace-card .trace-save-note{font-size:11.5px;color:var(--event);margin:0 0 8px}
+.side-bar #tab-map{display:flex;align-items:center;gap:4px}
+.app.collapsed .side-bar #tab-map{font-size:0;padding:6px}
+.app.collapsed .side-bar #tab-map::before{content:"\2699";font-size:16px}
 </style>
 </head>
 <body>
@@ -305,10 +343,10 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
       <input id="q" type="search" placeholder="Find a node" aria-label="Find a node"></label>
     <button class="btn" id="expand" type="button">Expand groups</button>
     <button class="btn" id="collapse" type="button">Collapse groups</button>
-    <button class="btn" id="clear" type="button">Clear focus</button>
+    <button class="btn" id="clear" type="button">Whole repository</button>
   </div>
 </header>
-<div class="legend" role="group" aria-label="Connection types">
+<details class="diagram-key"><summary>Diagram key</summary><div class="legend" role="group" aria-label="Connection types">
   <button class="chip" type="button" data-type="http" aria-pressed="true"><i class="sw http"></i><span data-lbl="http">HTTP call</span></button>
   <button class="chip" type="button" data-type="event" aria-pressed="true"><i class="sw event"></i><span data-lbl="event">Event</span></button>
   <button class="chip" type="button" data-type="sync" aria-pressed="true"><i class="sw sync"></i><span data-lbl="sync">Data sync / job</span></button>
@@ -317,6 +355,7 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
   <span class="note">Arrows point from caller to callee, publisher to topic to subscriber, and source to destination for syncs. Hover a card to trace it; click to open it.</span>
 </div>
 
+</details>
 <div class="stale" id="stale" hidden role="status"></div>
 <div class="scroller" id="scroller">
   <div class="board" id="board">
@@ -327,42 +366,40 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
 </div>
 <p class="foot" id="footnote">Edges into a collapsed group attach to the group header.</p>
 </main>
-<aside class="side" aria-label="Traces" id="side">
-  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize traces panel" tabindex="0" title="Drag to resize · double-click to reset"></div>
+<aside class="side" aria-label="Repository library" id="side">
+  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize library" tabindex="0" title="Drag to resize · double-click to reset"></div>
   <div class="side-in">
   <div class="side-bar">
-    <div class="lbl tabs" id="side-lbl" role="tablist" aria-label="Panel">
-      <button type="button" role="tab" id="tab-traces" aria-controls="pane-traces" aria-selected="true">Traces</button>
-      <button type="button" role="tab" id="tab-map" aria-controls="pane-map" aria-selected="false" tabindex="-1">Map<span class="tdot" id="tab-map-dot" hidden title="Needs attention"></span></button>
-    </div>
+    <button class="btn" id="tab-map" type="button">Settings<span class="tdot" id="tab-map-dot" hidden title="Needs attention"></span></button>
     <button class="iconbtn" id="side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Collapse panel"><svg viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
   </div>
-  <div class="pane" id="pane-traces" role="tabpanel" aria-labelledby="tab-traces">
-  <section>
-    <h2>Trace a process</h2>
+  <button class="btn primary" id="new-trace" type="button" aria-expanded="false" aria-controls="composer">New trace</button>
+  <div class="pane" id="pane-traces" >
+  <section id="composer" hidden>
+    <h2>Ask how something works</h2>
     <p class="hint" id="trace-hint">Describe a flow in plain words. Your AI tool reads this map and your local checkout, then highlights the parts involved and the code behind each step.</p>
     <div class="noai" id="noai" hidden><b>Tracing is off on this machine.</b> <span id="noai-why"></span> Run <code>repo-map doctor</code> to see your options, or set one up with the package’s SETUP.md. You can still open a trace a teammate shared: paste its code under <a href="#importbox" id="noai-import">Import a trace code</a>.</div>
-    <textarea id="prompt" placeholder="e.g. What happens when someone places an order?"></textarea>
-    <div class="row">
-      <span class="pick" id="pick" hidden>
-        <select id="pick-agent" aria-label="AI tool and model" title="AI tool and model for this trace"></select>
-        <select id="pick-effort" aria-label="Effort" title="How hard the AI tool works on this trace. Higher is slower and uses more of your plan or credits." hidden></select>
-        <button class="iconbtn" id="pick-refresh" type="button" title="Look for AI tools and models again" aria-label="Look for AI tools and models again"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg></button>
-      </span>
-      <button class="btn primary" id="run" type="button" disabled>Trace</button>
+    <textarea id="prompt" aria-label="Process to trace" placeholder="e.g. What happens when someone places an order?"></textarea>
+    <div class="trace-outputs">
+      <fieldset class="output-options"><legend>Outputs</legend>
+        <label class="opt"><input type="checkbox" id="witharchitecture" checked> Code architecture</label>
+        <label class="opt"><input type="checkbox" id="withflow" checked> Flowchart</label>
+        <p class="hint">Code architecture highlights the process on the repository map. Flowchart shows its decisions and outcomes.</p>
+      </fieldset>
+    </div>
+    <div class="trace-actions">
+      <button class="btn primary" id="run" type="button" disabled>Create trace</button>
+      <button class="iconbtn" id="pick-refresh" type="button" title="Look for AI tools and models again" aria-label="Look for AI tools and models again"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg></button>
+      <span class="status busy" id="status" aria-live="polite">Connecting…</span>
       <button class="btn" id="stop" type="button" hidden>Stop</button>
     </div>
-    <input class="pickin" id="pick-custom" type="text" placeholder="Model id, e.g. gpt-5" aria-label="Model id" spellcheck="false" autocomplete="off" hidden>
-    <div class="row">
-      <label class="opt" title="The AI tool also draws the process as a flowchart: decisions, failure paths and outcomes. Takes a little longer."><input type="checkbox" id="withflow" checked> Include a flowchart</label>
-      <span class="status busy" id="status" aria-live="polite">Connecting…</span>
-    </div>
+
   </section>
   <section>
-    <h2>Traces <span class="gc" id="savedcount"></span></h2>
-    <p class="hint" id="store-note">Saved automatically to .repo-map/traces on this machine (git-ignored). Open one to show it on the map.</p>
+    <h2>Saved traces <span class="gc" id="savedcount"></span></h2>
+    <p class="hint" id="store-note">Saved automatically to .repo-map/traces on this machine (git-ignored). Open an output to explore it.</p>
     <ul class="trace-list" id="trace-list"></ul>
-    <p class="empty" id="saved-empty">No traces yet. Describe a flow above, or import a trace code from a teammate.</p>
+    <p class="empty" id="saved-empty">No saved traces yet. Create a trace, or import one from a teammate.</p>
     <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
     <details class="imp">
       <summary>Import a trace code</summary>
@@ -371,7 +408,7 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
     </details>
   </section>
   </div>
-  <div class="pane" id="pane-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+  <div class="pane" id="pane-map">
   <section>
     <h2>This map</h2>
     <p class="hint" id="ms-text">Checking…</p>
@@ -401,27 +438,38 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
     <input class="pickin" id="mpick-custom" type="text" placeholder="Model id, e.g. gpt-5" aria-label="Model id for the map" spellcheck="false" autocomplete="off" hidden>
     <p class="status" id="mpick-status" aria-live="polite"></p>
   </section>
+  <section>
+    <h2>Trace agent</h2>
+    <p class="hint">The tool, model and effort for architecture traces and flowcharts. Remembered in this browser for this repository. Used for new traces and flowchart redraws.</p>
+    <div class="row"><span class="pick" id="tpick">
+      <select id="tpick-agent" aria-label="AI tool and model for traces"></select>
+      <select id="tpick-effort" aria-label="Effort for traces" hidden></select>
+      <button class="btn sm" id="tpick-refresh" type="button" aria-label="Refresh trace tools">Refresh</button>
+    </span></div>
+    <input class="pickin" id="tpick-custom" type="text" placeholder="Model id" aria-label="Custom model for traces" spellcheck="false" hidden>
+  </section>
   </div>
 </div>
 </aside>
 </div>
 
-<dialog class="fdlg" id="flowdlg" aria-labelledby="fl-title">
+<section class="fdlg" id="flowdlg" aria-labelledby="fl-title" hidden>
   <div class="fhead">
     <div><h2 id="fl-title">Flowchart</h2><p id="fl-sub"></p></div>
     <div class="acts">
       <span class="status" id="fl-status" aria-live="polite"></span>
       <button class="btn sm" id="fl-mermaid" type="button" title="Mermaid source, for GitHub, GitLab, Notion and other Markdown tools">Copy Mermaid</button>
       <button class="btn sm" id="fl-svg" type="button">Download SVG</button>
+      <button class="btn sm" id="fl-stop" type="button" hidden>Stop</button>
       <button class="btn sm" id="fl-redraw" type="button" title="Ask the AI tool to draw this flowchart again">Redraw</button>
-      <button class="btn sm" id="fl-close" type="button">Close</button>
+      <button class="btn sm" id="fl-close" type="button">Architecture</button>
     </div>
   </div>
   <div class="fmain">
     <div class="fcanvas" id="fl-canvas">
       <div class="fzoom"><button class="btn" id="fl-out" type="button" aria-label="Zoom out">−</button><button class="btn" id="fl-fit" type="button">Fit</button><button class="btn" id="fl-in" type="button" aria-label="Zoom in">+</button></div>
       <div id="fl-svgbox"></div>
-      <div class="flegend" aria-hidden="true">
+      <details class="flegend"><summary>Diagram key</summary><div>
         <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="5"/></svg>start / end</span>
         <span><svg viewBox="0 0 22 14"><polygon class="lg act" points="5,2 21,2 17,12 1,12"/></svg>person does</span>
         <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="2"/></svg>system does</span>
@@ -429,12 +477,15 @@ dialog.fdlg::backdrop{background:rgba(10,14,19,.55)}
         <span><svg viewBox="0 0 22 14"><rect class="lg err" x="1" y="2" width="20" height="10" rx="2"/></svg>failure</span>
         <span><svg viewBox="0 0 22 14"><rect class="lg inf" x="1" y="2" width="20" height="10" rx="2"/></svg>inferred</span>
         <span><svg viewBox="0 0 22 14"><circle class="lg num" cx="11" cy="7" r="6"/></svg>trace step</span>
-      </div>
+      </div></details>
     </div>
-    <aside class="fside" id="fl-side" aria-live="polite"></aside>
+    <aside class="fside" id="fl-side" aria-label="Flowchart details" aria-live="polite"></aside>
   </div>
-</dialog>
+</section>
 
+<dialog id="settings-dialog" aria-labelledby="settings-title">
+  <div class="fhead"><h2 id="settings-title">Settings</h2><button class="btn" id="settings-close" type="button">Close</button></div>
+</dialog>
 <script>
 /* Map data and repo config come from the local server (.repo-map/ in the repo). */
 var COLS=[],GROUPS=[],NODES=[],EDGES=[],PATHS={},DOCS={},CFG=null,REPO_BOOT=null,AI_BOOT=null;
@@ -455,6 +506,20 @@ async function loadMapData(){
 </script>
 <script>
 async function main(){
+const mainEl=document.querySelector(".main");
+const architecture=document.createElement("section");architecture.id="architecture-workspace";architecture.setAttribute("aria-label","Architecture");
+Array.from(mainEl.children).slice(1).forEach(el=>architecture.appendChild(el));mainEl.appendChild(architecture);
+const context=document.createElement("div");context.className="trace-context";context.id="trace-context";architecture.prepend(context);
+const stage=document.createElement("div");stage.className="arch-stage";
+const scroller=document.getElementById("scroller");scroller.before(stage);stage.appendChild(scroller);
+const inspector=document.createElement("aside");inspector.id="arch-details";inspector.hidden=true;inspector.setAttribute("aria-label","Architecture details");stage.appendChild(inspector);
+mainEl.appendChild(document.getElementById("flowdlg"));
+const flowEmpty=document.createElement("div");flowEmpty.id="flow-empty";flowEmpty.hidden=true;
+flowEmpty.innerHTML='<h2>Explore a process as a flowchart</h2><p>Create a trace with Flowchart selected, or open a saved flowchart from the library.</p><button class="btn primary" type="button">New trace</button>';
+mainEl.appendChild(flowEmpty);
+document.getElementById("settings-dialog").appendChild(document.getElementById("pane-map"));
+let workspace="architecture";
+
 const T={h:"http",e:"event",s:"sync"};
 let GH_TREE="", GH_BLOB=""; // set from the repo's git remote in loadRepo()
 const TL={http:"HTTP",event:"event",sync:"sync"};
@@ -523,30 +588,29 @@ function connItem(e,dir){
   const other=dir==="out"?e.t:e.f, o=byId[other];
   return '<li><button class="cl" type="button" data-go="'+other+'"><i class="sw '+e.type+'"></i><b>'+esc(o.title)+'</b><span>'+esc(e.label||TL[e.type])+'</span>'+(e.inf?'<em>inferred</em>':'')+'</button></li>';
 }
-function fillBody(n){
-  const el=nodeEl[n.id], nb=el.querySelector(".nb");
-  if(nb.dataset.filled)return;
-  let h='<p>'+esc(n.desc)+'</p>';
-  if(n.facts.length)h+='<ul class="facts">'+n.facts.map(f=>'<li>'+esc(f)+'</li>').join("")+'</ul>';
-  const docs=DOCS[n.id]||[];
-  // documentation first (agent guidance, then docs, then code comments), before the code
-  if(docs.length)h+='<div class="docs"><h4>Docs · '+docs.length+'</h4></div>';
-  if(PATHS[n.id]){const sp=PATHS[n.id];h+=GH_TREE?'<div class="path"><a href="'+GH_TREE+sp+'" target="_blank" rel="noopener">'+esc(sp)+' ↗</a></div>':'<div class="path">'+esc(sp)+'</div>';}
-  const o=out[n.id]||[], i=inc[n.id]||[];
-  h+='<div class="conn">';
-  if(i.length)h+='<h4>Receives from · '+i.length+'</h4><ul>'+i.map(e=>connItem(e,"in")).join("")+'</ul>';
-  if(o.length)h+='<h4>Sends to · '+o.length+'</h4><ul>'+o.map(e=>connItem(e,"out")).join("")+'</ul>';
-  if(!i.length&&!o.length)h+='<h4>No mapped connections</h4>';
-  h+='</div>';nb.innerHTML=h;nb.dataset.filled="1";
-  const box=nb.querySelector(".docs");
-  if(box)docs.forEach(l=>{try{box.appendChild(docEl(l));}catch(_){}});
-}
 function setOpen(id,open){
   const el=nodeEl[id], nb=el.querySelector(".nb"), b=el.querySelector(".nh");
-  if(open)fillBody(byId[id]);
-  nb.hidden=!open;el.classList.toggle("open",open);b.setAttribute("aria-expanded",String(open));
+  b.setAttribute("aria-controls","arch-details");
+  if(open)showArchitectureDetails(id);else if(inspector.dataset.id===id)inspector.hidden=true;
+  nb.hidden=true;el.classList.toggle("open",open);b.setAttribute("aria-expanded",String(open));
 }
 
+function showArchitectureDetails(id){
+  Object.entries(nodeEl).forEach(([other,el])=>{if(other!==id){el.classList.remove("open");el.querySelector(".nh").setAttribute("aria-expanded","false");}});
+  const n=byId[id];inspector.hidden=false;inspector.dataset.id=id;
+  inspector.innerHTML='<button class="btn sm" type="button" data-close>Close details</button><h3></h3><p class="description"></p><ul class="facts"></ul><div class="refs"></div><div class="conn"></div>';
+  inspector.querySelector("h3").textContent=n.title;inspector.querySelector(".description").textContent=n.desc;
+  n.facts.forEach(f=>{const li=document.createElement("li");li.textContent=f;inspector.querySelector(".facts").appendChild(li);});
+  const refs=inspector.querySelector(".refs");
+  if(trace){trace.steps.filter(st=>st.id===id).forEach(st=>{const p=document.createElement("p");p.textContent=st.note;refs.appendChild(p);});(trace.refs||[]).filter(r=>r.step===id).forEach(r=>refs.appendChild(refEl(r)));}
+  (DOCS[id]||[]).forEach(l=>refs.appendChild(docEl(l)));
+  inspector.querySelector(".conn").innerHTML='<h4>Connections</h4><ul>'+(inc[id]||[]).map(e=>connItem(e,"in")).join("")+(out[id]||[]).map(e=>connItem(e,"out")).join("")+'</ul>';
+  if(PATHS[id]){const p=document.createElement("p");p.className="path";
+    if(GH_TREE){const a=document.createElement("a");a.href=GH_TREE+PATHS[id];a.textContent=PATHS[id];a.target="_blank";a.rel="noopener";p.appendChild(a);}else p.textContent=PATHS[id];
+    inspector.appendChild(p);}
+  inspector.querySelector("[data-close]").onclick=()=>{setOpen(id,false);pinned=null;redraw();};
+}
+inspector.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b)goTo(b.dataset.go);});
 /* ---------- wires ---------- */
 const board=document.getElementById("board"), svg=document.getElementById("wires"), svgTop=document.getElementById("wires-top");
 const hidden={http:false,event:false,sync:false};
@@ -706,7 +770,7 @@ function normalizeTrace(raw,prompt){
     if(edgePairs.has(a+"|"+b))pairs.add(a+"|"+b);else if(edgePairs.has(b+"|"+a))pairs.add(b+"|"+a);}
   return {title:String(raw.title||"Untitled trace").slice(0,80),prompt:String(prompt||raw.prompt||"").slice(0,2000),
     summary:String(raw.summary||""),gaps:String(raw.gaps||""),steps,edges:[...pairs].map(k=>k.split("|")),pairs,refs:cleanRefs(refs,steps)||[],
-    flow:FLOW.normalizeFlow(raw.flow,steps.length),used:cleanUsed(raw.used)};
+    flow:FLOW.normalizeFlow(raw.flow,steps.length),outputs:OUTPUTS.traceOutputs(raw),pendingFlow:raw.pendingFlow===true,used:cleanUsed(raw.used)};
 }
 /** Which AI tool, model and effort made a trace (shown in the list; travels in trace codes as information only). */
 function cleanUsed(u){
@@ -714,7 +778,7 @@ function cleanUsed(u){
   const s=(v,n)=>String(v||"").slice(0,n);
   return {agent:s(u.agent,40),model:s(u.model,120),effort:s(u.effort,32),label:s(u.label,160)};
 }
-function plain(t){const o={title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};if(t.flow)o.flow=t.flow;if(t.used)o.used=t.used;return o;}
+function plain(t){const o={outputs:OUTPUTS.traceOutputs(t),pendingFlow:t.pendingFlow===true,title:t.title,prompt:t.prompt,summary:t.summary,gaps:t.gaps,steps:t.steps,edges:t.edges,refs:t.refs||[]};if(t.flow)o.flow=t.flow;if(t.used)o.used=t.used;return o;}
 
 let preTraceGroups=null;   // group open-state before a trace took over, restored on close
 function setTrace(t){
@@ -734,7 +798,7 @@ function setTrace(t){
     Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});
     pinned=null;
   }
-  renderSaved();redraw();
+  renderSaved();renderContext();redraw();
 }
 function reveal(id){
   const el=nodeEl[id], d=el.closest("details");if(d&&!d.open)d.open=true;
@@ -791,12 +855,11 @@ function traceBody(t){
   const body=document.createElement("div");body.className="tb";
   const p=document.createElement("p");p.className="rp";p.textContent=t.prompt?"“"+t.prompt+"”":"";if(t.prompt)body.appendChild(p);
   const sum=document.createElement("p");sum.className="rs";sum.textContent=t.summary;if(t.summary)body.appendChild(sum);
-  body.appendChild(flowRow(t));
   const ol=document.createElement("ol");ol.className="steps";
   t.steps.forEach((st,i)=>{
     const li=document.createElement("li");
     li.innerHTML='<button type="button"><i class="n">'+(i+1)+'</i><b>'+esc(byId[st.id].title)+'</b><span>'+esc(st.note)+'</span></button><div class="refs"></div>';
-    li.firstChild.onclick=()=>reveal(st.id);
+    li.firstChild.onclick=()=>{reveal(st.id);goTo(st.id);};
     const box=li.querySelector(".refs");
     (t.refs||[]).filter(r=>r.step===st.id).forEach(r=>box.appendChild(refEl(r)));
     ol.appendChild(li);
@@ -811,37 +874,64 @@ function traceBody(t){
   acts.querySelector('[data-a="copy"]').onclick=e=>copyCode(t,e.currentTarget);
   const del=acts.querySelector('[data-a="del"]');
   if(del)del.onclick=async()=>{
-    if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Confirm delete";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete";},3000);return;}
+    if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Delete trace and both outputs?";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete";},3000);return;}
     await removeTrace(t._doc);
   };
   const retry=acts.querySelector('[data-a="save"]');
-  if(retry)retry.onclick=()=>keepTrace(t);
+  if(retry)retry.onclick=()=>saveExisting(t);
   body.appendChild(acts);
   return body;
 }
 function renderSaved(){
   const ul=$("trace-list");ul.innerHTML="";
-  const rows=(store.temp?[{...plain(store.temp),key:null,createdAt:store.temp.createdAt,_temp:true}]:[]).concat(store.items);
-  $("savedcount").textContent=rows.length||"";
-  $("saved-empty").hidden=rows.length>0;
+  const rows=(store.temp?[{...plain(store.temp),key:null,createdAt:store.temp.createdAt,_temp:true}]:[]).concat(store.items.filter(it=>!store.temp||it.key!==store.temp._doc));
+  $("savedcount").textContent=rows.length||"";$("saved-empty").hidden=rows.length>0;
+  const active=workspace==="flowchart"?fl.t:trace;
   rows.forEach(it=>{
-    const open=trace&&(it._temp?trace===store.temp:trace._doc===it.key);
-    const li=document.createElement("li");li.className="ti"+(open?" cur":"");
-    const when=it.createdAt?new Date(it.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"";
-    li.innerHTML='<button class="th" type="button" aria-expanded="'+open+'"><svg class="car" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3"/></svg><span><b></b><small></small></span></button>';
-    li.querySelector("b").textContent=it.title;
-    if(it._temp)li.querySelector("b").insertAdjacentHTML("beforeend",'<span class="tbadge">not saved</span>');
-    li.querySelector("small").textContent=[when,(it.steps||[]).length+" steps",it.flow?"flowchart":"",open?"":it.prompt].filter(Boolean).join(" · ");
-    if(it.used&&it.used.label)li.querySelector(".th").title="Traced with "+it.used.label;
-    li.querySelector(".th").onclick=()=>{
-      if(open){setTrace(null);return;}
-      if(it._temp){setTrace(store.temp);return;}
-      try{const t=normalizeTrace(it,it.prompt);t._doc=it.key;t.createdAt=it.createdAt;setTrace(t);}catch(_){setStatus("That trace refers to nodes that are no longer on the map.",true);}
-    };
-    if(open)li.appendChild(traceBody(trace));
-    ul.appendChild(li);
+    const open=active&&(it._temp?active===store.temp:active._doc===it.key);
+    const li=document.createElement("li");li.className="ti trace-card"+(open?" cur":"");
+    const title=document.createElement("h3");title.textContent=it.title;li.appendChild(title);
+    const prompt=document.createElement("p");prompt.className="trace-prompt";prompt.textContent=it.prompt||"No prompt saved.";li.appendChild(prompt);
+    if(it._temp){const note=document.createElement("p");note.className="trace-save-note";note.textContent="Not saved. Open an output to retry saving.";li.appendChild(note);}
+    const actions=document.createElement("div");actions.className="trace-output-actions";
+    const outputs=OUTPUTS.traceOutputs(it);
+    ["architecture","flowchart"].forEach(output=>{
+      const button=document.createElement("button");button.type="button";button.className="btn sm";
+      button.textContent=output==="architecture"?"Architecture":"Flowchart";
+      button.setAttribute("aria-pressed",String(!!open&&workspace===output));
+      if(!outputs[output])button.title=output==="architecture"?"Add the architecture output to this trace":it.pendingFlow?"Retry drawing this flowchart":"Draw a flowchart for this trace";
+      button.disabled=output==="flowchart"&&!outputs.flowchart&&!AI_BOOT.available;
+      if(button.disabled)button.title="Configure an AI tool in Settings to draw this flowchart";
+      button.onclick=()=>openSavedOutput(it,output);
+      actions.appendChild(button);
+    });
+    li.appendChild(actions);ul.appendChild(li);
   });
-  const cur=ul.querySelector(".ti.cur");if(cur)cur.scrollIntoView({block:"nearest"});
+}
+async function openSavedOutput(item,output){
+  let t;
+  try{t=item._temp?store.temp:normalizeTrace(item,item.prompt);if(!item._temp){t._doc=item.key;t.createdAt=item.createdAt;}}
+  catch(_){setStatus("That trace refers to nodes that are no longer on the map.",true);return;}
+  if(output==="flowchart"){
+    if(t.flow)openFlow(t);else if(AI_BOOT.available)await drawFlow(t,$("fl-redraw"),$("fl-status"));
+  }else{
+    if(!t.outputs.architecture){t.outputs.architecture=true;await saveExisting(t);}
+    setTrace(t);showWorkspace("architecture");inspector.hidden=true;
+  }
+}
+function renderContext(){
+  context.innerHTML="";if(!trace)return;
+  const h=document.createElement("h2");h.textContent=trace.title;context.appendChild(h);
+  const p=document.createElement("p");p.textContent=trace.summary;context.appendChild(p);
+  context.appendChild(flowRow(trace));
+  const details=document.createElement("details");details.innerHTML='<summary>Walkthrough and trace actions</summary>';details.appendChild(traceBody(trace));context.appendChild(details);
+}
+async function saveExisting(t){
+  try{
+    if(!t._doc){await keepTrace(t);return;}
+    const r=await api("/api/traces/"+encodeURIComponent(t._doc),{method:"PUT",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
+    if(!r.ok)throw new Error();if(store.temp===t)store.temp=null;await loadSaved();
+  }catch(_){store.temp=t;setStatus("Changes could not be saved. Retry saving before reloading.",true);renderSaved();}
 }
 async function loadSaved(){
   try{const r=await api("/api/traces");store.items=(await r.json()).traces||[];store.ready=true;}
@@ -849,7 +939,7 @@ async function loadSaved(){
   renderSaved();
 }
 /** Save a trace (new, imported, or a retry) and open it. If saving fails it stays in the list, marked "not saved". */
-async function keepTrace(t){
+async function keepTrace(t,preferred=workspace){
   t.createdAt=t.createdAt||Date.now();
   try{
     const r=await api("/api/traces",{method:"POST",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
@@ -861,17 +951,22 @@ async function keepTrace(t){
     store.temp=t;
     setStatus("Couldn't save this trace to disk; it's shown below until you reload.",true);
   }
-  setTrace(t);
+  if(t.outputs.architecture)setTrace(t);
+  if((t.outputs.flowchart||t.pendingFlow)&&(preferred==="flowchart"||!t.outputs.architecture))openFlow(t);
+  else if(t.outputs.architecture)showWorkspace("architecture");
+  else{setTrace(t);showWorkspace("architecture");context.querySelector("details").open=true;}
 }
 async function removeTrace(key){
   try{
     const r=await api("/api/traces/"+encodeURIComponent(key),{method:"DELETE"});if(!r.ok)throw new Error();
+    if(store.temp&&store.temp._doc===key)store.temp=null;
     if(trace&&trace._doc===key)setTrace(null);
+    if(fl.t&&fl.t._doc===key){fl.t=null;showWorkspace(workspace);}
     await loadSaved();
   }catch(_){setStatus("Couldn't delete that trace.",true);}
 }
 
-/* ---------- flowcharts: drawn by the AI tool with a trace, shown in a modal ---------- */
+/* ---------- flowchart workspace ---------- */
 const FC_CSS=`.fc{font-family:var(--f-ui);font-size:12.5px}
 .fc .fs{fill:var(--panel);stroke:var(--muted);stroke-width:1.3}
 .fc .t-start .fs,.fc .t-end .fs{fill:var(--soft);stroke:var(--ink)}
@@ -899,6 +994,17 @@ const FC_UI_CSS=`.fc .fn{cursor:pointer;outline:none}
 document.head.insertAdjacentHTML("beforeend","<style>"+FC_CSS+"\n"+FC_UI_CSS+"</style>");
 const ICON_FLOW='<svg viewBox="0 0 16 16"><rect x="5" y="1.5" width="6" height="3.5" rx="1"/><path d="M8 5v2.2M8 7.2L11.5 10M8 7.2L4.5 10"/><rect x="1.5" y="10" width="6" height="3.5" rx="1"/><rect x="8.5" y="10" width="6" height="3.5" rx="1"/></svg>';
 
+function traceActions(t){
+  const row=document.createElement("div");row.className="row";
+  const architectureButton=document.createElement("button");architectureButton.className="btn sm";architectureButton.type="button";
+  architectureButton.textContent=OUTPUTS.traceOutputs(t).architecture?"View architecture":"Add architecture output";
+  architectureButton.onclick=async()=>{t.outputs={...OUTPUTS.traceOutputs(t),architecture:true};await saveExisting(t);setTrace(t);showWorkspace("architecture");};row.appendChild(architectureButton);
+  const copy=document.createElement("button");copy.className="btn sm";copy.type="button";copy.textContent="Copy trace code";copy.onclick=()=>copyCode(t,copy);row.appendChild(copy);
+  const del=document.createElement("button");del.className="btn sm";del.type="button";del.textContent="Delete trace";
+  del.onclick=()=>{if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Delete trace and both outputs?";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete trace";},3000);return;}if(t._doc)removeTrace(t._doc);else{if(store.temp===t)store.temp=null;fl.t=null;setTrace(null);showWorkspace(workspace);}};row.appendChild(del);
+  if(store.temp===t||!t._doc){const retry=document.createElement("button");retry.className="btn sm";retry.type="button";retry.textContent="Retry saving";retry.onclick=()=>saveExisting(t);row.appendChild(retry);}
+  return row;
+}
 function flowRow(t){
   const row=document.createElement("div");row.className="flowrow";
   if(t.flow){
@@ -918,7 +1024,8 @@ function flowRow(t){
 let flowCtl=null;
 async function drawFlow(t,btn,stat){
   if(flowCtl)return;
-  flowCtl=new AbortController();
+  openFlow(t);btn=$("fl-redraw");stat=$("fl-status");
+  flowCtl=new AbortController();$("fl-stop").hidden=false;
   btn.disabled=true;
   const t0=Date.now();let last="Starting "+pickLabel()+"…";
   const tick=()=>{stat.textContent=last+" · "+Math.round((Date.now()-t0)/1000)+"s";};
@@ -927,35 +1034,41 @@ async function drawFlow(t,btn,stat){
     const result=await runStream("/api/flow",{method:"POST",body:JSON.stringify({trace:plain(t),...currentPick()}),signal:flowCtl.signal},text=>{last=text;tick();});
     const flow=result&&FLOW.normalizeFlow(result.flow,t.steps.length);
     if(!flow)throw new Error("The AI tool ended without a usable flowchart.");
-    t.flow=flow;
+    t.flow=flow;t.pendingFlow=false;t.outputs={...OUTPUTS.traceOutputs(t),flowchart:true};
     clearInterval(tm);stat.textContent="";stat.className="status";
-    if(t._doc){
-      const r=await api("/api/traces/"+encodeURIComponent(t._doc),{method:"PUT",body:JSON.stringify({...plain(t),createdAt:t.createdAt})});
-      if(!r.ok)setStatus("Drew the flowchart but couldn't save it to disk.",true);
-      const it=store.items.find(x=>x.key===t._doc);if(it)it.flow=flow;
-    }
+    await saveExisting(t);
     renderSaved();openFlow(t);
   }catch(e){
     clearInterval(tm);
     stat.textContent=e&&e.name==="AbortError"?"Stopped.":(e.message||"Couldn't draw the flowchart.");stat.className="status err";
-  }finally{flowCtl=null;btn.disabled=false;}
+  }finally{flowCtl=null;btn.disabled=false;$("fl-stop").hidden=true;}
 }
 
 const fl={t:null,layout:null,scale:1,sel:null};
 const dlg=$("flowdlg");
 function openFlow(t){
-  fl.t=t;fl.sel=null;
+  if(flowCtl&&fl.t!==t){setStatus("A flowchart is being drawn. Stop it before opening another.",true);return;}
+  fl.t=t;fl.sel=null;setTrace(t);
+  $("fl-side").hidden=false;dlg.querySelector(".fmain").classList.remove("details-closed");
   $("fl-title").textContent=t.title;
   $("fl-sub").textContent=t.prompt?"“"+t.prompt+"”":t.summary;
   $("fl-status").textContent="";$("fl-status").className="status";
   $("fl-redraw").hidden=!AI_BOOT.available;
+  $("fl-mermaid").disabled=!t.flow;$("fl-svg").disabled=!t.flow;
+  $("fl-redraw").textContent=t.flow?"Redraw":"Draw flowchart";
+  dlg.querySelector(".fmain").hidden=!t.flow;
+  if(t.flow){
   fl.layout=FC.layoutFlow(t.flow);
   $("fl-svgbox").innerHTML=FC.renderFlowSvg(fl.layout,{title:t.title});
   // second arrowhead for highlighted connections
   const defs=$("fl-svgbox").querySelector("defs");
   defs.insertAdjacentHTML("beforeend",'<marker id="fc-arrow-on" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa on" d="M0 0.5L7.5 4L0 7.5z"/></marker>');
   sideFlow(null);
-  if(!dlg.open)dlg.showModal();
+  }else{fl.layout=null;$("fl-svgbox").innerHTML="";}
+  let actions=$("flow-actions");if(!actions){actions=document.createElement("div");actions.id="flow-actions";actions.className="trace-context";dlg.querySelector(".fhead").after(actions);}
+  actions.innerHTML="";actions.appendChild(traceActions(t));
+  if(!t.flow){const p=document.createElement("p");p.textContent="The supporting walkthrough was kept. Draw the flowchart to complete this output.";actions.appendChild(p);}
+  showWorkspace("flowchart");renderSaved();
   requestAnimationFrame(()=>fitFlow());
 }
 function setScale(s){
@@ -964,11 +1077,13 @@ function setScale(s){
   svgEl.setAttribute("width",Math.round(fl.layout.width*fl.scale));svgEl.setAttribute("height",Math.round(fl.layout.height*fl.scale));
 }
 function fitFlow(){
+  if(!fl.layout)return;
   const c=$("fl-canvas");
   // fit the whole chart, but not so small that labels stop being readable (scroll instead)
   setScale(Math.max(.65,Math.min(1,(c.clientWidth-24)/fl.layout.width,(c.clientHeight-92)/fl.layout.height)));
 }
 function pickFlow(id){
+  $("fl-side").hidden=false;dlg.querySelector(".fmain").classList.remove("details-closed");
   fl.sel=id;
   const box=$("fl-svgbox"), svgEl=box.querySelector("svg");
   svgEl.classList.toggle("picking",!!id);
@@ -983,8 +1098,11 @@ const FLOW_KIND={start:"Start",end:"Outcome",action:"Person does",process:"Syste
 function sideFlow(n){
   const side=$("fl-side");side.innerHTML="";
   const t=fl.t;
+  const close=document.createElement("button");close.type="button";close.className="btn sm";close.textContent="Close details";
+  close.onclick=()=>{side.hidden=true;dlg.querySelector(".fmain").classList.add("details-closed");requestAnimationFrame(fitFlow);};
+  side.appendChild(close);
   if(!n){
-    side.innerHTML='<p class="ft">How to read it</p><p class="empty">Click a box to see what happens there and the code behind it. Numbered badges match the steps of this trace on the map. Dashed boxes and arrows are inferred from naming, docs or the map rather than code the AI tool read.</p>';
+    side.insertAdjacentHTML("beforeend",'<p class="ft">How to read it</p><p class="empty">Click a box to see what happens there and the code behind it. Numbered badges match the steps of this trace on the map. Dashed boxes and arrows are inferred from naming, docs or the map rather than code the AI tool read.</p>');
     const inferred=t.flow.nodes.filter(x=>x.inferred).length+t.flow.edges.filter(x=>x.inferred).length;
     if(inferred)side.insertAdjacentHTML("beforeend",'<p class="fwarn" style="margin-top:10px">'+inferred+' part'+(inferred===1?' is':'s are')+' inferred. Check them before relying on this chart.</p>');
     if(t.gaps)side.insertAdjacentHTML("beforeend",'<p class="empty" style="margin-top:10px">Not shown clearly: '+esc(t.gaps)+'</p>');
@@ -1002,18 +1120,18 @@ function sideFlow(n){
   const st=n.step&&t.steps[n.step-1];
   if(st){
     const box=document.createElement("div");box.className="fstep";
-    box.innerHTML='<b></b><p></p><div class="refs"></div><div class="row"><button class="btn sm" type="button">Show on map</button></div>';
+    box.innerHTML='<b></b><p></p><div class="refs"></div><div class="row"><button class="btn sm" type="button">Show on architecture</button></div>';
     box.querySelector("b").textContent="Step "+n.step+" · "+byId[st.id].title;
     box.querySelector("p").textContent=st.note;
     const refs=box.querySelector(".refs");(t.refs||[]).filter(r=>r.step===st.id).forEach(r=>refs.appendChild(refEl(r)));
-    box.querySelector("button").onclick=()=>{dlg.close();reveal(st.id);};
+    (DOCS[st.id]||[]).forEach(l=>refs.appendChild(docEl(l)));
+    box.querySelector("button").onclick=()=>{setTrace(t);showWorkspace("architecture");reveal(st.id);goTo(st.id);};
     side.appendChild(box);
   }
 }
 $("fl-svgbox").addEventListener("click",ev=>{const g=ev.target.closest(".fn");pickFlow(g&&g.dataset.id!==fl.sel?g.dataset.id:null);});
 $("fl-svgbox").addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){const g=ev.target.closest(".fn");if(g){ev.preventDefault();pickFlow(g.dataset.id);}}});
-$("fl-close").onclick=()=>dlg.close();
-dlg.addEventListener("click",ev=>{if(ev.target===dlg)dlg.close();});
+$("fl-close").onclick=()=>showWorkspace("architecture");
 $("fl-in").onclick=()=>setScale(fl.scale*1.2);
 $("fl-out").onclick=()=>setScale(fl.scale/1.2);
 $("fl-fit").onclick=fitFlow;
@@ -1034,6 +1152,7 @@ $("fl-svg").onclick=()=>{
   a.download=(fl.t.title||"flowchart").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+".svg";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 };
+$("fl-stop").onclick=()=>flowCtl&&flowCtl.abort();
 $("fl-redraw").onclick=()=>{const t=fl.t;drawFlow(t,$("fl-redraw"),$("fl-status"));};
 
 /* repo info + GitHub links */
@@ -1044,7 +1163,7 @@ function loadRepo(){
   $("repoinfo").textContent="reading "+(j.branch||"detached HEAD")+" @ "+String(j.sha||"").slice(0,9)+(j.dirty?" (uncommitted changes)":"");
   REPO.ai=AI_BOOT.available;
   if(!AI_BOOT.available){
-    $("run").disabled=true;$("prompt").disabled=true;$("withflow").closest(".opt").hidden=true;setStatus("");
+    $("run").disabled=true;$("prompt").disabled=true;$("withflow").closest("fieldset").disabled=true;setStatus("");
     $("noai").hidden=false;$("noai-why").textContent=AI_BOOT.reason||"";
     $("noai-import").onclick=e=>{e.preventDefault();const d=document.querySelector("details.imp");d.open=true;$("importbox").focus();};
   }else{
@@ -1080,21 +1199,25 @@ const spend=r=>r&&(r.cost?" · "+(r.cost<0.01?"<$0.01":"$"+r.cost.toFixed(2)):r.
 
 let ctl=null, timer=0;
 /** The trace status line; `busy` shows a spinner while an agent is working. */
-function setStatus(t,err,busy){const s=$("status");s.textContent=t;s.className="status"+(err?" err":"")+(busy?" busy":"");}
+function setStatus(t,err,busy){if(err){$("composer").hidden=false;$("new-trace").setAttribute("aria-expanded","true");}const s=$("status");s.textContent=t;s.className="status"+(err?" err":"")+(busy?" busy":"");}
 async function runTrace(){
   const q=$("prompt").value.trim();if(!q||ctl)return;
+  const requested={architecture:$("witharchitecture").checked,flowchart:$("withflow").checked},origin=workspace;
+  if(!requested.architecture&&!requested.flowchart){setStatus("Select Code architecture, Flowchart, or both.",true);return;}
   ctl=new AbortController();
   $("run").disabled=true;$("stop").hidden=false;
   const t0=Date.now();let last="Starting "+pickLabel()+"…";
   const tick=()=>setStatus(last+" · "+Math.round((Date.now()-t0)/1000)+"s",false,true);tick();timer=setInterval(tick,1000);
   try{
-    const result=await runStream("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:$("withflow").checked,...currentPick()}),signal:ctl.signal},text=>{last=text;tick();});
+    const result=await runStream("/api/trace",{method:"POST",body:JSON.stringify({prompt:q,flow:requested.flowchart,...currentPick()}),signal:ctl.signal},text=>{last=text;tick();});
     if(!result)throw new Error(pickLabel()+" ended without an answer. Run repo-map doctor to check your setup.");
-    const t=normalizeTrace({...result.trace,used:result.used},q);
+    const t=normalizeTrace({...result.trace,outputs:requested,used:result.used},q);
+    t.outputs={architecture:requested.architecture,flowchart:requested.flowchart&&!!t.flow};t.pendingFlow=requested.flowchart&&!t.flow;
     clearInterval(timer);
     setStatus("Done in "+Math.round((Date.now()-t0)/1000)+"s"+spend(result));
-    await keepTrace(t);
+    await keepTrace(t,origin);
     $("prompt").value="";
+    if(requested.flowchart&&!t.flow)setStatus("The walkthrough was kept, but the flowchart was missing. Open the flowchart output to retry.",true);
   }catch(e){
     clearInterval(timer);
     if(e&&e.name==="AbortError")setStatus("Stopped.");
@@ -1212,8 +1335,8 @@ function createPicker(o){
 
 /* the trace picker: remembered in this browser, per repo */
 const tracePick=createPicker({
-  prefix:"pick",
-  title:"AI tool and model for this trace",
+  prefix:"tpick",
+  title:"AI tool and model for traces",
   initial(data){
     let saved=null;try{saved=JSON.parse(localStorage.getItem(NS+"pick")||"null");}catch(_){}
     if(saved&&liveAgent(saved.agent))return {agent:saved.agent,model:saved.model||"",effort:saved.effort||""};
@@ -1226,46 +1349,43 @@ const tracePick=createPicker({
     // the configured default may be unavailable while another tool works: tracing is still on
     if((data.agents||[]).some(a=>a.available)&&!data.off&&!AI_BOOT.available){
       AI_BOOT.available=true;REPO.ai=true;
-      $("run").disabled=!!ctl;$("prompt").disabled=false;$("withflow").closest(".opt").hidden=false;$("noai").hidden=true;
+      $("run").disabled=!!ctl;$("prompt").disabled=false;$("withflow").closest("fieldset").disabled=false;$("noai").hidden=true;
       renderSaved();
     }
   },
   onChange(P){$("trace-hint").textContent="Describe a flow in plain words. "+P.label()+" reads this map and your local checkout, then highlights the parts involved and the code behind each step.";},
 });
+$("pick-refresh").onclick=()=>AGENTS.load(true);
+AGENTS.subscribe({
+  busy(on){const b=$("pick-refresh");b.classList.toggle("busy",on);b.disabled=on;},
+  update(){},
+});
 function currentPick(){return tracePick.pick();}
 function pickLabel(){return tracePick.label();}
 
 $("run").onclick=runTrace;
-(()=>{const k=NS+"flow",cb=$("withflow");try{const v=localStorage.getItem(k);if(v!==null)cb.checked=v==="1";}catch(_){}
-  cb.onchange=()=>{try{localStorage.setItem(k,cb.checked?"1":"0");}catch(_){}};})();
+["witharchitecture","withflow"].forEach(id=>{const cb=$(id),key=NS+id;try{const v=localStorage.getItem(key);if(v!==null)cb.checked=v==="1";}catch(_){}cb.onchange=()=>{try{localStorage.setItem(key,cb.checked?"1":"0");}catch(_){}};});
 $("stop").onclick=()=>ctl&&ctl.abort();
 $("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
-/* ---------- sidebar tabs: Traces | Map ---------- */
-const TABS=["traces","map"];
-function showTab(name,focus){
-  TABS.forEach(t=>{
-    const on=t===name,b=$("tab-"+t);
-    b.setAttribute("aria-selected",String(on));b.tabIndex=on?0:-1;$("pane-"+t).hidden=!on;
-    if(on&&focus)b.focus();
-  });
-  try{localStorage.setItem(NS+"tab",name);}catch(_){}
+/* ---------- workspace navigation ---------- */
+function showWorkspace(name){
+  workspace=name;architecture.hidden=name!=="architecture";
+  $("flowdlg").hidden=name!=="flowchart"||!fl.t;flowEmpty.hidden=name!=="flowchart"||!!fl.t;
+  document.querySelector(".controls").hidden=name!=="architecture";
+  renderSaved();if(name==="architecture")renderContext();requestAnimationFrame(()=>{if(name==="flowchart"&&fl.t)fitFlow();else redraw();});
 }
-TABS.forEach((t,i)=>{
-  const b=$("tab-"+t);
-  b.onclick=()=>showTab(t);
-  b.onkeydown=e=>{
-    if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
-    e.preventDefault();showTab(TABS[(i+(e.key==="ArrowRight"?1:TABS.length-1))%TABS.length],true);
-  };
-});
-(()=>{let t="traces";try{t=localStorage.getItem(NS+"tab")||t;}catch(_){}showTab(TABS.includes(t)?t:"traces");})();
-/** Open the Map tab (and the panel, if it's collapsed). */
-function openMapTab(){
-  if(document.querySelector(".app").classList.contains("collapsed"))$("side-lbl").click();
-  showTab("map",true);
+function openComposer(){
+  $("composer").hidden=!$("composer").hidden;$("new-trace").setAttribute("aria-expanded",String(!$("composer").hidden));
+  if(document.querySelector(".app").classList.contains("collapsed"))$("side-toggle").click();
+  if(!$("composer").hidden)$("prompt").focus();
 }
+$("new-trace").onclick=openComposer;
+flowEmpty.querySelector("button").onclick=()=>{if($("composer").hidden)openComposer();else $("prompt").focus();};
+function openMapTab(){const d=$("settings-dialog");if(!d.open)d.showModal();}
+$("tab-map").onclick=openMapTab;
+$("settings-close").onclick=()=>$("settings-dialog").close();
 
-/* ---------- the Map panel: status, map jobs, and the map's tool/model/effort ---------- */
+/* ---------- Settings: status, map jobs, and the map's tool/model/effort ---------- */
 const shortSha=x=>String(x||"").slice(0,9);
 const nOf=(n,w)=>n+" "+w+(n===1?"":"s");
 let mapSt=null, jobCtl=null;
@@ -1334,7 +1454,7 @@ function renderMapPanel(){
 }
 ["ms-update","ms-redraw","ms-docs-go"].forEach(id=>{const b=$(id);b.dataset.title=b.title;});
 
-/** The notice above the map: one line, and a button into the Map panel. */
+/** The notice above the map: one line, and a button into Settings. */
 function renderBanner(){
   const st=mapSt,box=$("stale");
   box.className="stale";box.hidden=true;box.innerHTML="";
@@ -1343,9 +1463,10 @@ function renderBanner(){
     box.hidden=false;$("stale-go").onclick=openMapTab;
   };
   if(st.state==="stale")show("<b>This map is out of date.</b> "+nOf(st.changed,"file")+" changed since <code>"+shortSha(st.commit)+"</code>.",{label:"Review & update",primary:true});
+  else if(st.state==="current")show("Architecture is up to date"+(st.commit?" at <code>"+shortSha(st.commit)+"</code>":"")+".",{label:"Settings"});
   else if(st.state==="starter")show("This is a starter map built from your folders.",{label:"Draw the full map"});
-  else if(st.state==="unrecorded")show("This map has no recorded commit, so repo-map can’t tell when it goes out of date.",{label:"Map panel"});
-  else if(st.state==="unknown")show(esc(st.reason||""),{label:"Map panel"});
+  else if(st.state==="unrecorded")show("This map has no recorded commit, so repo-map can’t tell when it goes out of date.",{label:"Settings"});
+  else if(st.state==="unknown")show(esc(st.reason||""),{label:"Settings"});
 }
 
 /* map jobs: one at a time (the server enforces it too); Stop closes the request, which stops the AI run */
@@ -1390,7 +1511,7 @@ loadRepo();loadSaved();loadMapStatus();AGENTS.load();
 /* ---------- sidebar collapse + resize ---------- */
 (()=>{
   const app=document.querySelector(".app"), rz=$("resizer"), tg=$("side-toggle");
-  const LSW=NS+"side", DEF=360, MIN=280;
+  const LSW=NS+"library", DEF=300, MIN=260;
   const max=()=>Math.max(MIN,Math.min(760,Math.round(window.innerWidth*.6)));
   let st={w:DEF,c:false};try{st={...st,...JSON.parse(localStorage.getItem(LSW)||"{}")};}catch(_){}
   const save=()=>{try{localStorage.setItem(LSW,JSON.stringify(st));}catch(_){}};
@@ -1399,15 +1520,14 @@ loadRepo();loadSaved();loadMapStatus();AGENTS.load();
   rz.setAttribute("aria-valuemin",MIN);rz.setAttribute("aria-valuemax",760);
   setW(st.w);setC(!!st.c);
   tg.onclick=()=>{setC(!st.c);save();};
-  $("side-lbl").onclick=()=>{if(st.c){setC(false);save();}};
   let dragging=false;
   rz.addEventListener("pointerdown",e=>{dragging=true;rz.setPointerCapture(e.pointerId);document.body.classList.add("dragging");e.preventDefault();});
-  rz.addEventListener("pointermove",e=>{if(!dragging)return;setW(app.getBoundingClientRect().right-e.clientX);});
+  rz.addEventListener("pointermove",e=>{if(!dragging)return;setW(e.clientX-app.getBoundingClientRect().left);});
   const end=()=>{if(!dragging)return;dragging=false;document.body.classList.remove("dragging");save();redraw();};
   rz.addEventListener("pointerup",end);rz.addEventListener("pointercancel",end);
   rz.addEventListener("dblclick",()=>{setW(DEF);save();redraw();});
   rz.addEventListener("keydown",e=>{
-    const d=e.key==="ArrowLeft"?20:e.key==="ArrowRight"?-20:0;
+    const d=e.key==="ArrowLeft"?-20:e.key==="ArrowRight"?20:0;
     if(d){e.preventDefault();setW(st.w+d);save();redraw();}
     else if(e.key==="Home"||e.key==="Enter"){e.preventDefault();setW(DEF);save();redraw();}
   });
@@ -1420,8 +1540,8 @@ window.addEventListener("resize",redraw);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
 draw();
 }
-var FLOW=null, FC=null;   // lib/flow.mjs and app/flowchart.mjs, served by the local server
-Promise.all([loadMapData(),import("/lib/flow.mjs").then(m=>{FLOW=m;}),import("/app/flowchart.mjs").then(m=>{FC=m;})]).then(main).catch(err=>{
+var FLOW=null, FC=null, OUTPUTS=null;   // lib/flow.mjs and app/flowchart.mjs, served by the local server
+Promise.all([loadMapData(),import("/lib/trace-outputs.mjs").then(m=>{OUTPUTS=m;}),import("/lib/flow.mjs").then(m=>{FLOW=m;}),import("/app/flowchart.mjs").then(m=>{FC=m;})]).then(main).catch(err=>{
   document.getElementById("cols").innerHTML='<p class="foot">Couldn\'t load the map from the local server ('+String(err.message||err)+'). Start it with <code>repo-map serve</code> and reload.</p>';
 });
 </script>

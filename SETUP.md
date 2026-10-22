@@ -68,7 +68,7 @@ npx repo-map ai none                                    # map only, no tracing
 npx repo-map ai claude --model opus --effort high --for generate   # optional: a stronger model just for drawing the map
 ```
 
-You can still switch tool, model and effort for any single trace from the menu beside the **Trace** button.
+You can change the tool, model and effort for new traces in **Settings / Trace agent**.
 
 Then:
 
@@ -177,7 +177,7 @@ With `"provider": "auto"` (the default), repo-map uses the first one that's read
 
 ### Choosing per trace, and a different tool for the map
 
-The setting above is only the **default**. In the browser, the menu beside the **Trace** button lists every tool repo-map found on your machine, with its models and effort levels; pick one for the next trace (or flowchart). The choice is remembered in that browser. **Custom model…** takes any model id the tool accepts. ↻ looks for tools again, for example after you start Ollama.
+The setting above is only the **default**. In the browser, **Settings / Trace agent** lists every tool repo-map found on your machine, with its models and effort levels. This choice is remembered in that browser for new traces and flowchart redraws. **Custom model...** takes any model id the tool accepts. The refresh button beside **Create trace**, or the one in Settings, looks for tools again, for example after you start Ollama.
 
 Drawing and updating the map reads much more code than a trace, so it can use its own tool, model and effort. `repo-map` asks about this the first time; to change it later:
 
@@ -301,7 +301,7 @@ repo-map ai none
 
 ## Keeping the map up to date
 
-`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a notice above the map links to the **Map** tab in the sidebar, which lists the files and offers **Update map**.
+`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a notice above the map links to the **Settings** panel, which lists the files and offers **Update map**.
 
 An update sends your AI tool the current map plus **only the git diff** since that commit (capped in size; it can read whole files when it needs more), and asks for a small patch: nodes, groups and connections to add, change or remove. repo-map applies the patch, checks the result with the same rules as `validate`, records the new commit, and keeps the previous version as `.repo-map/map.prev.json`. If the patch would leave the map broken, nothing is written.
 
@@ -314,15 +314,25 @@ repo-map update --mark     # record the current commit without changing the map
 repo-map generate --force  # redraw the whole map instead (for big refactors)
 ```
 
-After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: the Map tab offers **Mark as current**, which does the same as `update --mark`.
+After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: Settings offers **Mark as current**, which does the same as `update --mark`.
 
-### The Map tab
+### Settings
 
-The sidebar's **Map** tab holds everything about the map itself:
+The sidebar's **Settings** button opens a dedicated panel for map maintenance and AI preferences:
 
 - **Status**: up to date or not, the files that changed, and whether documents changed since the docs were linked.
 - **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
 - **Map agent**: the tool, model and effort that draw and update the map and link its docs, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
+
+**Trace agent** sets the tool, model and effort used for process architecture and flowcharts. This preference is remembered in your browser for this repo and used for new traces and flowchart redraws.
+
+### Creating and exploring traces
+
+Choose **New trace**, describe a process, and select **Code architecture**, **Flowchart**, or both. At least one output is required. Both are selected initially; later choices are remembered in this browser. Architecture shows the process path on the repository map. Use the **Architecture** and **Flowchart** buttons on a saved trace to open its outputs on the main canvas.
+
+Each saved trace is one question with linked outputs. The library always shows all saved traces, each with its title, prompt, and Architecture / Flowchart buttons. You can add a missing output later without creating a second trace. Deleting a trace removes both outputs. Old traces and import codes keep working. If a flowchart is missing from an otherwise usable answer, its library entry offers a retry; failed saves remain visible with **Retry saving** until you reload.
+
+Click an architecture card or flowchart step for explanations, code references and linked documentation. **Show on architecture** switches to the related card without adding a saved architecture output. **Whole repository** clears a highlighted path. Mermaid and SVG exports remain available in Flowcharts.
 
 ### Documentation on the cards
 

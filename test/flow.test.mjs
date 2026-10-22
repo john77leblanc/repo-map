@@ -167,11 +167,15 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
     assert.equal((await fetch(`${base}/api/flow`, { method: 'POST', headers: H, body: '{}' })).status, 400);
 
     const { key } = await (await fetch(`${base}/api/traces`, { method: 'POST', headers: H, body: JSON.stringify({ ...noFlow.trace, createdAt: 123 }) })).json();
-    const put = await fetch(`${base}/api/traces/${key}`, { method: 'PUT', headers: H, body: JSON.stringify({ ...noFlow.trace, flow: drawn.flow, createdAt: 999 }) });
+    const outputs = { architecture: false, flowchart: true };
+    const put = await fetch(`${base}/api/traces/${key}`, { method: 'PUT', headers: H, body: JSON.stringify({ ...noFlow.trace, flow: drawn.flow, outputs, createdAt: 999 }) });
     assert.equal(put.status, 200);
     const saved = JSON.parse(readFileSync(path.join(dir, '.repo-map', 'traces', `${key}.json`), 'utf8'));
     assert.equal(saved.createdAt, 123);
     assert.equal(saved.flow.nodes.length, 7);
+    assert.deepEqual(saved.outputs, outputs);
+    const listed = (await (await fetch(`${base}/api/traces`, { headers: H })).json()).traces;
+    assert.deepEqual(listed.find(trace => trace.key === key).outputs, outputs);
     assert.equal(readdirSync(path.join(dir, '.repo-map', 'traces')).length, 1);
     assert.equal((await fetch(`${base}/api/traces/00000000-0000-0000-0000-000000000000`, { method: 'PUT', headers: H, body: '{}' })).status, 404);
 

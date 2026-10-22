@@ -3,8 +3,8 @@
 An interactive architecture map for any repo, with plain-language process tracing through the AI tool you already use: Claude Code, Codex, Gemini, OpenAI or any OpenAI-compatible API, including local models like Ollama.
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
-- **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. A menu beside the **Trace** button lists every AI tool found on your machine with its models and effort levels, so a quick question can use a fast model and a hard one a stronger model.
-- **See the logic as a flowchart.** Each trace can come with a flowchart of the process: what the person does, what the system does, the decisions it makes and every outcome, including failure paths. Boxes link back to the trace steps and their code. Copy it as Mermaid or download it as SVG for docs and PRs.
+- **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. Choose the tool, model and effort under **Settings / Trace agent**.
+- **Choose how to explore a process.** Select **Code architecture**, **Flowchart**, or both when creating a trace. Architecture highlights the process on the repository map; Flowcharts opens its decisions, failure paths and outcomes on the main canvas. Click a card or step for its explanation, expandable code references and linked docs. Copy a flowchart as Mermaid or download it as SVG.
 - **Read the docs where the code is.** When the map is drawn, a second pass links sections of your docs, your agent guidance (AGENTS.md, CLAUDE.md…) and substantial code comments to the cards they explain. Open a card and its docs are listed first, agent guidance on top, readable in place.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
 - **Stay current.** The map knows which commit it describes, flags when the code has moved on, and updates itself from just the diff.
@@ -41,7 +41,9 @@ Add a script so teammates only need `npm install` and `npm run map`:
 
 Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignore`). Saved traces and personal AI settings stay out of git.
 
-**Keeping it current:** the map remembers the commit it was drawn from. When files in the code folders change, a notice says so, and the **Map** tab in the sidebar shows what changed and offers **Update map**, which sends only the diff to your AI tool to patch the map (and relinks docs if documents changed). The same tab has **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
+**Explore:** the sidebar has Settings and collapse controls, **New trace**, and **Saved traces**. Each trace card shows its title, original prompt, and **Architecture** / **Flowchart** buttons. Both outputs open on the main canvas and share one saved trace. A missing output can be added using its button; drawing a flowchart requires an AI tool. **Whole repository** clears the highlighted architecture path. Older saved traces and import codes continue to work.
+
+**Keeping it current:** the map remembers the commit it was drawn from. When files in the code folders change, a notice opens **Settings**, which shows what changed and offers **Update map**, **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. Settings also holds the trace AI preference used for new traces and flowchart redraws. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
 
 The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
 
@@ -148,7 +150,7 @@ Box types: *start*, *end*, *action* (the person does something), *process* (the 
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
 - Documents (`docs` in config.json, and agent guidance files) are readable outside `codeRoots`, with the same rules: never `.env*`, `.repo-map/` or `blocked` folders.
-- The Map tab can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.
+- Settings can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.
 - The trace menu can only choose among the tools repo-map detected, their effort levels, and model ids that look like model ids. The browser can never set a command, its arguments or a URL.
 - API models (OpenAI-compatible, including local) only get repo-map's own read-only tools, which go through the same `codeRoots` and `blocked` rules as the code viewer.
 - `command` tools (Codex, Gemini, others) read files on their own; use their read-only or sandbox modes. repo-map can't restrict a third-party CLI.

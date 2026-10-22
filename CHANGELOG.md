@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- The sidebar centers navigation on saved traces. Each card shows its title, prompt, and Architecture / Flowchart buttons; Settings and collapse controls sit above New trace. Both outputs use the main canvas.
+- New trace creation offers Code architecture and Flowchart independently, remembers selections, and saves linked outputs together. Older saved traces and share codes remain compatible; incomplete flowcharts can be retried.
+- The trace composer places the prompt above output choices, followed by Create trace, tool refresh and progress on one row. The AI picker is available in Settings.
+- Settings has its own panel with map maintenance and both AI preference groups. The trace AI picker lives in Settings.
+- Architecture cards and flowchart steps show explanations, expandable code and linked docs in details panels. Diagram keys are compact, and flowchart drawing has a Stop action.
+
 ## 0.6.0
 
 - **Documentation on the cards.** After drawing the map, a second pass with the map's AI tool links sections of the repo's docs, its agent guidance (AGENTS.md, CLAUDE.md, GEMINI.md, Copilot and Cursor rules) and substantial code comments to the cards they explain. Open a card and they're listed first, agent guidance on top, before the code; each opens in place with its lines read live. Saved in `.repo-map/docs.json` (commit it).
