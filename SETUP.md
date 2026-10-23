@@ -96,11 +96,11 @@ The rest of this guide explains each step in more detail.
 
 ## 1. Requirements
 
-- **Node.js 20 or newer** (`node -v`)
+- **Node.js >=22.12** (`node -v`)
 - **git**, for branch info and GitHub links
 - **Optional: one AI tool** from [section 4](#4-choose-an-ai-tool)
 
-repo-map has no npm dependencies.
+Node >=22.12 is required. The backend uses only Node built-ins. React, React DOM, MobX, observer bindings, TypeScript, Vite, Vitest, Playwright and related frontend tooling are devDependencies. Browser code is bundled into git-ignored `dist/`. Registry packages ship prebuilt assets and require no runtime build tools.
 
 ## 2. Install
 
@@ -125,12 +125,36 @@ Then add a script to `package.json`:
 "scripts": { "map": "npx -y @whitemane/repo-map@latest" }
 ```
 
-**Without npm**, from a clone:
+**Directly from GitHub:**
+
+```shell
+npx github:john77leblanc/repo-map
+```
+
+`prepare` is `npm run build`. `npx github:john77leblanc/repo-map` requires Git and enabled npm lifecycle scripts; npm installs development dependencies and builds frontend assets on the first Git install. Git checkouts do not contain built assets. Do not disable lifecycle scripts for Git installs.
+
+**From a clone:**
 
 ```shell
 git clone https://github.com/john77leblanc/repo-map.git ~/tools/repo-map
+cd ~/tools/repo-map
+npm ci                 # prepare builds frontend assets
 alias repo-map='node ~/tools/repo-map/bin/repo-map.mjs'   # add to ~/.zshrc or ~/.bashrc
 ```
+
+For development in the clone:
+
+```shell
+npm ci                          # install devDependencies; prepare builds assets
+npm run dev                     # example backend + Vite
+npm run build                   # type-check and bundle to dist/
+npm run example                 # build, then serve examples/shop on localhost:4477
+npm test                        # Node suites + Vitest
+npx playwright install chromium # install once, separately from test runs
+npm run test:e2e                # Playwright
+```
+
+`npm ci` runs prepare. Rebuild after frontend changes when serving directly with Node; `npm run dev` runs the example backend plus Vite. Chromium installation is separate from running tests.
 
 The examples below use `repo-map`. With a dev dependency, run them as `npx repo-map …` (or `pnpm exec repo-map …`).
 
@@ -390,4 +414,6 @@ To share a trace, anyone who has an AI tool can run it, press **Copy trace code*
 | "answered, but not in the expected JSON shape" | Try again. If it keeps happening, use a stronger model. |
 | "ran out of turns" | Ask a narrower question, or raise `maxTurns`. |
 | "Couldn't reach …" | The API server isn't running or the base URL is wrong. For Ollama, run `ollama serve`. |
+| Missing frontend assets | Use Node >=22.12, enable lifecycle scripts, then run `npm ci` and `npm run build` in the checkout. Registry packages include prebuilt assets. |
+| Playwright cannot find Chromium | Run `npx playwright install chromium` once, then retry `npm run test:e2e`. |
 | Port 4477 in use | `repo-map serve --port 4478`, or set `REPO_MAP_PORT`. |

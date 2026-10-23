@@ -2,3 +2,7 @@ node_modules/
 .DS_Store
 examples/*/.repo-map/traces/
 *.tgz
+dist/
+test-results/
+playwright-report/
+.verification/

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Keep the implementation-plan modal header and Close button visible while its content scrolls.
+- Document the approved React/TypeScript/MobX MVVM frontend migration, bootstrap/models/features/shared layout, injected plain-class view models, observer views, immutable base map with computed proposals, and view-layer DOM adapters. Shared pure `.mjs` helpers remain browser-safe.
+- Require Node >=22.12 with the Node built-in-only backend. Frontend libraries and tooling are development dependencies bundled into git-ignored `dist/`; registry packages ship prebuilt assets without runtime build tools.
+- Document `npm ci`, example backend + Vite development, builds, build-before-serve examples, Node + Vitest tests and separate Playwright tests with one-time Chromium installation. `prepare` runs `npm run build` for first Git installs via `npx github:john77leblanc/repo-map` (Git and lifecycle scripts required).
+
 ## 0.9.0
 
 - Removed the duplicate Not shown clearly message from the top of the flowchart sidebar.

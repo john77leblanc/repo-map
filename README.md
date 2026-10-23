@@ -4,7 +4,7 @@ An interactive architecture map for any repo, with plain-language process tracin
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
 - **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. Choose the tool, model and effort under **Settings / Trace agent**.
-- **Explore a hypothetical change.** Ask "Where would coupon support fit?" in the same prompt window. Intent is detected automatically. The trace explains placement and rationale and marks proposed components and connections as **New**, **Modified**, or **Removed** in both diagrams. Select **Implementation plan** to generate ordered tasks, interface changes, tests and risks in a modal. Plans and proposal diagrams travel with saved traces and shared codes; the repository map stays unchanged.
+- **Explore a hypothetical change.** Ask "Where would coupon support fit?" in the same prompt window. Intent is detected automatically. The trace explains placement and rationale and marks proposed components and connections as **New**, **Modified**, or **Removed** in both diagrams. Select **Implementation plan** to generate ordered tasks, interface changes, tests and risks in a modal. Its content scrolls while the title and Close button stay visible. Plans and proposal diagrams travel with saved traces and shared codes; the repository map stays unchanged.
 - **Choose how to explore a process.** Select **Code architecture**, **Flowchart**, or both when creating a trace. Architecture highlights the process on the repository map; Flowcharts opens its decisions, failure paths and outcomes on the main canvas. Click a card or step for its explanation, expandable code references and linked docs. Copy a flowchart as Mermaid or download it as SVG.
 - **Read the docs where the code is.** When the map is drawn, a second pass links sections of your docs, your agent guidance (AGENTS.md, CLAUDE.md…) and substantial code comments to the cards they explain. Open a card and its docs are listed first, agent guidance on top, readable in place.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
@@ -16,10 +16,10 @@ Everything runs on your machine. The server listens on `localhost` only, and no 
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js >=22.12
 - Optional: an AI tool for tracing and `generate`. Any one of [Claude Code](https://docs.claude.com/en/docs/claude-code), an OpenAI-compatible API key, a local model server (Ollama, LM Studio), or a CLI like Codex or Gemini. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). The map, search and shared trace codes work without one.
 
-No other dependencies.
+Node >=22.12 is required. The backend uses only Node built-ins. React, React DOM, MobX, observer bindings, TypeScript, Vite, Vitest, Playwright and related frontend tooling are devDependencies. Browser code is bundled into git-ignored `dist/`. Registry packages ship prebuilt assets and require no runtime build tools.
 
 ## Get started
 
@@ -30,7 +30,9 @@ npm install --save-dev @whitemane/repo-map
 npx repo-map
 ```
 
-Or try it without installing anything: `npx @whitemane/repo-map`.
+Or run without adding it to your project: `npx @whitemane/repo-map`.
+
+`prepare` is `npm run build`. `npx github:john77leblanc/repo-map` requires Git and enabled npm lifecycle scripts; npm installs development dependencies and builds frontend assets on the first Git install. Git checkouts do not contain built assets. Do not disable lifecycle scripts for Git installs.
 
 The first run asks a few questions: a name for the map, which folders hold the code, a one-line description, and which AI tool to use (it lists the ones it finds on your machine, or you can skip). It then offers to draft the map, and opens it in your browser. Every later run goes straight to the map.
 
@@ -54,7 +56,7 @@ Both diagrams fill the available workspace height and scroll inside their canvas
 
 The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
 
-Want to see it first? Clone this repo and run `npm run example`.
+Want to see it first? Clone this repo, run `npm ci`, then `npm run example` (builds before serving).
 
 For scripted or CI setups, configuring a specific AI tool, and troubleshooting, see [SETUP.md](SETUP.md).
 
@@ -148,7 +150,7 @@ If the repo has `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instruct
 
 With **Include a flowchart** ticked (the default), the AI tool also returns a flowchart with each trace. Traces saved without one have a **Draw flowchart** button, which asks the AI tool to draw it from the trace's steps and code. The chart opens in a window over the map: click a box for its detail, the trace step behind it and that step's code, or **Show on map** to jump there.
 
-Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (no extra dependencies), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
+Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (using shared pure layout helpers), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
 
 ## Safety
 
@@ -165,11 +167,18 @@ Box types: *start*, *end*, *action* (the person does something), *process* (the 
 
 ## Development
 
+The frontend uses React, TypeScript and MobX with MVVM boundaries under `app/src/`: bootstrap, models, features and shared services/UI/styles/types.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, adding providers, and releasing.
 
 ```shell
-npm test             # node --test
-npm run example
+npm ci                          # install devDependencies; prepare builds assets
+npm run dev                     # example backend + Vite
+npm run build                   # type-check and bundle to dist/
+npm run example                 # build, then serve examples/shop on localhost:4477
+npm test                        # Node suites + Vitest
+npx playwright install chromium # install once, separately from test runs
+npm run test:e2e                # Playwright
 ```
 
 ## License

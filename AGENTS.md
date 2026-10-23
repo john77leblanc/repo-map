@@ -4,25 +4,42 @@ Guidance for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor, Copilot, 
 
 ## Commands
 
-Node 20+, **zero dependencies** (no `npm install`, no build step). Keep it that way: only `node:` built-ins.
+Node >=22.12 is required. The backend uses only Node built-ins. React, React DOM, MobX, observer bindings, TypeScript, Vite, Vitest, Playwright and related frontend tooling are devDependencies. Browser code is bundled into git-ignored `dist/`. Registry packages ship prebuilt assets and require no runtime build tools.
 
 ```shell
-npm test                                  # node --test, all suites (no network, no AI tool needed)
-node --test test/flow.test.mjs            # one file
-node --test --test-name-pattern="layout"  # tests matching a name
-npm run example                           # serve examples/shop on http://localhost:4477
-node bin/repo-map.mjs serve --dir <other-repo>   # try working copy on another repo
+npm ci                          # install devDependencies; prepare builds assets
+npm run dev                     # example backend + Vite
+npm run build                   # type-check and bundle to dist/
+npm run example                 # build, then serve examples/shop on localhost:4477
+npm test                        # Node suites + Vitest
+npx playwright install chromium # install once, separately from test runs
+npm run test:e2e                # Playwright
+node --test test/flow.test.mjs            # one backend suite
+node --test --test-name-pattern="layout"  # backend tests matching a name
+node bin/repo-map.mjs serve --dir <other-repo> # serve built assets
 ```
 
-No linter configured. Style: ESM `.mjs`, 4-space indent, single quotes, named exports collected in one `export { … }` at file bottom.
+No linter configured. Style: backend/shared helpers use ESM `.mjs`; frontend uses TypeScript/TSX. 4-space indent, single quotes, named exports collected in one `export { … }` at file bottom.
 
 ## Architecture
 
 CLI tool that serves an interactive architecture map of a target repo, plus AI-driven "traces" (plain-language walkthrough of a process, with optional flowchart). Each target repo stores state in `.repo-map/` (`config.json`, `map.json`, git-ignored `traces/`, `local.json`, drafts).
 
 - `bin/repo-map.mjs` — arg parsing + command dispatch. No-arg / `start` → `lib/start.mjs` (interactive setup: config → AI tool → map → serve; non-TTY never prompts).
-- `lib/server.mjs` — localhost-only HTTP server. Serves `app/index.html` plus a whitelist of ES modules (`MODULES` map) and `/api/*` routes (config, map, map status/update/mark, file reads, trace, flow, saved traces). API requires `x-map: 1` header (CSRF guard) and rejects non-localhost Host headers.
-- `app/index.html` — entire UI, single file, inline JS/CSS. Sidebar has Traces and Map tabs. `runStream()` reads every ndjson stream (trace, flow, map jobs). Tool pickers share one store (`AGENTS`, from `/api/agents`) via `createPicker()`: the trace picker saves to localStorage, the Map tab's to `PUT /api/settings/generate` (→ `.repo-map/local.json` `ai.generate`). Map jobs (`/api/map/update`, `/api/map/generate`, `/api/docs/link`) share one server-side lock (409 when busy). `.status.busy` shows a spinner. `app/flowchart.mjs` (flowchart layout + SVG) and `lib/flow.mjs` (flow normalization, Mermaid export) are **shared by browser and Node** — must stay dependency-free and browser-safe (no `node:` imports). New browser-imported modules must be added to `MODULES` in server.mjs.
+- `lib/server.mjs` ? localhost-only Node built-in HTTP server serving built `dist/` assets and `/api/*` routes. API requires `x-map: 1` (CSRF guard) and rejects non-localhost Host headers. Map update/generate/docs jobs share one server-side lock (409 when busy).
+- `app/index.html` ? Vite HTML entry, replacing the inline UI. Agent choices come from `/api/agents`; trace preferences are browser-local, and map preferences use `PUT /api/settings/generate` (? `.repo-map/local.json` `ai.generate`). Services handle streams and persistence.
+
+The React/TypeScript/MobX frontend follows MVVM under `app/src/`:
+
+- `bootstrap/`: composition root constructing services, models and view models.
+- `models/`: shared domain and application state.
+- `features/`: shell, architecture, traces, flowchart, plans and settings.
+- `shared/`: services, ui, styles and types.
+
+View models are plain MobX classes with injected services and callbacks, owning observable state, actions and computed values. React views use `observer`, render state and invoke view-model actions; views make no direct network or storage calls. Services own HTTP/NDJSON streaming and persistence. Keep the base map immutable and derive proposal diagrams as computed, disposable compositions. DOM adapters for diagram mounting, measurement, focus, scrolling and SVG integration stay in views, outside models and view models.
+
+Existing shared pure `.mjs` helpers, including `app/flowchart.mjs`, `lib/flow.mjs`, `lib/proposal.mjs` and `lib/trace-outputs.mjs`, remain dependency-free and browser-safe, without `node:` imports. Vite bundles frontend imports; source modules need no individual server module-whitelist entries.
+
 - `lib/config.mjs` — loads config/map with defaults. AI settings layered: defaults < `config.json` `ai` < `~/.config/repo-map/ai.json` < `.repo-map/local.json` < `REPO_MAP_*` env vars. `lib/settings.mjs` writes these for `repo-map ai <tool>` (presets in `AI_PRESETS`).
 - `lib/ai/` — agent abstraction. `agents.mjs` is the registry: detects every agent (claude, codex, gemini, api, ollama, lmstudio, command) with its models and effort levels (`listAgents`, cached 60s), and `resolveSelection(config, { task, pick })` picks agent+model+effort for a task (`trace` or `generate`; `generate` reads `ai.generate`, empty fields fall back to trace defaults). Browser/CLI picks are validated there (code `pick` → HTTP 400): only detected agents, listed efforts, model ids matching a safe pattern and not starting with `-`. `index.mjs` wraps it: `detectProvider(config, task)`, `runAi({ ..., task, pick })` (returns `used`), `agentsSummary` for `GET /api/agents`. Model/effort reach CLIs as flags (`claude --model/--effort`; codex `-m`, `-c model_reasoning_effort=`; presets use `modelArgs`/`effortArgs` and an `{options}` slot). On Windows, npm `.cmd` shims are started via cmd.exe with shell-safe args only (`command.mjs`). Runner contract: takes `{ root, config, prompt, settings, timeoutMs, maxTurns, onProgress }`, returns `{ promise, kill }`; promise resolves `{ text, cost?, turns?, tokens? }` or rejects with `Error` whose `code` ∈ `missing|auth|access|limit|model|timeout|turns|failed` (use `classifyFailure()` in `errors.mjs`). `api.mjs` runs a tool-call loop using `tools.mjs` read-only repo tools.
 - `lib/prompts.mjs` builds prompts for trace / flow / generate / update; `lib/json.mjs` extracts the JSON object from model replies; `lib/validate.mjs` checks `map.json`.
@@ -41,6 +58,12 @@ CLI tool that serves an interactive architecture map of a target repo, plus AI-d
 - `examples/shop/` is used by both `npm run example` and the tests; changes there affect test expectations.
 - User-facing docs: README.md (overview, config/map schema), SETUP.md (install, AI tool config, troubleshooting), CONTRIBUTING.md (layout, releasing). Update them and CHANGELOG.md when behavior changes.
 
+## Packaging
+
+`prepare` is `npm run build`. `npx github:john77leblanc/repo-map` requires Git and enabled npm lifecycle scripts; npm installs development dependencies and builds frontend assets on the first Git install. Git checkouts do not contain built assets. Do not disable lifecycle scripts for Git installs.
+
+`dist/` stays git-ignored but must ship prebuilt in registry packages. `npm run dev` starts the example backend plus Vite; `npm run example` builds before serving. `npm test` runs Node suites and Vitest; Playwright runs separately after a one-time Chromium install.
+
 ## Releasing
 
-Bump `version` in package.json + CHANGELOG.md, `npm test`, `npm publish --dry-run` (check no "errors corrected" warning; `bin` must stay `"bin/repo-map.mjs"` with no leading `./`). Commit `chore: release 0.x.y`, tag `v0.x.y`. Published as `@whitemane/repo-map`. Commit messages follow `feat:` / `fix:` / `chore:` with version in parens for feature releases.
+Bump `version` in package.json + CHANGELOG.md, `npm run build`, `npm test`, `npm run test:e2e`, `npm publish --dry-run` (verify prebuilt `dist/` assets are included) (check no "errors corrected" warning; `bin` must stay `"bin/repo-map.mjs"` with no leading `./`). Commit `chore: release 0.x.y`, tag `v0.x.y`. Published as `@whitemane/repo-map`. Commit messages follow `feat:` / `fix:` / `chore:` with version in parens for feature releases.
