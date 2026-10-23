@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-10-22T01:15:36.944Z",
+  "starter": true,
+  "groups": [
+    {
+      "id": "g-lib",
+      "col": 2,
+      "title": "lib",
+      "open": true
+    },
+    {
+      "id": "g-app",
+      "col": 2,
+      "title": "app",
+      "open": true
+    },
+    {
+      "id": "g-bin",
+      "col": 2,
+      "title": "bin",
+      "open": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ai",
+      "group": "g-lib",
+      "kind": "service",
+      "path": "lib/ai",
+      "title": "ai",
+      "desc": "Folder lib/ai. Describe what it does here, or run `repo-map generate` to draft the map with an AI tool."
+    },
+    {
+      "id": "app-2",
+      "group": "g-app",
+      "kind": "service",
+      "path": "app",
+      "title": "app",
+      "desc": "Folder app. Describe what it does here, or run `repo-map generate` to draft the map with an AI tool."
+    },
+    {
+      "id": "bin-2",
+      "group": "g-bin",
+      "kind": "service",
+      "path": "bin",
+      "title": "bin",
+      "desc": "Folder bin. Describe what it does here, or run `repo-map generate` to draft the map with an AI tool."
+    }
+  ],
+  "edges": []
+}

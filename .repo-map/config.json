@@ -1,0 +1,60 @@
+{
+    "name": "repo-map",
+    "description": "",
+    "github": "john77leblanc/repo-map",
+    "defaultBranch": "main",
+    "codeRoots": [
+        "lib/",
+        "app/",
+        "bin/"
+    ],
+    "blocked": [
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        "coverage"
+    ],
+    "columns": [
+        {
+            "title": "Outside world",
+            "subtitle": "Users, browsers and vendors that start flows"
+        },
+        {
+            "title": "Entry points",
+            "subtitle": "Pages, routes and handlers that receive traffic"
+        },
+        {
+            "title": "Core",
+            "subtitle": "Shared state, stores and APIs"
+        },
+        {
+            "title": "Features",
+            "subtitle": "Modules and components by area"
+        },
+        {
+            "title": "Downstream",
+            "subtitle": "Backends and systems the data ends up in"
+        }
+    ],
+    "kinds": {
+        "service": "module",
+        "topic": "event or store",
+        "external": "outside the repo"
+    },
+    "edgeTypes": {
+        "http": "API call",
+        "event": "event",
+        "sync": "data flow / job"
+    },
+    "prompt": {
+        "context": "repo-map is a zero-dependency Node CLI (bin/repo-map.mjs) that serves an interactive architecture map of a repo. lib/server.mjs is a localhost HTTP server for the single-file UI in app/index.html; lib/ai/ runs AI agents (Claude Code, Codex, Gemini, OpenAI-compatible APIs) read-only to draw the map and trace processes.",
+        "hints": ""
+    },
+    "footnote": "",
+    "tracesDir": ".repo-map/traces",
+    "ai": {
+        "provider": "auto"
+    }
+}

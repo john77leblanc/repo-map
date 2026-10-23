@@ -98,7 +98,7 @@ test('layoutFlow ranks top to bottom, draws loops as return arrows, and never ov
     const svg = renderFlowSvg(L, { title: 'Checkout' });
     assert.match(svg, /^<svg[^>]+viewBox="0 0 \d+ \d+"/);
     assert.equal((svg.match(/class="fn /g) || []).length, 7);
-    assert.match(svg, /data-step="3"/);
+    assert.doesNotMatch(svg, /data-step=|class="fb"|\(step \d+\)/);
     assert.match(svg, />declined</);
 });
 

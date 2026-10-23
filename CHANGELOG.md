@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.9.0
+
+- Removed the duplicate Not shown clearly message from the top of the flowchart sidebar.
+
+- Removed the inherited left indentation from the architecture details overlay's trace-step section.
+
+- Architecture details and their backdrop are confined to the diagram; the sidebar stays interactive while details are open.
+- Flowcharts and SVG exports no longer display architecture step badges or labels. The flowchart column omits the architecture walkthrough while retaining relevant code references and documentation.
+
+- Architecture detail modals show the matching numbered trace-step badge and group the step explanation and code references inside a bordered section.
+
+- Removed the How to read it and proposed-change guidance sections from the flowchart details column; the diagram key remains available in its accordion.
+
+- Both diagram workspaces fill their container's available height and scroll internally. The architecture diagram's horizontal scrollbar stays at the bottom of the screen, including when its content is short or the key is expanded.
+
+- Diagram keys are collapsed by default, with one Diagram key accordion button beside each diagram's controls that expands the key beneath them.
+- Architecture card details open in a centered modal over the diagram, with keyboard focus management, connection navigation and Close, Escape or backdrop dismissal.
+
+- Trace prompts automatically route to current-behavior descriptions or hypothetical proposals using a hidden same-provider classifier, with main-agent fallback and cancellation across both stages.
+- Proposal traces show distinctly labeled new, modified and removed components/connections in architecture diagrams and flowcharts without changing the base map. Proposal state survives redraws, exports, saves and shared trace codes.
+- An optional Implementation plan modal generates and retains ordered tasks, interface changes, tests, risks and open questions, with Stop, retry, Copy and explicit regeneration.
+
+- Startup shows an ASCII spinner while the agent drafts or updates the map and links documentation, keeping progress messages visible and clearing the indicator on completion, failure, or Ctrl+C.
+
 ## 0.8.0
 
 - Removed the descriptive footnote beneath the architecture map.

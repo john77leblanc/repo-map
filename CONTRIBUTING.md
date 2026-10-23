@@ -17,6 +17,8 @@ To try your working copy against another repo:
 node /path/to/repo-map/bin/repo-map.mjs serve --dir /path/to/other-repo
 ```
 
+Startup uses the dependency-free `lib/spinner.mjs` helper while drafting or updating the map, including the docs pass. It animates only on TTY stdout, preserves progress lines, and must be stopped before result or cancellation messages and in `finally` cleanup. Standalone AI commands use plain progress output.
+
 ### Layout
 
 ```
@@ -39,6 +41,8 @@ lib/ai/tools.mjs     read-only repo tools given to API models
 lib/ai/errors.mjs    turns provider failures into causes people can act on
 app/index.html       the whole UI (single file, no build step)
 lib/trace-outputs.mjs shared output availability and legacy trace compatibility
+lib/proposal.mjs      browser-safe proposal/plan validation and disposable map composition
+lib/trace-run.mjs     hidden classification, fallback, usage totals and cancellation for traces
 templates/           starter config for `repo-map init`
 examples/shop/       small fictional repo used by `npm run example` and the tests
 test/                node:test suites
@@ -47,6 +51,14 @@ test/                node:test suites
 The sidebar has a home view (New trace and Saved traces) and a selected trace view (back button, title, prompt, output tabs, expanded walkthrough and actions, and flowchart step details). Returning home clears highlighting and restores group state without deleting saved data. Trace information stays outside the main diagram layout. Settings has a separate dialog; architecture cards retain their code and docs inspector. A saved trace's optional `outputs: { architecture, flowchart }` records its available outputs. Legacy traces expose architecture and any valid flowchart. `pendingFlow: true` keeps an incomplete flowchart discoverable for retry. Supporting trace steps remain present for flowchart-only results. The shared output helper is browser-safe and served through the module whitelist in `lib/server.mjs`.
 
 ### Adding an AI provider
+
+The application shell has a viewport-height row; both diagram workspaces use a flex chain with `min-height: 0` down to their scroll containers. Keep architecture scrolling on `.scroller` and flowchart scrolling on `.fcanvas` so horizontal scrollbars stay at the bottom of the available canvas rather than the end of short diagram content. Expanded keys take space above the canvas. On narrow screens, the sidebar and diagram share the viewport vertically.
+
+Diagram keys use independent, initially collapsed accordions: control-row buttons expose `aria-expanded` and `aria-controls`, and reveal the full key beneath the controls. Architecture details use a nonmodal native dialog (`show()`, not `showModal()`) and a backdrop positioned inside `.arch-stage`; both are clipped to the diagram so sidebar interaction stays available. Preserve connection navigation and cleanup on dismissal or trace changes. Close, Escape and backdrop clicks dismiss it. Flowchart details use the trace sidebar without architecture step badges, labels or walkthroughs; hidden step metadata still maps boxes to code references and docs and remains backward compatible in saved traces.
+
+Trace intent is `description` or `proposal`; legacy traces default to description. Proposals keep `rationale`, `assumptions`, `questions`, and trace-local `nodes`/`edges` with `status: new|modified|removed`. New component ids use `proposal:` and an existing group; modified/removed elements must refer to the base map. `lib/proposal.mjs` validates these identities and composes a disposable view. Keep the underlying map immutable and preserve change status separately from `inferred` in normalization, flowchart redraw, SVG/Mermaid exports, persistence and sharing.
+
+`POST /api/trace` runs the cancellable classifier and response under one lifecycle. Small-model choices are explicit provider mappings, checked against detected model lists, with optional `ai.classify` overrides on the same provider. Classifier failure falls back to the main agent. `POST /api/plan` accepts a proposal trace and streams a normalized `{ summary, tasks: [{ title, detail, files }], interfaces, tests, risks, questions }` plan. It uses the existing read-only runner and API protections. Plans are generated on demand, retained as `trace.plan`, and included in trace codes. The proposal tests use fake runners/HTTP servers; workspace tests cover sharing and modal caching/cancellation without AI services.
 
 Each runner takes `{ root, config, prompt, settings, timeoutMs, maxTurns, onProgress }` and returns `{ promise, kill }`. The promise resolves to `{ text, cost?, turns?, tokens? }`, or rejects with an `Error` whose `code` is one of `missing`, `auth`, `access`, `limit`, `model`, `timeout`, `turns` or `failed`. Use `classifyFailure()` from `lib/ai/errors.mjs` for the message. Add it to the registry in `lib/ai/agents.mjs`: a detect function returning `{ id, kind, label, available, reason, settings, models, efforts, defaultModel }`, an entry in `listAgents`, `AUTO_ORDER` and `PROVIDERS` (`lib/config.mjs`), and a case in `runSelection` if it needs a new runner. Pass the model and effort to the tool as flags, never through a shell. Document it in SETUP.md, and add a test with a fake server or script (see `test/ai.test.mjs`).
 

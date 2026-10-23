@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 import { normalizeFlow } from '../lib/flow.mjs';
 import { traceOutputs } from '../lib/trace-outputs.mjs';
+import * as PROPOSAL from '../lib/proposal.mjs';
 
 const html = readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
 const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]).join('\n');
@@ -21,6 +22,8 @@ function browserContext({ architecture = true, flowchart = true, result = raw, f
     const calls = { requests: [], saved: [], selected: [] };
     const context = vm.createContext({
         $: id => elements[id], byId: { checkout: { title: 'Checkout' } }, edgePairs: new Set(),
+        PROPOSAL, BASE_MAP: { nodes: [{ id: 'checkout', title: 'Checkout', group: 'shop', kind: 'service' }], groups: [{ id: 'shop' }], edges: [] },
+        hideArchitectureDetails: () => {},
         FLOW: { normalizeFlow }, OUTPUTS: { traceOutputs },
         AbortController, TextDecoder, Date, setInterval: () => 1, clearInterval() {},
         setTimeout: () => 1, clearTimeout() {}, REPO: { ai: true },
@@ -60,6 +63,100 @@ test('page sharing and normalization preserve output choices, code links, and pe
     const pending = page.decodeTrace(page.encodeTrace(page.normalizeTrace({ ...raw, pendingFlow: true, outputs: { architecture: false, flowchart: false } })));
     assert.equal(pending.pendingFlow, true);
     assert.equal(page.normalizeTrace(raw).outputs.architecture, true);
+});
+
+test('proposal sharing preserves new components, direction, statuses and the retained implementation plan', () => {
+    const { page } = browserContext();
+    const proposal = { rationale: 'Validate coupons in checkout.', nodes: [
+        { id: 'checkout', status: 'modified', rationale: 'Accept a coupon.' },
+        { id: 'proposal:coupons', status: 'new', title: 'Coupons', group: 'shop', suggestedPath: 'coupons.mjs' },
+    ], edges: [{ from: 'checkout', to: 'proposal:coupons', status: 'new' }] };
+    const plan = { tasks: [{ title: 'Validate', detail: 'Check expiry.', files: ['new: coupons.mjs'] }] };
+    const input = { ...raw, intent: 'proposal', proposal, plan, steps: [...raw.steps, { id: 'proposal:coupons', note: 'Validate codes.' }],
+        edges: [['checkout', 'proposal:coupons']], flow: { ...flow, nodes: [flow.nodes[0], { ...flow.nodes[1], status: 'new', step: 2 }] } };
+    const restored = page.decodeTrace(page.encodeTrace(page.normalizeTrace(input)));
+    assert.equal(restored.intent, 'proposal');assert.equal(restored.steps.length, 2);
+    assert.equal(restored.proposal.nodes[1].suggestedPath, 'coupons.mjs');
+    assert.equal(restored.flow.nodes[1].status, 'new');assert.equal(restored.flow.nodes[1].step, 2);
+    assert.equal(restored.plan.tasks[0].detail, 'Check expiry.');
+    assert.equal(restored.pairs.has('checkout|proposal:coupons'), true);
+    const description = page.normalizeTrace({ ...raw, proposal, plan });
+    assert.equal(description.intent, 'description');assert.equal(description.proposal, null);assert.equal(description.plan, null);
+});
+
+test('discarding invalid trace steps remaps flowchart references rather than shifting their meaning', () => {
+    const { page } = browserContext();
+    const normalized = page.normalizeTrace({ ...raw, steps: [{ id: 'missing' }, ...raw.steps], flow: { ...flow, nodes: [{ ...flow.nodes[0], step: 1 }, { ...flow.nodes[1], step: 2 }] } });
+    assert.equal(normalized.flow.nodes[0].step, undefined);
+    assert.equal(normalized.flow.nodes[1].step, 1);
+});
+
+test('switching proposals mounts disposable cards and connections and restores the base view', () => {
+    const badges=[],keys=[{hidden:true},{hidden:true}],classes=()=>({values:new Set(),add(v){this.values.add(v);},remove(...vs){vs.forEach(v=>this.values.delete(v));}});
+    const node=()=>({classList:classes(),removed:false,remove(){this.removed=true;},querySelector:()=>({appendChild:badge=>badges.push(badge)})});
+    const base={groups:[{id:'shop'}],nodes:[{id:'checkout',group:'shop',kind:'service',title:'Checkout'}],edges:[]};
+    const byId={checkout:{id:'checkout',g:'shop',title:'Checkout'}},nodeEl={checkout:node()},count={textContent:1},members=[];
+    const context=vm.createContext({PROPOSAL,BASE_MAP:base,NODES:[['checkout','shop','s']],byId,nodeEl,groupOf:{checkout:'shop'},
+        edges:[],baseEdges:[],out:{},inc:{},inspector:{hidden:false},hideArchitectureDetails:()=>{},
+        groupEl:{shop:{querySelector:selector=>selector==='.gc'?count:{appendChild:el=>members.push(el)}}},
+        document:{querySelectorAll:selector=>selector==='[data-proposal-key]'?keys:badges.filter(b=>!b.removed),createElement:()=>({remove(){this.removed=true;}})},
+        makeNode:n=>{const el=node();nodeEl[n.id]=el;return el;},
+    });
+    vm.runInContext(between('const overlayIds=new Set();','function setTrace('),context);
+    const proposal=id=>PROPOSAL.normalizeProposal({nodes:[{id:'checkout',status:'modified'},{id,status:'new',title:id,group:'shop'}],edges:[{from:'checkout',to:id,status:'new'}]},base);
+    context.mountProposal({proposal:proposal('proposal:coupons')});
+    const temporary=nodeEl['proposal:coupons'];
+    assert.equal(context.NODES.length,2);assert.equal(context.edges.length,1);assert.equal(count.textContent,2);
+    assert.equal(nodeEl.checkout.classList.values.has('change-modified'),true);assert.equal(keys[0].hidden,false);
+    context.mountProposal({proposal:proposal('proposal:rewards')});
+    assert.equal(temporary.removed,true);assert.equal(byId['proposal:coupons'],undefined);
+    assert.equal(context.edges[0].t,'proposal:rewards');assert.equal(context.NODES.length,2);
+    context.mountProposal(null);
+    assert.equal(context.edges.length,0);assert.equal(context.NODES.length,1);assert.equal(count.textContent,1);
+    assert.deepEqual(Object.keys(byId),['checkout']);assert.equal(nodeEl.checkout.classList.values.size,0);
+    assert.equal(keys[0].hidden,true);assert.equal(base.nodes.length,1);assert.equal(base.edges.length,0);
+});
+
+function planContext(){
+    const element=()=>({hidden:false,disabled:false,textContent:'',className:'',innerHTML:'',open:false,children:[],listeners:{},
+        appendChild(child){this.children.push(child);},addEventListener(name,fn){this.listeners[name]=fn;},
+        showModal(){this.open=true;},close(){this.open=false;this.listeners.close?.();}});
+    const elements=Object.fromEntries(['plan-dialog','plan-status','plan-body','plan-copy','plan-generate','plan-stop','plan-close'].map(id=>[id,element()]));
+    const calls={requests:[],saved:[]};let fail=null;
+    const plan={summary:'Coupons',tasks:[{title:'Add validation',detail:'Check expiry.',files:['new: coupons.mjs']}],tests:['Expired coupons are rejected.']};
+    const context=vm.createContext({$:id=>elements[id],document:{createElement:element},PROPOSAL,AbortController,REPO:{ai:true},
+        currentPick:()=>({agent:'api',model:'test'}),spend:()=>'',navigator:{clipboard:{writeText:async()=>{}}},
+        runStream:async(url,opts)=>{calls.requests.push({url,opts});if(fail)throw fail;return {plan};},
+        saveExisting:async t=>calls.saved.push(t),
+    });
+    vm.runInContext(between('let planTrace=null,planCtl=null;','/* ---------- flowchart workspace ---------- */')+'\nglobalThis.page={openPlan,generatePlan,planText};',context);
+    return {page:context.page,elements,calls,plan,setFailure:err=>{fail=err;},context};
+}
+
+test('implementation plan is generated on demand, cached on reopening, and retained after failed regeneration', async()=>{
+    const t={intent:'proposal'};
+    const modal=planContext();modal.context.plain=value=>value;
+    await modal.page.openPlan(t);
+    assert.equal(modal.calls.requests.length,1);assert.equal(modal.calls.requests[0].url,'/api/plan');
+    assert.equal(t.plan.tasks[0].title,'Add validation');assert.equal(modal.calls.saved.length,1);
+    modal.elements['plan-dialog'].close();await modal.page.openPlan(t);
+    assert.equal(modal.calls.requests.length,1,'reopening uses the saved plan');
+    const retained=t.plan;modal.setFailure(new Error('Temporary failure'));
+    await modal.page.generatePlan();
+    assert.equal(t.plan,retained);assert.match(modal.elements['plan-status'].textContent,/Temporary failure/);
+    assert.equal(modal.elements['plan-generate'].disabled,false);
+    assert.match(modal.page.planText(t.plan),/new: coupons.mjs/);
+});
+
+test('closing the implementation-plan modal aborts generation and permits a retry',async()=>{
+    const modal=planContext();modal.context.plain=value=>value;
+    let started;const ready=new Promise(resolve=>{started=resolve;});
+    modal.context.runStream=async(url,{signal})=>{started();return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(new Error('Stopped'),{name:'AbortError'}))));};
+    const t={intent:'proposal'},pending=modal.page.openPlan(t);await ready;
+    modal.elements['plan-dialog'].close();await pending;
+    assert.equal(t.plan,undefined);assert.equal(modal.calls.saved.length,0);
+    assert.equal(modal.elements['plan-generate'].disabled,false);
+    assert.match(modal.elements['plan-status'].textContent,/Stopped/);
 });
 
 for (const [architecture, flowchart] of [[true, false], [false, true], [true, true]]) {
@@ -112,6 +209,7 @@ test('adding an output updates the existing saved trace; failure retains retryab
     context.api = async (url, opts) => { calls.requests.push({ url, body: JSON.parse(opts.body), method: opts.method }); return { ok: true }; };
     context.loadSaved = async () => {};
     context.renderSaved = () => {};
+    context.mountProposal = () => {};
     vm.runInContext(between('async function saveExisting(', 'async function loadSaved('), context);
     const trace = { ...raw, _doc: 'existing-id', createdAt: 123, flow, outputs: { architecture: true, flowchart: true } };
     await context.saveExisting(trace);
@@ -124,6 +222,68 @@ test('adding an output updates the existing saved trace; failure retains retryab
     context.api = async () => ({ ok: true });
     await context.saveExisting(trace);
     assert.equal(context.store.temp, null);
+});
+
+test('diagram keys start collapsed and their control-row accordions toggle independently', () => {
+    const elements = {};
+    for (const name of ['architecture', 'flowchart']) {
+        assert.match(html, new RegExp(`id="${name}-key"[^>]*hidden`));
+        assert.match(html, new RegExp(`id="${name}-key-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="${name}-key"`));
+        elements[name + '-key'] = { hidden: true };
+        elements[name + '-key-toggle'] = { setAttribute(key, value) { this[key] = value; } };
+    }
+    let draws = 0;
+    const context = vm.createContext({ document: { getElementById: id => elements[id] }, redraw: () => draws++ });
+    vm.runInContext(between('function toggleDiagramKey(', 'function clearTrace('), context);
+    elements['architecture-key-toggle'].onclick();
+    assert.equal(elements['architecture-key'].hidden, false);
+    assert.equal(elements['architecture-key-toggle']['aria-expanded'], 'true');
+    assert.equal(elements['flowchart-key'].hidden, true);
+    elements['architecture-key-toggle'].onclick();
+    elements['flowchart-key-toggle'].onclick();
+    assert.equal(elements['architecture-key'].hidden, true);
+    assert.equal(elements['flowchart-key'].hidden, false);
+    assert.equal(draws, 3);
+});
+
+test('architecture details use a diagram-scoped nonmodal dialog and dismiss cleanly', () => {
+    const attrs = {}, button = { setAttribute(key, value) { attrs[key] = value; } }, body = {};
+    let cardOpen = true, closed = 0;
+    const inspector = { open: true, hidden: false, dataset: { id: 'checkout' }, style: {}, close() { this.open = false;closed++; } };
+    const architectureShade = { hidden: false };
+    const context = vm.createContext({ inspector, architectureShade,
+        stage: { getBoundingClientRect: () => ({ left: 300, right: 1440, top: 120, bottom: 1800 }) },
+        window: { innerWidth: 1440, innerHeight: 900 }, pinned: 'checkout', hover: 'checkout', redraw() {},
+        nodeEl: { checkout: { querySelector: selector => selector === '.nh' ? button : body, classList: { toggle(name, value) { cardOpen = value; } } } },
+    });
+    vm.runInContext(between('function setOpen(', 'function showArchitectureDetails('), context);
+    context.dismissArchitectureDetails();
+    assert.equal(closed, 1);assert.equal(inspector.hidden, true);assert.equal(cardOpen, false);
+    assert.equal(architectureShade.hidden, true);
+    assert.equal(attrs['aria-expanded'], 'false');assert.equal(attrs['aria-haspopup'], 'dialog');
+    assert.equal(context.pinned, null);assert.equal(context.hover, null);
+    assert.match(script, /createElement\("dialog"\);inspector.id="arch-details"/);
+    assert.match(script, /if\(!inspector.open\)inspector.show\(\)/);
+    assert.doesNotMatch(script, /inspector.showModal\(/);
+    assert.match(script, /stage.appendChild\(architectureShade\)/);
+});
+
+test('flowchart details retain code evidence without architecture step labels or notes', () => {
+    const heading = {}, detail = { remove() {} }, markup = [], children = [];
+    const side = { innerHTML: '', insertAdjacentHTML(where, value) { markup.push(value); },
+        querySelector: selector => selector === 'h3' ? heading : detail, appendChild: child => children.push(child) };
+    const node = { id: 'process', type: 'process', label: 'Validate coupon', detail: 'Check expiry.', step: 1 };
+    const context = vm.createContext({ $: () => side, esc: value => String(value), PROPOSAL,
+        fl: { t: { flow: { nodes: [node], edges: [] }, steps: [{ id: 'checkout', note: 'Architecture note' }], refs: [{ step: 'checkout', path: 'checkout.mjs' }] } },
+        DOCS: { checkout: [{ title: 'Coupon docs' }] }, refEl: ref => ({ ref }), docEl: doc => ({ doc }),
+        document: { createElement: () => ({ children: [], appendChild(child) { this.children.push(child); } }) },
+    });
+    vm.runInContext(between('const FLOW_KIND=', '$(' + '"fl-svgbox").addEventListener("click"'), context);
+    context.sideFlow(node);
+    assert.equal(heading.textContent, 'Validate coupon');assert.equal(detail.textContent, 'Check expiry.');
+    assert.doesNotMatch(markup.join(''), /Step 1|Architecture note|checkout/);
+    assert.equal(children.length, 1);assert.equal(children[0].children.length, 2);
+    assert.equal(children[0].children[0].ref.path, 'checkout.mjs');
 });
 
 test('page script parses and DOM ids remain unique', () => {
@@ -250,10 +410,12 @@ test('clearing a trace restores the whole map without deleting saved data', () =
     };
     context.groupEl = { first: { open: false }, second: { open: true } };
     context.preTraceGroups = { first: true, second: false };
+    context.mountProposal = () => {};
     context.trace = raw;
     context.pinned = 'checkout';
     context.hover = 'checkout';
     context.inspector = { hidden: false };
+    context.hideArchitectureDetails = () => { context.inspector.hidden = true; };
     context.q = { value: 'checkout' };
     context.nodeEl = { checkout: { classList: { contains: () => true } } };
     context.setOpen = (id, open) => calls.selected.push({ id, open });

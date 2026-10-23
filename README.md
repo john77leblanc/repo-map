@@ -4,6 +4,7 @@ An interactive architecture map for any repo, with plain-language process tracin
 
 - **See how a codebase fits together.** Services, apps, pages or modules, the shared code they lean on, and the outside systems they talk to, laid out left to right in the order data flows. Hover a card to light up its connections; click it for a description, key facts and a GitHub link.
 - **Ask how a process works.** Type "What happens when someone places an order?" and your AI tool reads the map and your checkout (read-only), numbers the path on the map, and shows the code behind each step, read live from your files. Choose the tool, model and effort under **Settings / Trace agent**.
+- **Explore a hypothetical change.** Ask "Where would coupon support fit?" in the same prompt window. Intent is detected automatically. The trace explains placement and rationale and marks proposed components and connections as **New**, **Modified**, or **Removed** in both diagrams. Select **Implementation plan** to generate ordered tasks, interface changes, tests and risks in a modal. Plans and proposal diagrams travel with saved traces and shared codes; the repository map stays unchanged.
 - **Choose how to explore a process.** Select **Code architecture**, **Flowchart**, or both when creating a trace. Architecture highlights the process on the repository map; Flowcharts opens its decisions, failure paths and outcomes on the main canvas. Click a card or step for its explanation, expandable code references and linked docs. Copy a flowchart as Mermaid or download it as SVG.
 - **Read the docs where the code is.** When the map is drawn, a second pass links sections of your docs, your agent guidance (AGENTS.md, CLAUDE.md…) and substantial code comments to the cards they explain. Open a card and its docs are listed first, agent guidance on top, readable in place.
 - **Keep what you learn.** Every trace is saved locally, and any one can be shared as a short code a teammate pastes in.
@@ -33,6 +34,8 @@ Or try it without installing anything: `npx @whitemane/repo-map`.
 
 The first run asks a few questions: a name for the map, which folders hold the code, a one-line description, and which AI tool to use (it lists the ones it finds on your machine, or you can skip). It then offers to draft the map, and opens it in your browser. Every later run goes straight to the map.
 
+During startup, an ASCII spinner shows when the agent is drafting or updating the map, including linking documentation. Progress messages remain visible above it.
+
 Add a script so teammates only need `npm install` and `npm run map`:
 
 ```json
@@ -43,7 +46,9 @@ Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignor
 
 **Explore:** the sidebar starts with the repository title and details, followed by **New trace** and **Saved traces**. Select a trace to see its title, original prompt, **Architecture** / **Flowchart** tabs, and expanded walkthrough and actions. Flowchart controls sit above its diagram key, while step details appear in the sidebar when you click a box. The flowchart canvas fills the available height. Both outputs use the main canvas. A missing output can be added using its tab; drawing a flowchart requires an AI tool. **Back to all traces** returns to the library and whole map without deleting anything. The map stays in place as trace information changes. Older saved traces and import codes continue to work.
 
-Diagram keys stay visible above the architecture map and flowchart. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
+Each diagram has a **Diagram key** accordion beside its controls, collapsed by default. Expand it to show the key below the controls. Clicking an architecture card opens a centered details overlay confined to the diagram, leaving the sidebar interactive. Close it with **Close details**, Escape, or a click on its backdrop. Flowcharts show their own process details and code references without architecture step numbers or the architecture walkthrough. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
+
+Both diagrams fill the available workspace height and scroll inside their canvas. The architecture diagram's horizontal scrollbar stays at the bottom of the screen even when the diagram's content is short.
 
 **Keeping it current:** the map remembers the commit it was drawn from. Map and documentation issues show a notification icon on **Settings**, which shows what needs attention and offers **Update map**, **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. Settings also holds the trace AI preference used for new traces and flowchart redraws. Use **Dismiss notification** in Settings to hide the icon for the current issue; dismissal is remembered in this browser, and new issues notify again. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
 

@@ -11,6 +11,8 @@
  * the spacing allows (isotonic regression keeps order and gaps exact).
  */
 
+import { CHANGE_LABELS } from '../lib/proposal.mjs';
+
 const FONT_W = 6.7;          // average glyph width at 12.5px
 const LINE_H = 16;
 const PAD_X = 14;
@@ -40,13 +42,14 @@ function wrap(text, maxChars) {
 }
 
 function sizeNode(n) {
+    const label = CHANGE_LABELS[n.status] ? `[${CHANGE_LABELS[n.status]}] ${n.label}` : n.label;
     if (n.type === 'decision') {
-        const lines = wrap(n.label, 16);
+        const lines = wrap(label, 16);
         const tw = Math.max(...lines.map((l) => l.length)) * FONT_W;
         const th = lines.length * LINE_H;
         return { lines, w: Math.max(150, Math.round(tw * 2 + 12)), h: Math.max(70, Math.round(th * 2 + 14)) };
     }
-    const lines = wrap(n.label, n.type === 'start' || n.type === 'end' ? 22 : 26);
+    const lines = wrap(label, n.type === 'start' || n.type === 'end' ? 22 : 26);
     const tw = Math.max(...lines.map((l) => l.length)) * FONT_W;
     const skew = n.type === 'action' ? 22 : 0;
     const pill = n.type === 'start' || n.type === 'end' ? 12 : 0;
@@ -255,7 +258,7 @@ function layoutFlow(flow) {
     }
 
     // 6. y per rank.
-    const labelled = new Set(fwd.filter((e) => e.label).map((e) => rank.get(e.from)));
+    const labelled = new Set(fwd.filter((e) => e.label || CHANGE_LABELS[e.status]).map((e) => rank.get(e.from)));
     const rowH = layers.map((L) => Math.max(0, ...L.map((it) => it.h)));
     const rowY = [];
     let y = MARGIN;
@@ -369,7 +372,8 @@ function layoutFlow(flow) {
         const tx = t.x + t.w + 2;
         const R = 8;
         const d = `M${r1(sx)},${r1(s.cy)} L${r1(xr - R)},${r1(s.cy)} Q${r1(xr)},${r1(s.cy)} ${r1(xr)},${r1(s.cy - R)} L${r1(xr)},${r1(t.cy + R)} Q${r1(xr)},${r1(t.cy)} ${r1(xr - R)},${r1(t.cy)} L${r1(tx)},${r1(t.cy)}`;
-        width = Math.max(width, xr + MARGIN + (e.label ? e.label.length * 3.4 + 8 : 0));
+        const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
+        width = Math.max(width, xr + MARGIN + (caption ? caption.length * 6.1 + 16 : 0));
         routed.push({ ...e, d, label: e.label || '', labelAt: [xr + 6, (s.cy + t.cy) / 2, 'start'] });
     });
 
@@ -400,37 +404,33 @@ function shapeOf(n) {
     return `<rect class="fs" x="${r1(x)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(rx)}"/>`;
 }
 
-/** SVG markup for a layout. Boxes carry data-id and data-step for click handling. */
+/** SVG markup for a layout. Boxes carry data-id for click handling. */
 function renderFlowSvg(layout, { title = '' } = {}) {
     const parts = [];
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" class="fc" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" role="img" aria-label="${escXml(title || 'Flowchart')}">`);
     parts.push('<defs><marker id="fc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa" d="M0 0.5L7.5 4L0 7.5z"/></marker></defs>');
     parts.push('<g class="fe-all">');
     layout.edges.forEach((e, i) => {
-        parts.push(`<path class="fe${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"/>`);
+        parts.push(`<path class="fe${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
     });
     parts.push('</g><g class="fl-all">');
     layout.edges.forEach((e) => {
-        if (!e.label) {
+        const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
+        if (!caption) {
             return;
         }
         const [lx, ly, anchor] = e.labelAt;
-        const w = e.label.length * 6.1 + 10;
+        const w = caption.length * 6.1 + 10;
         const x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-        parts.push(`<g class="fl"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(e.label)}</text></g>`);
+        parts.push(`<g class="fl"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
     });
     parts.push('</g>');
     layout.nodes.forEach((n) => {
-        const label = `${n.label}${n.step ? ` (step ${n.step})` : ''}`;
-        parts.push(`<g class="fn t-${n.type}${n.inferred ? ' inf' : ''}" data-id="${escXml(n.id)}"${n.step ? ` data-step="${n.step}"` : ''} tabindex="0" role="button" aria-label="${escXml(label)}">`);
+        const label = `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
+        parts.push(`<g class="fn t-${n.type}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
         parts.push(shapeOf(n));
         const top = n.cy - ((n.lines.length - 1) * LINE_H) / 2 + 4.5;
         parts.push(`<text x="${r1(n.cx)}" y="${r1(top)}" text-anchor="middle">${n.lines.map((l, i) => `<tspan x="${r1(n.cx)}"${i ? ` dy="${LINE_H}"` : ''}>${escXml(l)}</tspan>`).join('')}</text>`);
-        if (n.step) {
-            const bx = n.type === 'decision' ? n.cx - n.w / 4 - 4 : n.x + 2;
-            const by = n.type === 'decision' ? n.y + n.h / 4 - 4 : n.y + 2;
-            parts.push(`<g class="fb"><circle cx="${r1(bx)}" cy="${r1(by)}" r="9"/><text x="${r1(bx)}" y="${r1(by + 3.5)}" text-anchor="middle">${n.step}</text></g>`);
-        }
         parts.push('</g>');
     });
     parts.push('</svg>');
