@@ -44,7 +44,7 @@ examples/shop/       small fictional repo used by `npm run example` and the test
 test/                node:test suites
 ```
 
-The UI has a trace-centered sidebar: Settings and collapse controls, New trace, and saved trace cards with title, prompt, and Architecture / Flowchart buttons. Outputs open on the main canvas; Settings has a separate dialog. Flowcharts use the main canvas; both diagrams expose details and code on selection. A saved trace's optional `outputs: { architecture, flowchart }` records its available outputs. Legacy traces expose architecture and any valid flowchart. `pendingFlow: true` keeps an incomplete flowchart discoverable for retry. Supporting trace steps remain present for flowchart-only results. The shared output helper is browser-safe and served through the module whitelist in `lib/server.mjs`.
+The sidebar has a home view (New trace and Saved traces) and a selected trace view (back button, title, prompt, output tabs, expanded walkthrough and actions, and flowchart step details). Returning home clears highlighting and restores group state without deleting saved data. Trace information stays outside the main diagram layout. Settings has a separate dialog; architecture cards retain their code and docs inspector. A saved trace's optional `outputs: { architecture, flowchart }` records its available outputs. Legacy traces expose architecture and any valid flowchart. `pendingFlow: true` keeps an incomplete flowchart discoverable for retry. Supporting trace steps remain present for flowchart-only results. The shared output helper is browser-safe and served through the module whitelist in `lib/server.mjs`.
 
 ### Adding an AI provider
 

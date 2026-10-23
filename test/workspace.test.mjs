@@ -173,19 +173,20 @@ test('failed initial save keeps the selected flowchart available and can be retr
     assert.equal(trace._doc, 'retry-id');
 });
 
-test('saved trace cards keep all traces visible with title, prompt, and per-trace output buttons', async () => {
-    const { context, calls } = browserContext();
+test('sidebar switches from trace library to expanded trace information and output tabs', async () => {
+    const { context, calls, page } = browserContext();
     const element = tag => ({
-        tag, children: [], attributes: {},
+        tag, children: [], attributes: {}, hidden: true,
         appendChild(child) { this.children.push(child); },
         setAttribute(name, value) { this.attributes[name] = value; },
         set innerHTML(value) { this.children = []; },
+        focus() {}, click() { return this.onclick(); },
     });
-    const list = element('ul');
-    const count = element('span');
-    const empty = element('p');
-    context.$ = id => ({ 'trace-list': list, savedcount: count, 'saved-empty': empty })[id];
-    context.document = { createElement: element };
+    const ids = ['trace-list', 'savedcount', 'saved-empty', 'sidebar-home', 'sidebar-trace', 'trace-back', 'trace-title', 'trace-prompt', 'trace-architecture', 'trace-flowchart', 'trace-walkthrough', 'trace-flow-details', 'tab-map'];
+    const elements = Object.fromEntries(ids.map(id => [id, element('div')]));
+    const list = elements['trace-list'];
+    context.$ = id => elements[id];
+    context.document = { createElement: element, querySelector: () => ({ scrollTop: 0 }) };
     context.AI_BOOT = { available: false };
     context.trace = null;
     context.fl = { t: null };
@@ -198,21 +199,143 @@ test('saved trace cards keep all traces visible with title, prompt, and per-trac
     context.setTrace = trace => calls.selected.push({ trace, workspace: 'architecture' });
     context.showWorkspace = workspace => calls.selected.push({ workspace });
     context.saveExisting = async trace => calls.saved.push(trace);
-    vm.runInContext(between('function renderSaved(', 'function renderContext('), context);
-    for (const workspace of ['architecture', 'flowchart']) {
-        context.workspace = workspace;
-        context.renderSaved();
-        assert.equal(list.children.length, 2, 'the library is independent of the active output');
-        assert.equal(list.children[0].children[0].textContent, raw.title);
-        assert.equal(list.children[0].children[1].textContent, 'How does <checkout> work?');
-        const buttons = list.children[0].children[2].children;
-        assert.deepEqual(buttons.map(button => button.textContent), ['Architecture', 'Flowchart']);
-        assert.equal(buttons[1].disabled, true, 'missing flow needs an AI tool');
-    }
-    await list.children[1].children[2].children[1].onclick();
+    context.traceBody = () => element('div');
+    vm.runInContext(between('function renderSaved(', 'async function saveExisting('), context);
+    context.renderSaved();
+    assert.equal(elements['sidebar-home'].hidden, false);
+    assert.equal(elements['tab-map'].hidden, false);
+    assert.equal(elements['trace-back'].hidden, true);
+    assert.equal(elements['sidebar-trace'].hidden, true);
+    assert.equal(list.children.length, 2);
+    assert.equal(list.children[0].children[0].children[0].textContent, raw.title);
+    assert.equal(list.children[0].children[0].children[1].textContent, 'How does <checkout> work?');
+    await list.children[1].children[0].onclick();
     assert.equal(calls.selected.at(-1).trace._doc, 'flowchart-id');
-    await list.children[1].children[2].children[0].onclick();
-    assert.equal(calls.saved[0]._doc, 'flowchart-id', 'adding architecture retains the same trace');
+    const active = page.normalizeTrace(context.store.items[1]);active._doc = 'flowchart-id';
+    context.trace = active;context.fl.t = active;context.workspace = 'flowchart';
+    context.renderSaved();
+    assert.equal(elements['sidebar-home'].hidden, true);
+    assert.equal(elements['tab-map'].hidden, true);
+    assert.equal(elements['trace-back'].hidden, false);
+    assert.equal(elements['sidebar-trace'].hidden, false);
+    assert.equal(elements['trace-title'].textContent, raw.title);
+    assert.equal(elements['trace-prompt'].textContent, 'What are the outcomes?');
+    assert.equal(elements['trace-flowchart'].attributes['aria-selected'], 'true');
+    assert.equal(elements['trace-architecture'].attributes['aria-selected'], 'false');
+    assert.equal(elements['trace-walkthrough'].children.length, 1);
+    assert.notEqual(elements['trace-walkthrough'].children[0].tag, 'details');
+    assert.equal(elements['trace-flow-details'].hidden, false);
+    await elements['trace-architecture'].onclick();
+    assert.equal(calls.saved[0]._doc, 'flowchart-id');
     assert.equal(calls.saved[0].outputs.architecture, true);
-    assert.equal(calls.selected.at(-1).workspace, 'architecture');
+    context.workspace = 'architecture';context.renderTraceSidebar(active);
+    assert.equal(elements['trace-flow-details'].hidden, true);
+    const selectedCount = calls.selected.length;
+    await elements['trace-architecture'].onclick();
+    assert.equal(calls.selected.length, selectedCount, 'clicking an active tab keeps it selected');
+    context.trace = null;context.renderSaved();
+    assert.equal(elements['sidebar-home'].hidden, false);
+    assert.equal(elements['tab-map'].hidden, false);
+    assert.equal(elements['sidebar-trace'].hidden, true);
+});
+
+test('clearing a trace restores the whole map without deleting saved data', () => {
+    const { context, calls } = browserContext();
+    let removedBadge = false;
+    let removedHighlights = false;
+    context.document = {
+        querySelectorAll: selector => selector === '.stepn'
+            ? [{ remove() { removedBadge = true; } }]
+            : [{ classList: { remove() { removedHighlights = true; } } }],
+    };
+    context.groupEl = { first: { open: false }, second: { open: true } };
+    context.preTraceGroups = { first: true, second: false };
+    context.trace = raw;
+    context.pinned = 'checkout';
+    context.hover = 'checkout';
+    context.inspector = { hidden: false };
+    context.q = { value: 'checkout' };
+    context.nodeEl = { checkout: { classList: { contains: () => true } } };
+    context.setOpen = (id, open) => calls.selected.push({ id, open });
+    context.renderSaved = () => {};
+    context.redraw = () => {};
+    context.doSearch = () => {};
+    context.showWorkspace = name => { context.workspace = name; };
+    context.store = { items: [{ ...raw, key: 'saved-trace' }] };
+    vm.runInContext([
+        between('function setTrace(', 'function reveal('),
+        between('function clearTrace(', 'document.addEventListener("keydown"'),
+    ].join('\n'), context);
+    context.clearTrace();
+    assert.equal(context.trace, null);
+    assert.equal(context.pinned, null);
+    assert.equal(context.hover, null);
+    assert.equal(context.preTraceGroups, null);
+    assert.equal(context.groupEl.first.open, true);
+    assert.equal(context.groupEl.second.open, false);
+    assert.equal(context.inspector.hidden, true);
+    assert.equal(context.q.value, '');
+    assert.equal(context.workspace, 'architecture');
+    assert.equal(removedBadge, true);
+    assert.equal(removedHighlights, true);
+    assert.equal(context.store.items.length, 1);
+    assert.equal(calls.requests.length, 0);
+});
+
+test('default flowchart zoom adds two plus steps while Fit preserves the fitted scale', () => {
+    const scales = [];
+    const context = vm.createContext({
+        fl: { layout: { width: 500, height: 300 } },
+        $: () => ({ clientWidth: 1024, clientHeight: 768 }),
+        setScale: value => scales.push(value),
+    });
+    vm.runInContext(between('function fitFlow(', 'function pickFlow('), context);
+    context.fitFlow(1.2 ** 2);
+    assert.equal(scales.at(-1), 1.44);
+    context.fitFlow();
+    assert.equal(scales.at(-1), 1);
+    context.fl.layout = { width: 2000, height: 1200 };
+    context.fitFlow(1.2 ** 2);
+    assert.equal(scales.at(-1), 0.65 * 1.44);
+});
+
+test('Settings notifications can be dismissed across reloads and reappear for new issues', () => {
+    const storage = new Map();
+    function noticeContext() {
+        const elements = Object.fromEntries(['tab-map', 'tab-map-dot', 'ms-dismiss'].map(id => [id, {
+            setAttribute(name, value) { this[name] = value; },
+        }]));
+        const context = vm.createContext({
+            $: id => elements[id], NS: 'test-repo:',
+            mapSt: { state: 'unrecorded', docs: { linked: true } },
+            localStorage: {
+                getItem: key => storage.get(key),
+                setItem: (key, value) => storage.set(key, value),
+                removeItem: key => storage.delete(key),
+            },
+        });
+        vm.runInContext(between('function mapNoticeKey(', '/* map jobs:'), context);
+        return { context, elements };
+    }
+    const { context, elements } = noticeContext();
+    context.renderMapNotice();
+    assert.equal(elements['tab-map-dot'].hidden, false);
+    assert.match(elements['tab-map']['aria-label'], /needs attention/);
+    elements['ms-dismiss'].onclick();
+    assert.equal(elements['tab-map-dot'].hidden, true);
+    assert.equal(elements['ms-dismiss'].hidden, true);
+    assert.equal(context.mapSt.state, 'unrecorded', 'dismissal does not alter the underlying map');
+    const reloaded = noticeContext();reloaded.context.renderMapNotice();
+    assert.equal(reloaded.elements['tab-map-dot'].hidden, true);
+    context.mapSt = { state: 'stale', commit: 'abc', changed: 1, files: ['a.mjs'], docs: { linked: true } };
+    context.renderMapNotice();
+    assert.equal(elements['tab-map-dot'].hidden, false);
+    context.dismissMapNotice();
+    context.mapSt.files = ['b.mjs'];context.renderMapNotice();
+    assert.equal(elements['tab-map-dot'].hidden, false, 'different changes notify again');
+    context.mapSt = { state: 'current', docs: { linked: true } };context.renderMapNotice();
+    assert.equal(elements['tab-map-dot'].hidden, true);
+    assert.equal(storage.size, 0, 'resolved issues clear the dismissal');
+    context.mapSt.docs = { linked: true, changed: 1, files: ['README.md'] };context.renderMapNotice();
+    assert.equal(elements['tab-map-dot'].hidden, false, 'changed documentation also notifies');
 });

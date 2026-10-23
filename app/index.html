@@ -115,7 +115,6 @@ details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--fo
 .cl b{font-family:var(--f-mono);font-weight:500;font-size:11.5px;white-space:nowrap}
 .cl span{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
 .cl em{font-style:normal;color:var(--muted);font-size:10.5px;border:1px dashed var(--line);border-radius:3px;padding:0 3px;flex:none}
-.foot{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px;color:var(--muted);font-size:12px;max-width:900px}
 /* app shell + trace sidebar */
 .app{--side-w:360px;display:grid;grid-template-columns:minmax(0,1fr) var(--side-w);align-items:start}
 .app.collapsed{grid-template-columns:minmax(0,1fr) 44px}
@@ -294,7 +293,7 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .side{grid-column:1;grid-row:1;border-left:0;border-right:1px solid var(--line)}
 .main{grid-column:2;grid-row:1;padding:0;min-height:100vh}
 .top{padding:24px 28px 16px;gap:16px}.side-in{padding:20px 16px;gap:22px}.resizer{left:auto;right:-5px}
-.diagram-key{padding:0 28px 12px;color:var(--muted);font-size:12px}.diagram-key summary{cursor:pointer;width:fit-content}.diagram-key .legend{padding:12px 0 0}
+.diagram-key{padding:0 28px 12px;color:var(--muted);font-size:12px}.diagram-key .legend{padding:12px 0 0}
 .output-options{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px}.output-options legend{font-weight:500;margin-bottom:6px}.output-options .hint{flex-basis:100%}
 .trace-outputs{margin-top:12px}
 .trace-actions{display:grid;grid-template-columns:max-content 28px minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:12px}
@@ -303,10 +302,9 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .arch-stage{display:grid;grid-template-columns:minmax(0,1fr) auto;min-height:70vh}
 #arch-details{width:310px;padding:18px;border-left:1px solid var(--line);background:var(--panel);max-height:calc(100vh - 180px);overflow:auto;position:sticky;top:0;box-sizing:border-box}
 #arch-details h3{font-size:17px;margin:16px 0 8px}#arch-details .refs{margin-top:18px}#arch-details .cl{width:100%}#arch-details p{font-size:13px}
-.trace-context{padding:12px 28px;border-block:1px solid var(--line);background:var(--panel)}.trace-context:empty{display:none}.trace-context h2{font-size:17px;margin:0 0 4px}.trace-context p{font-size:13px;color:var(--muted);margin:0}
 .fdlg{background:var(--bg);color:var(--ink)}.fhead{padding:18px 24px}.fmain{min-height:65vh;height:calc(100vh - 260px)}.fcanvas{min-height:400px}
 .fmain.details-closed{grid-template-columns:minmax(0,1fr)}
-.flegend{display:block}.flegend summary{cursor:pointer}.flegend>div{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:8px}
+.flegend{display:block}.flegend>div{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:8px}
 #flow-empty{padding:48px 28px;max-width:600px}
 #settings-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(680px,calc(100vw - 32px));max-height:90vh;padding:0}
 #settings-dialog::backdrop{background:rgba(0,0,0,.35)}#pane-map{padding:24px;display:grid;gap:24px}#pane-map h2{font-size:16px;margin:0 0 8px}.fside{font-size:13px}
@@ -327,6 +325,57 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .side-bar #tab-map{display:flex;align-items:center;gap:4px}
 .app.collapsed .side-bar #tab-map{font-size:0;padding:6px}
 .app.collapsed .side-bar #tab-map::before{content:"\2699";font-size:16px}
+.canvas-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.trace-walkthrough{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.trace-walkthrough summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.trace-walkthrough .tb{padding:10px 0 0}
+#sidebar-home{display:flex;flex-direction:column;gap:22px}
+#sidebar-home>#new-trace{width:100%}
+#sidebar-trace{min-width:0}
+#trace-back{margin-bottom:18px}
+#sidebar-trace #trace-title{display:block;font-size:20px;line-height:1.25;overflow-wrap:anywhere;margin:0 0 10px}
+#trace-prompt{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);margin:0 0 18px}
+#sidebar-trace hr{border:0;border-top:1px solid var(--line);margin:0 0 16px}
+.trace-tabs{display:flex;gap:6px;margin-bottom:16px}
+.trace-tabs .btn{flex:1}
+.trace-tabs [aria-selected="true"]{background:var(--soft);border-color:var(--ink)}
+#trace-walkthrough .tb{padding:0;border:0}
+#trace-status:empty{display:none}
+#trace-flow-details{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+#trace-flow-details .fside{padding:0;border:0;max-height:none;overflow:visible}
+.fmain{grid-template-columns:minmax(0,1fr)}
+.trace-open{display:block;width:100%;padding:0;border:0;background:transparent;color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+.trace-open:focus-visible{outline:2px solid var(--http);outline-offset:6px}
+.trace-card-title{display:block;font-family:var(--f-head);font-size:15px;font-weight:600;margin-bottom:6px}
+.trace-open .trace-prompt{display:block;margin:0}
+.side-bar #side-toggle{margin-left:auto}
+.key-title{font-size:12px;font-weight:500;margin:0 0 8px;color:var(--muted)}
+.flegend{position:static;padding:12px 24px;border-bottom:1px solid var(--line);background:var(--bg)}
+.flegend>div{padding-top:0}
+.settings-map-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.settings-map-heading h2{margin:0!important}
+.settings-notice{display:inline-flex;color:var(--event);margin-left:4px}
+.settings-notice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.repo-summary h1{font-size:23px;overflow-wrap:anywhere}
+.repo-summary .sub{display:grid;gap:4px;font-size:12px;overflow-wrap:anywhere}
+.repo-summary .sub code{white-space:normal;overflow-wrap:anywhere}
+.flow-tools{display:grid;gap:10px;margin-bottom:16px}
+.flow-zoom,.flow-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.flow-actions .status{flex-basis:100%;overflow-wrap:anywhere}
+.flow-actions .status:empty{display:none}
+#trace-flow-details>h3{font-size:14px;margin:0 0 12px}
+#fl-svgbox{padding-top:16px}
+#trace-flow-details{border:0;padding-top:0;margin-top:0}
+.side-bar #trace-back{margin-bottom:0}
+.app.collapsed .side-bar #trace-back{font-size:0;padding:6px}
+.app.collapsed .side-bar #trace-back::before{content:"\2190";font-size:16px}
+.main.showing-flow{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.main.showing-flow>.top{display:none}
+.main.showing-flow>#flowdlg{flex:1;min-height:0;display:flex;flex-direction:column}
+#flowdlg>.flow-tools{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;padding:16px 24px;margin:0;flex:none}
+#flowdlg>.flegend{flex:none}
+#flowdlg .fmain{height:auto;min-height:0;flex:1;grid-template-rows:minmax(0,1fr)}
+#flowdlg .fcanvas{min-height:0;height:100%}
 </style>
 </head>
 <body>
@@ -334,19 +383,17 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 <div class="app">
 <main class="main">
 <header class="top">
-  <div>
-    <h1 id="map-name">Repo Map</h1>
-    <p class="sub"><code id="repo-name"></code> · <span id="stat"></span> · <span id="repoinfo">connecting to local server…</span></p>
-  </div>
+
+  <div class="canvas-controls">
   <div class="controls">
     <label class="search"><svg viewBox="0 0 16 16" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
       <input id="q" type="search" placeholder="Find a node" aria-label="Find a node"></label>
     <button class="btn" id="expand" type="button">Expand groups</button>
     <button class="btn" id="collapse" type="button">Collapse groups</button>
-    <button class="btn" id="clear" type="button">Whole repository</button>
+  </div>
   </div>
 </header>
-<details class="diagram-key"><summary>Diagram key</summary><div class="legend" role="group" aria-label="Connection types">
+<section class="diagram-key" aria-label="Diagram key"><p class="key-title">Diagram key</p><div class="legend" role="group" aria-label="Connection types">
   <button class="chip" type="button" data-type="http" aria-pressed="true"><i class="sw http"></i><span data-lbl="http">HTTP call</span></button>
   <button class="chip" type="button" data-type="event" aria-pressed="true"><i class="sw event"></i><span data-lbl="event">Event</span></button>
   <button class="chip" type="button" data-type="sync" aria-pressed="true"><i class="sw sync"></i><span data-lbl="sync">Data sync / job</span></button>
@@ -355,24 +402,29 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
   <span class="note">Arrows point from caller to callee, publisher to topic to subscriber, and source to destination for syncs. Hover a card to trace it; click to open it.</span>
 </div>
 
-</details>
-<div class="stale" id="stale" hidden role="status"></div>
+</section>
 <div class="scroller" id="scroller">
+  <p class="empty" id="map-empty" hidden>This map is empty. Open Settings to draw a map, or run <code>repo-map generate</code>, then reload.</p>
   <div class="board" id="board">
     <svg id="wires" class="wires" aria-hidden="true"><defs></defs></svg>
     <div class="cols" id="cols"></div>
     <svg id="wires-top" class="wires" aria-hidden="true"></svg>
   </div>
 </div>
-<p class="foot" id="footnote">Edges into a collapsed group attach to the group header.</p>
 </main>
 <aside class="side" aria-label="Repository library" id="side">
   <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize library" tabindex="0" title="Drag to resize · double-click to reset"></div>
   <div class="side-in">
   <div class="side-bar">
-    <button class="btn" id="tab-map" type="button">Settings<span class="tdot" id="tab-map-dot" hidden title="Needs attention"></span></button>
-    <button class="iconbtn" id="side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Collapse panel"><svg viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
+    <button class="btn" id="tab-map" type="button">Settings<span class="settings-notice" id="tab-map-dot" hidden aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 11h10l-1.5-2V6a3.5 3.5 0 0 0-7 0v3L3 11zm3.5 2h3"/></svg></span></button>
+    <button class="btn" id="trace-back" type="button" hidden>Back to all traces</button>
+    <button class="iconbtn" id="side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Collapse panel"><svg viewBox="0 0 16 16"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg></button>
   </div>
+  <div id="sidebar-home">
+    <section class="repo-summary" aria-label="Repository">
+      <h1 id="map-name">Repo Map</h1>
+      <p class="sub"><code id="repo-name"></code><span id="stat"></span><span id="repoinfo">Connecting to local server...</span></p>
+    </section>
   <button class="btn primary" id="new-trace" type="button" aria-expanded="false" aria-controls="composer">New trace</button>
   <div class="pane" id="pane-traces" >
   <section id="composer" hidden>
@@ -400,7 +452,6 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
     <p class="hint" id="store-note">Saved automatically to .repo-map/traces on this machine (git-ignored). Open an output to explore it.</p>
     <ul class="trace-list" id="trace-list"></ul>
     <p class="empty" id="saved-empty">No saved traces yet. Create a trace, or import one from a teammate.</p>
-    <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
     <details class="imp">
       <summary>Import a trace code</summary>
       <textarea id="importbox" placeholder="Paste a trace code (rmap1:…)"></textarea>
@@ -408,9 +459,25 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
     </details>
   </section>
   </div>
+  </div>
+  <section id="sidebar-trace" hidden aria-label="Selected trace">
+    <h2 id="trace-title"></h2>
+    <p id="trace-prompt"></p>
+    <hr>
+    <div class="trace-tabs" role="tablist" aria-label="Trace output">
+      <button class="btn" id="trace-architecture" type="button" role="tab" aria-controls="architecture-workspace" aria-selected="true">Architecture</button>
+      <button class="btn" id="trace-flowchart" type="button" role="tab" aria-controls="flowdlg" aria-selected="false" tabindex="-1">Flowchart</button>
+    </div>
+    <textarea id="codebox" readonly hidden aria-label="Trace code"></textarea>
+    <p id="trace-status" class="status" aria-live="polite"></p>
+    <section id="trace-flow-details" hidden aria-label="Flowchart details">
+      <p id="fl-empty" class="hint" hidden>The supporting walkthrough was kept. Draw the flowchart to complete this output.</p>
+    </section>
+    <div id="trace-walkthrough"></div>
+  </section>
   <div class="pane" id="pane-map">
   <section>
-    <h2>This map</h2>
+    <div class="settings-map-heading"><h2>This map</h2><button class="btn sm" id="ms-dismiss" type="button" hidden>Dismiss notification</button></div>
     <p class="hint" id="ms-text">Checking…</p>
     <p class="mfiles" id="ms-files" hidden></p>
     <p class="hint" id="ms-docs"></p>
@@ -453,23 +520,19 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 </aside>
 </div>
 
-<section class="fdlg" id="flowdlg" aria-labelledby="fl-title" hidden>
-  <div class="fhead">
-    <div><h2 id="fl-title">Flowchart</h2><p id="fl-sub"></p></div>
-    <div class="acts">
-      <span class="status" id="fl-status" aria-live="polite"></span>
-      <button class="btn sm" id="fl-mermaid" type="button" title="Mermaid source, for GitHub, GitLab, Notion and other Markdown tools">Copy Mermaid</button>
-      <button class="btn sm" id="fl-svg" type="button">Download SVG</button>
-      <button class="btn sm" id="fl-stop" type="button" hidden>Stop</button>
-      <button class="btn sm" id="fl-redraw" type="button" title="Ask the AI tool to draw this flowchart again">Redraw</button>
-      <button class="btn sm" id="fl-close" type="button">Architecture</button>
-    </div>
-  </div>
-  <div class="fmain">
-    <div class="fcanvas" id="fl-canvas">
-      <div class="fzoom"><button class="btn" id="fl-out" type="button" aria-label="Zoom out">−</button><button class="btn" id="fl-fit" type="button">Fit</button><button class="btn" id="fl-in" type="button" aria-label="Zoom in">+</button></div>
-      <div id="fl-svgbox"></div>
-      <details class="flegend"><summary>Diagram key</summary><div>
+<section class="fdlg" id="flowdlg" aria-label="Flowchart" hidden>
+      <div class="flow-tools">
+        <div class="flow-zoom" role="group" aria-label="Flowchart zoom"><button class="btn" id="fl-out" type="button" aria-label="Zoom out">−</button><button class="btn" id="fl-fit" type="button">Fit</button><button class="btn" id="fl-in" type="button" aria-label="Zoom in">+</button></div>
+        <div class="flow-actions">
+          <span class="status" id="fl-status" aria-live="polite"></span>
+          <button class="btn sm" id="fl-mermaid" type="button" title="Mermaid source, for GitHub, GitLab, Notion and other Markdown tools">Copy Mermaid</button>
+          <button class="btn sm" id="fl-svg" type="button">Download SVG</button>
+          <button class="btn sm" id="fl-stop" type="button" hidden>Stop</button>
+          <button class="btn sm" id="fl-redraw" type="button" title="Ask the AI tool to draw this flowchart again">Redraw</button>
+        </div>
+      </div>
+
+      <section class="flegend" aria-label="Diagram key"><p class="key-title">Diagram key</p><div>
         <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="5"/></svg>start / end</span>
         <span><svg viewBox="0 0 22 14"><polygon class="lg act" points="5,2 21,2 17,12 1,12"/></svg>person does</span>
         <span><svg viewBox="0 0 22 14"><rect class="lg" x="1" y="2" width="20" height="10" rx="2"/></svg>system does</span>
@@ -477,7 +540,12 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
         <span><svg viewBox="0 0 22 14"><rect class="lg err" x="1" y="2" width="20" height="10" rx="2"/></svg>failure</span>
         <span><svg viewBox="0 0 22 14"><rect class="lg inf" x="1" y="2" width="20" height="10" rx="2"/></svg>inferred</span>
         <span><svg viewBox="0 0 22 14"><circle class="lg num" cx="11" cy="7" r="6"/></svg>trace step</span>
-      </div></details>
+      </div></section>
+  <div class="fmain">
+    <div class="fcanvas" id="fl-canvas">
+
+      <div id="fl-svgbox"></div>
+
     </div>
     <aside class="fside" id="fl-side" aria-label="Flowchart details" aria-live="polite"></aside>
   </div>
@@ -509,11 +577,11 @@ async function main(){
 const mainEl=document.querySelector(".main");
 const architecture=document.createElement("section");architecture.id="architecture-workspace";architecture.setAttribute("aria-label","Architecture");
 Array.from(mainEl.children).slice(1).forEach(el=>architecture.appendChild(el));mainEl.appendChild(architecture);
-const context=document.createElement("div");context.className="trace-context";context.id="trace-context";architecture.prepend(context);
 const stage=document.createElement("div");stage.className="arch-stage";
 const scroller=document.getElementById("scroller");scroller.before(stage);stage.appendChild(scroller);
 const inspector=document.createElement("aside");inspector.id="arch-details";inspector.hidden=true;inspector.setAttribute("aria-label","Architecture details");stage.appendChild(inspector);
 mainEl.appendChild(document.getElementById("flowdlg"));
+document.getElementById("trace-flow-details").appendChild(document.getElementById("fl-side"));
 const flowEmpty=document.createElement("div");flowEmpty.id="flow-empty";flowEmpty.hidden=true;
 flowEmpty.innerHTML='<h2>Explore a process as a flowchart</h2><p>Create a trace with Flowchart selected, or open a saved flowchart from the library.</p><button class="btn primary" type="button">New trace</button>';
 mainEl.appendChild(flowEmpty);
@@ -536,7 +604,6 @@ document.getElementById("repo-name").textContent=REPO_BOOT.github||"local repo";
 document.getElementById("stat").textContent=svcCount+" "+plural(svcCount,CFG.kinds.service)+" · "+topicCount+" "+plural(topicCount,CFG.kinds.topic)+" · "+edges.length+" connection"+(edges.length===1?"":"s");
 document.querySelectorAll("[data-lbl]").forEach(x=>x.textContent=CFG.edgeTypes[x.dataset.lbl]||x.textContent);
 document.querySelectorAll("[data-kind]").forEach(x=>x.textContent=CFG.kinds[x.dataset.kind]||x.textContent);
-if(CFG.footnote)document.getElementById("footnote").textContent=CFG.footnote+" Edges into a collapsed group attach to the group header.";
 const NS="repomap:"+(REPO_BOOT.github||CFG.name)+":";
 
 const LS=NS+"groups";
@@ -723,7 +790,11 @@ function goTo(id){
 
 document.getElementById("expand").onclick=()=>{Object.values(groupEl).forEach(d=>d.open=true);};
 document.getElementById("collapse").onclick=()=>{Object.values(groupEl).forEach(d=>d.open=false);};
-document.getElementById("clear").onclick=()=>{pinned=null;hover=null;setTrace(null);Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});q.value="";doSearch();redraw();};
+function clearTrace(){
+  pinned=null;hover=null;setTrace(null);inspector.hidden=true;
+  Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});
+  q.value="";doSearch();showWorkspace("architecture");
+}
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){pinned=null;hover=null;applyFocus();}});
 document.querySelectorAll(".chip[data-type]").forEach(c=>c.addEventListener("click",()=>{
   const t=c.dataset.type;hidden[t]=!hidden[t];c.setAttribute("aria-pressed",String(!hidden[t]));redraw();
@@ -798,7 +869,7 @@ function setTrace(t){
     Object.keys(nodeEl).forEach(id=>{if(nodeEl[id].classList.contains("open"))setOpen(id,false);});
     pinned=null;
   }
-  renderSaved();renderContext();redraw();
+  renderSaved();redraw();
 }
 function reveal(id){
   const el=nodeEl[id], d=el.closest("details");if(d&&!d.open)d.open=true;
@@ -849,17 +920,20 @@ $("importbtn").onclick=async()=>{
 };
 
 /* traces: saved automatically as JSON files in .repo-map/traces (git-ignored).
-   The list is an accordion: opening a trace shows it on the map; closing it clears the map. */
+   Saved cards own output selection and walkthroughs; the diagram stays in place. */
 const store={ready:false,items:[],temp:null};   // temp: a trace that couldn't be saved
 function traceBody(t){
   const body=document.createElement("div");body.className="tb";
-  const p=document.createElement("p");p.className="rp";p.textContent=t.prompt?"“"+t.prompt+"”":"";if(t.prompt)body.appendChild(p);
   const sum=document.createElement("p");sum.className="rs";sum.textContent=t.summary;if(t.summary)body.appendChild(sum);
   const ol=document.createElement("ol");ol.className="steps";
   t.steps.forEach((st,i)=>{
     const li=document.createElement("li");
     li.innerHTML='<button type="button"><i class="n">'+(i+1)+'</i><b>'+esc(byId[st.id].title)+'</b><span>'+esc(st.note)+'</span></button><div class="refs"></div>';
-    li.firstChild.onclick=()=>{reveal(st.id);goTo(st.id);};
+    li.firstChild.onclick=()=>{
+      if(workspace==="flowchart"){
+        const node=t.flow&&t.flow.nodes.find(n=>n.step===i+1);if(node)pickFlow(node.id);
+      }else{reveal(st.id);goTo(st.id);}
+    };
     const box=li.querySelector(".refs");
     (t.refs||[]).filter(r=>r.step===st.id).forEach(r=>box.appendChild(refEl(r)));
     ol.appendChild(li);
@@ -870,7 +944,7 @@ function traceBody(t){
   if(t.used&&t.used.label){const u=document.createElement("div");u.className="codestat";u.innerHTML='<span class="status"></span>';u.firstChild.textContent="Traced with "+t.used.label;body.appendChild(u);}
   if(t.gaps){const g=document.createElement("p");g.className="gaps";g.textContent="Not shown clearly: "+t.gaps;body.appendChild(g);}
   const acts=document.createElement("div");acts.className="sva";
-  acts.innerHTML='<button class="linkbtn" data-a="copy" type="button">Copy trace code</button>'+(t._doc?'<button class="linkbtn danger" data-a="del" type="button">Delete</button>':'<button class="linkbtn" data-a="save" type="button">Retry saving</button>');
+  acts.innerHTML='<button class="linkbtn" data-a="copy" type="button">Copy trace code</button>'+(t._doc?'<button class="linkbtn danger" data-a="del" type="button">Delete</button>':'')+(!t._doc||store.temp===t?'<button class="linkbtn" data-a="save" type="button">Retry saving</button>':'');
   acts.querySelector('[data-a="copy"]').onclick=e=>copyCode(t,e.currentTarget);
   const del=acts.querySelector('[data-a="del"]');
   if(del)del.onclick=async()=>{
@@ -888,43 +962,49 @@ function renderSaved(){
   $("savedcount").textContent=rows.length||"";$("saved-empty").hidden=rows.length>0;
   const active=workspace==="flowchart"?fl.t:trace;
   rows.forEach(it=>{
-    const open=active&&(it._temp?active===store.temp:active._doc===it.key);
-    const li=document.createElement("li");li.className="ti trace-card"+(open?" cur":"");
-    const title=document.createElement("h3");title.textContent=it.title;li.appendChild(title);
-    const prompt=document.createElement("p");prompt.className="trace-prompt";prompt.textContent=it.prompt||"No prompt saved.";li.appendChild(prompt);
-    if(it._temp){const note=document.createElement("p");note.className="trace-save-note";note.textContent="Not saved. Open an output to retry saving.";li.appendChild(note);}
-    const actions=document.createElement("div");actions.className="trace-output-actions";
-    const outputs=OUTPUTS.traceOutputs(it);
-    ["architecture","flowchart"].forEach(output=>{
-      const button=document.createElement("button");button.type="button";button.className="btn sm";
-      button.textContent=output==="architecture"?"Architecture":"Flowchart";
-      button.setAttribute("aria-pressed",String(!!open&&workspace===output));
-      if(!outputs[output])button.title=output==="architecture"?"Add the architecture output to this trace":it.pendingFlow?"Retry drawing this flowchart":"Draw a flowchart for this trace";
-      button.disabled=output==="flowchart"&&!outputs.flowchart&&!AI_BOOT.available;
-      if(button.disabled)button.title="Configure an AI tool in Settings to draw this flowchart";
-      button.onclick=()=>openSavedOutput(it,output);
-      actions.appendChild(button);
-    });
-    li.appendChild(actions);ul.appendChild(li);
+    const li=document.createElement("li");li.className="ti trace-card";
+    const button=document.createElement("button");button.type="button";button.className="trace-open";
+    const title=document.createElement("span");title.className="trace-card-title";title.textContent=it.title;button.appendChild(title);
+    const prompt=document.createElement("span");prompt.className="trace-prompt";prompt.textContent=it.prompt||"No prompt saved.";button.appendChild(prompt);
+    if(it._temp){const note=document.createElement("span");note.className="trace-save-note";note.textContent="Not saved";button.appendChild(note);}
+    button.onclick=()=>openSavedOutput(it,OUTPUTS.traceOutputs(it).architecture?"architecture":"flowchart");
+    li.appendChild(button);ul.appendChild(li);
   });
+  renderTraceSidebar(active);
+}
+function renderTraceSidebar(active){
+  const opening=$("sidebar-trace").hidden;
+  $("sidebar-home").hidden=!!active;$("sidebar-trace").hidden=!active;$("tab-map").hidden=!!active;$("trace-back").hidden=!active;
+  if(!active)return;
+  if(opening){document.querySelector(".side-in").scrollTop=0;$("trace-back").focus({preventScroll:true});}
+  $("trace-title").textContent=active.title;$("trace-prompt").textContent=active.prompt||"No prompt saved.";
+  const item={...active,key:active._doc,_temp:store.temp===active};
+  ["architecture","flowchart"].forEach(output=>{
+    const button=$("trace-"+output),selected=workspace===output;
+    button.setAttribute("aria-selected",String(selected));button.tabIndex=selected?0:-1;
+    button.disabled=output==="flowchart"&&!active.flow&&!active.pendingFlow&&!AI_BOOT.available;
+    button.title=button.disabled?"Configure an AI tool in Settings to draw a flowchart":"";
+    button.onclick=()=>openSavedOutput(item,output);
+    button.onkeydown=event=>{
+      if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;
+      event.preventDefault();const target=$("trace-"+(event.key==="Home"?"architecture":event.key==="End"?"flowchart":output==="architecture"?"flowchart":"architecture"));
+      if(!target.disabled){target.focus();target.click();}
+    };
+  });
+  const body=$("trace-walkthrough");body.innerHTML="";body.appendChild(traceBody(active));
+  $("trace-flow-details").hidden=workspace!=="flowchart";
 }
 async function openSavedOutput(item,output){
+  if(output===workspace&&trace&&(item._temp?trace===store.temp:trace._doc===item.key))return;
   let t;
   try{t=item._temp?store.temp:normalizeTrace(item,item.prompt);if(!item._temp){t._doc=item.key;t.createdAt=item.createdAt;}}
   catch(_){setStatus("That trace refers to nodes that are no longer on the map.",true);return;}
   if(output==="flowchart"){
-    if(t.flow)openFlow(t);else if(AI_BOOT.available)await drawFlow(t,$("fl-redraw"),$("fl-status"));
+    if(t.flow||t.pendingFlow)openFlow(t);else if(AI_BOOT.available)await drawFlow(t,$("fl-redraw"),$("fl-status"));
   }else{
     if(!t.outputs.architecture){t.outputs.architecture=true;await saveExisting(t);}
     setTrace(t);showWorkspace("architecture");inspector.hidden=true;
   }
-}
-function renderContext(){
-  context.innerHTML="";if(!trace)return;
-  const h=document.createElement("h2");h.textContent=trace.title;context.appendChild(h);
-  const p=document.createElement("p");p.textContent=trace.summary;context.appendChild(p);
-  context.appendChild(flowRow(trace));
-  const details=document.createElement("details");details.innerHTML='<summary>Walkthrough and trace actions</summary>';details.appendChild(traceBody(trace));context.appendChild(details);
 }
 async function saveExisting(t){
   try{
@@ -954,7 +1034,7 @@ async function keepTrace(t,preferred=workspace){
   if(t.outputs.architecture)setTrace(t);
   if((t.outputs.flowchart||t.pendingFlow)&&(preferred==="flowchart"||!t.outputs.architecture))openFlow(t);
   else if(t.outputs.architecture)showWorkspace("architecture");
-  else{setTrace(t);showWorkspace("architecture");context.querySelector("details").open=true;}
+  else{setTrace(t);showWorkspace("architecture");}
 }
 async function removeTrace(key){
   try{
@@ -992,34 +1072,6 @@ const FC_UI_CSS=`.fc .fn{cursor:pointer;outline:none}
 .flegend .lg.act{stroke:var(--sync)} .flegend .lg.dec{stroke:var(--event)} .flegend .lg.err{stroke:var(--err)} .flegend .lg.inf{stroke-dasharray:3 2}
 .flegend .lg.num{fill:var(--http);stroke:none}`;
 document.head.insertAdjacentHTML("beforeend","<style>"+FC_CSS+"\n"+FC_UI_CSS+"</style>");
-const ICON_FLOW='<svg viewBox="0 0 16 16"><rect x="5" y="1.5" width="6" height="3.5" rx="1"/><path d="M8 5v2.2M8 7.2L11.5 10M8 7.2L4.5 10"/><rect x="1.5" y="10" width="6" height="3.5" rx="1"/><rect x="8.5" y="10" width="6" height="3.5" rx="1"/></svg>';
-
-function traceActions(t){
-  const row=document.createElement("div");row.className="row";
-  const architectureButton=document.createElement("button");architectureButton.className="btn sm";architectureButton.type="button";
-  architectureButton.textContent=OUTPUTS.traceOutputs(t).architecture?"View architecture":"Add architecture output";
-  architectureButton.onclick=async()=>{t.outputs={...OUTPUTS.traceOutputs(t),architecture:true};await saveExisting(t);setTrace(t);showWorkspace("architecture");};row.appendChild(architectureButton);
-  const copy=document.createElement("button");copy.className="btn sm";copy.type="button";copy.textContent="Copy trace code";copy.onclick=()=>copyCode(t,copy);row.appendChild(copy);
-  const del=document.createElement("button");del.className="btn sm";del.type="button";del.textContent="Delete trace";
-  del.onclick=()=>{if(del.dataset.arm!=="1"){del.dataset.arm="1";del.textContent="Delete trace and both outputs?";setTimeout(()=>{del.dataset.arm="";del.textContent="Delete trace";},3000);return;}if(t._doc)removeTrace(t._doc);else{if(store.temp===t)store.temp=null;fl.t=null;setTrace(null);showWorkspace(workspace);}};row.appendChild(del);
-  if(store.temp===t||!t._doc){const retry=document.createElement("button");retry.className="btn sm";retry.type="button";retry.textContent="Retry saving";retry.onclick=()=>saveExisting(t);row.appendChild(retry);}
-  return row;
-}
-function flowRow(t){
-  const row=document.createElement("div");row.className="flowrow";
-  if(t.flow){
-    const b=document.createElement("button");b.type="button";b.className="btn sm flowbtn";
-    b.innerHTML=ICON_FLOW+"<span>View flowchart</span>";b.title=t.flow.nodes.length+" boxes";
-    b.onclick=()=>openFlow(t);row.appendChild(b);
-  }else if(AI_BOOT.available){
-    const b=document.createElement("button");b.type="button";b.className="btn sm flowbtn";
-    b.innerHTML=ICON_FLOW+"<span>Draw flowchart</span>";
-    const st=document.createElement("span");st.className="status";
-    b.onclick=()=>drawFlow(t,b,st);row.append(b,st);
-  }
-  return row;
-}
-
 /** Ask the AI tool for a flowchart of an existing trace, save it with the trace, then show it. */
 let flowCtl=null;
 async function drawFlow(t,btn,stat){
@@ -1044,17 +1096,16 @@ async function drawFlow(t,btn,stat){
   }finally{flowCtl=null;btn.disabled=false;$("fl-stop").hidden=true;}
 }
 
+const FLOW_ZOOM_STEP=1.2;
 const fl={t:null,layout:null,scale:1,sel:null};
 const dlg=$("flowdlg");
 function openFlow(t){
   if(flowCtl&&fl.t!==t){setStatus("A flowchart is being drawn. Stop it before opening another.",true);return;}
   fl.t=t;fl.sel=null;setTrace(t);
-  $("fl-side").hidden=false;dlg.querySelector(".fmain").classList.remove("details-closed");
-  $("fl-title").textContent=t.title;
-  $("fl-sub").textContent=t.prompt?"“"+t.prompt+"”":t.summary;
   $("fl-status").textContent="";$("fl-status").className="status";
   $("fl-redraw").hidden=!AI_BOOT.available;
-  $("fl-mermaid").disabled=!t.flow;$("fl-svg").disabled=!t.flow;
+  ["fl-mermaid","fl-svg","fl-in","fl-out","fl-fit"].forEach(id=>$(id).disabled=!t.flow);
+  $("fl-empty").hidden=!!t.flow;
   $("fl-redraw").textContent=t.flow?"Redraw":"Draw flowchart";
   dlg.querySelector(".fmain").hidden=!t.flow;
   if(t.flow){
@@ -1065,25 +1116,22 @@ function openFlow(t){
   defs.insertAdjacentHTML("beforeend",'<marker id="fc-arrow-on" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa on" d="M0 0.5L7.5 4L0 7.5z"/></marker>');
   sideFlow(null);
   }else{fl.layout=null;$("fl-svgbox").innerHTML="";}
-  let actions=$("flow-actions");if(!actions){actions=document.createElement("div");actions.id="flow-actions";actions.className="trace-context";dlg.querySelector(".fhead").after(actions);}
-  actions.innerHTML="";actions.appendChild(traceActions(t));
-  if(!t.flow){const p=document.createElement("p");p.textContent="The supporting walkthrough was kept. Draw the flowchart to complete this output.";actions.appendChild(p);}
-  showWorkspace("flowchart");renderSaved();
-  requestAnimationFrame(()=>fitFlow());
+  showWorkspace("flowchart");if(t.flow)sideFlow(fl.sel?t.flow.nodes.find(n=>n.id===fl.sel):null);
 }
 function setScale(s){
   fl.scale=Math.max(.3,Math.min(2.5,s));
   const svgEl=$("fl-svgbox").querySelector("svg");if(!svgEl)return;
   svgEl.setAttribute("width",Math.round(fl.layout.width*fl.scale));svgEl.setAttribute("height",Math.round(fl.layout.height*fl.scale));
 }
-function fitFlow(){
+function fitFlow(zoom=1){
   if(!fl.layout)return;
   const c=$("fl-canvas");
   // fit the whole chart, but not so small that labels stop being readable (scroll instead)
-  setScale(Math.max(.65,Math.min(1,(c.clientWidth-24)/fl.layout.width,(c.clientHeight-92)/fl.layout.height)));
+  setScale(Math.max(.65,Math.min(1,(c.clientWidth-24)/fl.layout.width,(c.clientHeight-92)/fl.layout.height))*zoom);
 }
 function pickFlow(id){
-  $("fl-side").hidden=false;dlg.querySelector(".fmain").classList.remove("details-closed");
+  if(document.querySelector(".app").classList.contains("collapsed"))$("side-toggle").click();
+  document.querySelector(".side-in").scrollTop=0;
   fl.sel=id;
   const box=$("fl-svgbox"), svgEl=box.querySelector("svg");
   svgEl.classList.toggle("picking",!!id);
@@ -1098,9 +1146,6 @@ const FLOW_KIND={start:"Start",end:"Outcome",action:"Person does",process:"Syste
 function sideFlow(n){
   const side=$("fl-side");side.innerHTML="";
   const t=fl.t;
-  const close=document.createElement("button");close.type="button";close.className="btn sm";close.textContent="Close details";
-  close.onclick=()=>{side.hidden=true;dlg.querySelector(".fmain").classList.add("details-closed");requestAnimationFrame(fitFlow);};
-  side.appendChild(close);
   if(!n){
     side.insertAdjacentHTML("beforeend",'<p class="ft">How to read it</p><p class="empty">Click a box to see what happens there and the code behind it. Numbered badges match the steps of this trace on the map. Dashed boxes and arrows are inferred from naming, docs or the map rather than code the AI tool read.</p>');
     const inferred=t.flow.nodes.filter(x=>x.inferred).length+t.flow.edges.filter(x=>x.inferred).length;
@@ -1120,21 +1165,19 @@ function sideFlow(n){
   const st=n.step&&t.steps[n.step-1];
   if(st){
     const box=document.createElement("div");box.className="fstep";
-    box.innerHTML='<b></b><p></p><div class="refs"></div><div class="row"><button class="btn sm" type="button">Show on architecture</button></div>';
+    box.innerHTML='<b></b><p></p><div class="refs"></div>';
     box.querySelector("b").textContent="Step "+n.step+" · "+byId[st.id].title;
     box.querySelector("p").textContent=st.note;
     const refs=box.querySelector(".refs");(t.refs||[]).filter(r=>r.step===st.id).forEach(r=>refs.appendChild(refEl(r)));
     (DOCS[st.id]||[]).forEach(l=>refs.appendChild(docEl(l)));
-    box.querySelector("button").onclick=()=>{setTrace(t);showWorkspace("architecture");reveal(st.id);goTo(st.id);};
     side.appendChild(box);
   }
 }
 $("fl-svgbox").addEventListener("click",ev=>{const g=ev.target.closest(".fn");pickFlow(g&&g.dataset.id!==fl.sel?g.dataset.id:null);});
 $("fl-svgbox").addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){const g=ev.target.closest(".fn");if(g){ev.preventDefault();pickFlow(g.dataset.id);}}});
-$("fl-close").onclick=()=>showWorkspace("architecture");
-$("fl-in").onclick=()=>setScale(fl.scale*1.2);
-$("fl-out").onclick=()=>setScale(fl.scale/1.2);
-$("fl-fit").onclick=fitFlow;
+$("fl-in").onclick=()=>setScale(fl.scale*FLOW_ZOOM_STEP);
+$("fl-out").onclick=()=>setScale(fl.scale/FLOW_ZOOM_STEP);
+$("fl-fit").onclick=()=>fitFlow();
 $("fl-canvas").addEventListener("wheel",ev=>{if(!(ev.ctrlKey||ev.metaKey))return;ev.preventDefault();setScale(fl.scale*(ev.deltaY<0?1.1:1/1.1));},{passive:false});
 $("fl-mermaid").onclick=async e=>{
   const b=e.currentTarget, src=FLOW.flowToMermaid(fl.t.flow,fl.t.title);
@@ -1199,7 +1242,7 @@ const spend=r=>r&&(r.cost?" · "+(r.cost<0.01?"<$0.01":"$"+r.cost.toFixed(2)):r.
 
 let ctl=null, timer=0;
 /** The trace status line; `busy` shows a spinner while an agent is working. */
-function setStatus(t,err,busy){if(err){$("composer").hidden=false;$("new-trace").setAttribute("aria-expanded","true");}const s=$("status");s.textContent=t;s.className="status"+(err?" err":"")+(busy?" busy":"");}
+function setStatus(t,err,busy){const note=$("trace-status");if(note){note.textContent=t;note.className="status"+(err?" err":"")+(busy?" busy":"");}if(err){$("composer").hidden=false;$("new-trace").setAttribute("aria-expanded","true");}const s=$("status");s.textContent=t;s.className="status"+(err?" err":"")+(busy?" busy":"");}
 async function runTrace(){
   const q=$("prompt").value.trim();if(!q||ctl)return;
   const requested={architecture:$("witharchitecture").checked,flowchart:$("withflow").checked},origin=workspace;
@@ -1369,17 +1412,19 @@ $("stop").onclick=()=>ctl&&ctl.abort();
 $("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();runTrace();}});
 /* ---------- workspace navigation ---------- */
 function showWorkspace(name){
-  workspace=name;architecture.hidden=name!=="architecture";
+  workspace=name;architecture.hidden=name!=="architecture";mainEl.classList.toggle("showing-flow",name==="flowchart");
   $("flowdlg").hidden=name!=="flowchart"||!fl.t;flowEmpty.hidden=name!=="flowchart"||!!fl.t;
   document.querySelector(".controls").hidden=name!=="architecture";
-  renderSaved();if(name==="architecture")renderContext();requestAnimationFrame(()=>{if(name==="flowchart"&&fl.t)fitFlow();else redraw();});
+  renderSaved();requestAnimationFrame(()=>{if(name==="flowchart"&&fl.t)fitFlow(FLOW_ZOOM_STEP**2);else redraw();});
 }
 function openComposer(){
+  if($("sidebar-home").hidden)clearTrace();
   $("composer").hidden=!$("composer").hidden;$("new-trace").setAttribute("aria-expanded",String(!$("composer").hidden));
   if(document.querySelector(".app").classList.contains("collapsed"))$("side-toggle").click();
   if(!$("composer").hidden)$("prompt").focus();
 }
 $("new-trace").onclick=openComposer;
+$("trace-back").onclick=()=>{clearTrace();$("new-trace").focus();};
 flowEmpty.querySelector("button").onclick=()=>{if($("composer").hidden)openComposer();else $("prompt").focus();};
 function openMapTab(){const d=$("settings-dialog");if(!d.open)d.showModal();}
 $("tab-map").onclick=openMapTab;
@@ -1415,7 +1460,7 @@ const mapPick=createPicker({
 
 async function loadMapStatus(){
   try{mapSt=await (await api("/api/map/status")).json();}catch(_){return;}
-  renderMapPanel();renderBanner();
+  renderMapPanel();
 }
 
 function renderMapPanel(){
@@ -1450,24 +1495,38 @@ function renderMapPanel(){
   const noAi=AGENTS.data&&!g?(AGENTS.data.generateReason||"Needs an AI tool: run repo-map doctor"):"";
   [up,redraw,relink].forEach(b=>{b.disabled=!!jobCtl||!!noAi;b.title=noAi||b.dataset.title||b.title;});
   if(st.tooBig&&!up.hidden){up.disabled=true;up.title="Too many changes for a quick update: redraw the map instead.";}
-  $("tab-map-dot").hidden=!(st.state==="stale"||st.state==="starter"||(hasMap&&d.linked&&d.changed));
+  renderMapNotice();
 }
 ["ms-update","ms-redraw","ms-docs-go"].forEach(id=>{const b=$(id);b.dataset.title=b.title;});
 
-/** The notice above the map: one line, and a button into Settings. */
-function renderBanner(){
-  const st=mapSt,box=$("stale");
-  box.className="stale";box.hidden=true;box.innerHTML="";
-  const show=(html,btn)=>{
-    box.innerHTML='<span>'+html+'</span><span class="acts"><button class="btn sm'+(btn.primary?' primary':'')+'" id="stale-go" type="button">'+btn.label+'</button></span>';
-    box.hidden=false;$("stale-go").onclick=openMapTab;
-  };
-  if(st.state==="stale")show("<b>This map is out of date.</b> "+nOf(st.changed,"file")+" changed since <code>"+shortSha(st.commit)+"</code>.",{label:"Review & update",primary:true});
-  else if(st.state==="current")show("Architecture is up to date"+(st.commit?" at <code>"+shortSha(st.commit)+"</code>":"")+".",{label:"Settings"});
-  else if(st.state==="starter")show("This is a starter map built from your folders.",{label:"Draw the full map"});
-  else if(st.state==="unrecorded")show("This map has no recorded commit, so repo-map can’t tell when it goes out of date.",{label:"Settings"});
-  else if(st.state==="unknown")show(esc(st.reason||""),{label:"Settings"});
+/** A dismissal applies only to this map issue; new issues can notify again. */
+function mapNoticeKey(st){
+  if(!st)return "";
+  const hasMap=st.state!=="starter"&&st.state!=="empty",d=st.docs||{};
+  const mapIssue=["stale","unrecorded","unknown","starter","empty","nogit"].includes(st.state);
+  const docsIssue=hasMap&&(!d.linked||!!d.changed);
+  if(!mapIssue&&!docsIssue)return "";
+  return JSON.stringify({
+    state:st.state,commit:st.commit||"",reason:st.reason||"",
+    changed:st.changed||0,files:st.files||[],
+    docs:docsIssue?{linked:!!d.linked,changed:d.changed||0,files:d.files||[],commit:d.commit||""}:null,
+  });
 }
+let dismissedMapNotice="";
+try{dismissedMapNotice=localStorage.getItem(NS+"dismissed-map-notice")||"";}catch(_){}
+function renderMapNotice(){
+  const key=mapNoticeKey(mapSt),visible=!!key&&key!==dismissedMapNotice;
+  $("tab-map-dot").hidden=!visible;$("ms-dismiss").hidden=!visible;
+  const label=visible?"Settings: map needs attention":"Settings";
+  $("tab-map").setAttribute("aria-label",label);$("tab-map").title=label;
+  if(!key&&dismissedMapNotice){dismissedMapNotice="";try{localStorage.removeItem(NS+"dismissed-map-notice");}catch(_){}}
+}
+function dismissMapNotice(){
+  dismissedMapNotice=mapNoticeKey(mapSt);
+  try{localStorage.setItem(NS+"dismissed-map-notice",dismissedMapNotice);}catch(_){}
+  renderMapNotice();
+}
+$("ms-dismiss").onclick=dismissMapNotice;
 
 /* map jobs: one at a time (the server enforces it too); Stop closes the request, which stops the AI run */
 const JOB_URL={update:"/api/map/update",generate:"/api/map/generate",docs:"/api/docs/link"};
@@ -1534,7 +1593,7 @@ loadRepo();loadSaved();loadMapStatus();AGENTS.load();
   window.addEventListener("resize",()=>{if(st.w>max())setW(st.w);});
 })();
 
-if(!NODES.length)document.getElementById("footnote").innerHTML="This map is empty. Run <code>repo-map generate</code> to draft <code>.repo-map/map.json</code> with your AI tool, then reload.";
+document.getElementById("map-empty").hidden=NODES.length>0;
 new ResizeObserver(redraw).observe(colsEl);
 window.addEventListener("resize",redraw);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);

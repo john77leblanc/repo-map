@@ -301,7 +301,7 @@ repo-map ai none
 
 ## Keeping the map up to date
 
-`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. When something has, a notice above the map links to the **Settings** panel, which lists the files and offers **Update map**.
+`map.json` records the commit it describes (`"commit"`). Each time the map opens, repo-map compares that commit with your checkout and counts the files under `codeRoots` that changed. Map and documentation issues show a notification icon on **Settings**. The panel lists the changed files and offers **Update map**. **Dismiss notification** hides the icon for the current issue in this browser, while keeping the status and maintenance controls available. A different issue shows the icon again.
 
 An update sends your AI tool the current map plus **only the git diff** since that commit (capped in size; it can read whole files when it needs more), and asks for a small patch: nodes, groups and connections to add, change or remove. repo-map applies the patch, checks the result with the same rules as `validate`, records the new commit, and keeps the previous version as `.repo-map/map.prev.json`. If the patch would leave the map broken, nothing is written.
 
@@ -328,11 +328,13 @@ The sidebar's **Settings** button opens a dedicated panel for map maintenance an
 
 ### Creating and exploring traces
 
-Choose **New trace**, describe a process, and select **Code architecture**, **Flowchart**, or both. At least one output is required. Both are selected initially; later choices are remembered in this browser. Architecture shows the process path on the repository map. Use the **Architecture** and **Flowchart** buttons on a saved trace to open its outputs on the main canvas.
+Choose **New trace**, describe a process, and select **Code architecture**, **Flowchart**, or both. At least one output is required. Both are selected initially; later choices are remembered in this browser. Architecture shows the process path on the repository map. Select a saved trace, then use its **Architecture** and **Flowchart** tabs to open outputs on the main canvas.
 
-Each saved trace is one question with linked outputs. The library always shows all saved traces, each with its title, prompt, and Architecture / Flowchart buttons. You can add a missing output later without creating a second trace. Deleting a trace removes both outputs. Old traces and import codes keep working. If a flowchart is missing from an otherwise usable answer, its library entry offers a retry; failed saves remain visible with **Retry saving** until you reload.
+Each saved trace is one question with linked outputs. The sidebar home shows the repository title and details above New trace and the saved trace list. Selecting one replaces the library with its title, prompt, output tabs, and expanded walkthrough and actions. **Back to all traces** returns to the library and whole map. You can add a missing output later without creating a second trace. Deleting a trace removes both outputs. Old traces and import codes keep working. If a flowchart is missing from an otherwise usable answer, its library entry offers a retry; failed saves remain visible with **Retry saving** until you reload.
 
-Click an architecture card or flowchart step for explanations, code references and linked documentation. **Show on architecture** switches to the related card without adding a saved architecture output. **Whole repository** clears a highlighted path. Mermaid and SVG exports remain available in Flowcharts.
+Click an architecture card or flowchart step for explanations, code references and linked documentation. Flowchart step details appear in the selected trace sidebar, above the expanded walkthrough. Switch outputs using its **Architecture** and **Flowchart** tabs. **Back to all traces** returns to the library and whole map without deleting saved data. Trace information stays beside the diagram so it does not shift vertically. Flowchart zoom, Fit, Mermaid and SVG export, redraw, progress and Stop controls sit above the diagram key. Its canvas fills the available height; step details remain in the sidebar. Settings and Back to all traces share the top sidebar control slot.
+
+Diagram keys stay visible above the architecture map and flowchart. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
 
 ### Documentation on the cards
 

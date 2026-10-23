@@ -1,6 +1,6 @@
 {
   "name": "@whitemane/repo-map",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "An interactive architecture map for any repo, with plain-language process tracing through Claude Code, Codex, Gemini or any OpenAI-compatible API, including local models",
   "keywords": [
     "architecture",

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+- Removed the descriptive footnote beneath the architecture map.
+- Repository title and details appear above New trace in the sidebar home. Settings and Back to all traces share the top control slot. Flowchart controls sit above its diagram key, and the canvas fills the available height; duplicate titles and the sidebar divider are removed.
+- Map and documentation notices use a notification icon on Settings instead of a banner above the diagram. Dismissal is remembered in this browser for the current issue; new issues notify again. Status and maintenance actions remain in Settings.
+- Corrected the sidebar chevron direction; Settings appears only in the sidebar home view.
+- Diagram keys remain visible above both diagrams. Flowcharts open two zoom-in steps closer; Fit still fits the chart.
+- The sidebar switches between a trace library and a selected trace information panel, with title, prompt, Architecture / Flowchart tabs, expanded walkthrough and actions, and flowchart step details.
+- Back to all traces returns to the whole repository without deleting saved traces. Trace information stays out of the space above the map, keeping its vertical position stable.
+
 ## 0.7.0
 
 - The sidebar centers navigation on saved traces. Each card shows its title, prompt, and Architecture / Flowchart buttons; Settings and collapse controls sit above New trace. Both outputs use the main canvas.
