@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Clear architecture hover highlighting when the cursor leaves a node button or group header, including within the diagram.
 - Keep the implementation-plan modal header and Close button visible while its content scrolls.
 - Document the approved React/TypeScript/MobX MVVM frontend migration, bootstrap/models/features/shared layout, injected plain-class view models, observer views, immutable base map with computed proposals, and view-layer DOM adapters. Shared pure `.mjs` helpers remain browser-safe.
 - Require Node >=22.12 with the Node built-in-only backend. Frontend libraries and tooling are development dependencies bundled into git-ignored `dist/`; registry packages ship prebuilt assets without runtime build tools.

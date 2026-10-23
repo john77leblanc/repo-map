@@ -262,6 +262,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                             >
                                                 <summary
                                                     onMouseEnter={() => vm.setHover('g:' + g.id)}
+                                                    onMouseLeave={() => vm.setHover(null)}
                                                 >
                                                     <svg className="car" viewBox="0 0 10 10">
                                                         <path d="M3.5 2l3 3-3 3" />
@@ -324,6 +325,9 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                                     }
                                                                     onMouseEnter={() =>
                                                                         vm.setHover(n.id)
+                                                                    }
+                                                                    onMouseLeave={() =>
+                                                                        vm.setHover(null)
                                                                     }
                                                                     onFocus={() =>
                                                                         vm.setHover(n.id)
