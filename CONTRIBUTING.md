@@ -29,7 +29,7 @@ Startup uses the dependency-free `lib/spinner.mjs` helper while drafting or upda
 ### Layout
 
 ```
-bin/repo-map.mjs     CLI: init, generate, validate, doctor, serve
+bin/repo-map.mjs     CLI: init, ai, update, docs, validate, doctor, serve
 lib/config.mjs       loads .repo-map/config.json, map.json and the layered AI settings
 lib/server.mjs       local HTTP server: config, map, file reads, traces, saved traces
 lib/repo.mjs         git info and safe, read-only file access (codeRoots / blocked)
@@ -90,7 +90,7 @@ Trace intent is `description` or `proposal`; legacy traces default to descriptio
 
 ### Sitemap and lane diagrams
 
-`lib/sitemap-data.mjs` is the browser-safe version-1 sitemap normalizer. `lib/sitemap.mjs` owns code-reference validation, atomic persistence, generation, and commit freshness. `GET /api/sitemap` returns `{ sitemap, status }`; `POST /api/sitemap/generate` streams the standard progress/result/error events using map-generation AI settings and the shared map/docs/sitemap job lock. Failed validation or cancellation must not replace the existing artifact. The repository sitemap remains independent and immutable during tracing. A trace owns a separate snapshot and optional proposal overlay.
+`lib/sitemap-data.mjs` is the browser-safe version-1 sitemap normalizer. `lib/sitemap.mjs` owns code-reference validation, atomic persistence, generation, and commit freshness. `GET /api/sitemap` returns `{ sitemap, status }`; `POST /api/sitemap/generate` streams the standard progress/result/error events using map-generation AI settings and its own job lock (map update/generate/docs share a separate one), so it can run beside a map job. `POST /api/map/starter` writes the folder-based starter map when none exists. Failed validation or cancellation must not replace the existing artifact. The repository sitemap remains independent and immutable during tracing. A trace owns a separate snapshot and optional proposal overlay.
 
 The sitemap MVVM feature uses injected services and the shared `DiagramSvg` DOM adapter. `DiagramToolbar` owns the common flowchart/sitemap controls and styling; feature views supply selectors, state, and callbacks. `DiagramMore` handles dropdown focus, Escape, and outside-click dismissal. Sitemap's view model owns Info, Details, More, and Diagram key disclosure state. Hide metadata by default when a diagram is available; keep empty-result explanations and active status visible. Selecting a screen or journey step reopens Details, and only the selected journey step shows its note. Repository views are Architecture/Sitemap; trace outputs are Architecture/Flowchart/Sitemap. Preserve the last repository view across trace exploration. Cover no-UI and incomplete results, route-less screens, cross-application navigation, invalid evidence, cancellation, and stale commits using fake AI servers and browser fixtures.
 

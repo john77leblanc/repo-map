@@ -25,15 +25,15 @@ No linter configured. Style: backend/shared helpers use ESM `.mjs`; frontend use
 
 CLI tool that serves an interactive architecture map of a target repo, plus AI-driven "traces" (plain-language walkthrough of a process, with optional flowchart). Each target repo stores state in `.repo-map/` (`config.json`, `map.json`, git-ignored `traces/`, `local.json`, drafts).
 
-- `bin/repo-map.mjs` — arg parsing + command dispatch. No-arg / `start` → `lib/start.mjs` (interactive setup: config → AI tool → map → serve; non-TTY never prompts).
-- `lib/server.mjs` ? localhost-only Node built-in HTTP server serving built `dist/` assets and `/api/*` routes. API requires `x-map: 1` (CSRF guard) and rejects non-localhost Host headers. Map update/generate/docs jobs share one server-side lock (409 when busy).
+- `bin/repo-map.mjs` — arg parsing + command dispatch. No-arg / `start` → `lib/start.mjs` (interactive setup: config → AI tool → offer update of a stale map → serve; non-TTY never prompts). There is no `generate` command: the first map is built in the browser's starter screen (`app/src/features/start/`), which picks the map agent, optionally builds the sitemap in parallel, or falls back to the folder starter map (`POST /api/map/starter`).
+- `lib/server.mjs` ? localhost-only Node built-in HTTP server serving built `dist/` assets and `/api/*` routes. API requires `x-map: 1` (CSRF guard) and rejects non-localhost Host headers. Map update/generate/docs jobs share one server-side lock; sitemap generation has its own, so it can run beside a map job (409 when the relevant lock is busy).
 - `app/index.html` ? Vite HTML entry, replacing the inline UI. Agent choices come from `/api/agents`; trace preferences are browser-local, and map preferences use `PUT /api/settings/generate` (? `.repo-map/local.json` `ai.generate`). Services handle streams and persistence.
 
 The React/TypeScript/MobX frontend follows MVVM under `app/src/`:
 
 - `bootstrap/`: composition root constructing services, models and view models.
 - `models/`: shared domain and application state.
-- `features/`: shell, architecture, traces, flowchart, plans and settings.
+- `features/`: start (first-run build screen), shell, architecture, sitemap, traces, flowchart, plans and settings.
 - `shared/`: services, ui, styles and types.
 
 View models are plain MobX classes with injected services and callbacks, owning observable state, actions and computed values. React views use `observer`, render state and invoke view-model actions; views make no direct network or storage calls. Services own HTTP/NDJSON streaming and persistence. Keep the base map immutable and derive proposal diagrams as computed, disposable compositions. DOM adapters for diagram mounting, measurement, focus, scrolling and SVG integration stay in views, outside models and view models.

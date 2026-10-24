@@ -7,6 +7,7 @@ import { ArchitectureViewModel } from '../features/architecture/ArchitectureView
 import { FlowchartViewModel } from '../features/flowchart/FlowchartViewModel';
 import { PlansViewModel } from '../features/plans/PlansViewModel';
 import { SitemapViewModel } from '../features/sitemap/SitemapViewModel';
+import { StartViewModel } from '../features/start/StartViewModel';
 import type { Services } from '../shared/services/contracts';
 import type { Trace, Workspace } from '../models/types';
 
@@ -19,6 +20,7 @@ export class Application {
     readonly flowchart: FlowchartViewModel;
     readonly plans: PlansViewModel;
     readonly sitemap: SitemapViewModel;
+    readonly start: StartViewModel;
     constructor(
         readonly repo: RepositoryModel,
         readonly services: Services
@@ -30,6 +32,7 @@ export class Application {
         } });
         this.settings = new SettingsViewModel({ repo, services });
         this.architecture = new ArchitectureViewModel({ repo, services });
+        this.start = new StartViewModel({ repo, services, settings: this.settings, sitemap: this.sitemap });
         const getPick = () => this.settings.currentPick();
         const saveTrace = (trace: Trace) => this.traces.saveExisting(trace);
         this.plans = new PlansViewModel({ repo, services, getPick, saveTrace });
@@ -78,6 +81,7 @@ export class Application {
         await Promise.all([this.settings.init(), this.traces.init()]);
     }
     dispose() {
+        this.start.dispose();
         this.sitemap.dispose();
         this.traces.dispose();
         this.plans.dispose();

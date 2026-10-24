@@ -187,8 +187,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
             <div className="arch-stage">
                 <div className="scroller" id="scroller">
                     <p className="empty" id="map-empty" hidden={!!vm.map.nodes.length}>
-                        This map is empty. Open Settings to draw a map, or run{' '}
-                        <code>repo-map generate</code>, then reload.
+                        This map is empty. Open Settings to redraw it with an AI tool.
                     </p>
                     <div
                         className={'board' + (vm.active || vm.trace ? ' focusing' : '')}

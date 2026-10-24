@@ -145,7 +145,7 @@ test('committing sitemap metadata alone does not make a root-wide sitemap stale'
     assert.equal((await sitemapStatus(root, cfg, sitemap)).state, 'stale');
 });
 
-test('sitemap API guards access, streams generation, and shares the map job lock', async (t) => {
+test('sitemap API guards access, streams generation, and runs beside a map job with its own lock', async (t) => {
     const { root } = shop(t);
     let release;
     const held = new Promise((resolve) => { release = resolve; });
@@ -161,10 +161,19 @@ test('sitemap API guards access, streams generation, and shares the map job lock
     assert.equal((await (await fetch(`${base}/api/sitemap`, { headers })).json()).sitemap, null);
     const pending = fetch(`${base}/api/sitemap/generate`, { method: 'POST', headers });
     await entered;
-    const busy = await fetch(`${base}/api/map/generate`, { method: 'POST', headers });
-    assert.equal(busy.status, 409);
+    // the map has its own lock, so a map job starts while the sitemap runs
+    const mapCtl = new AbortController();
+    const mapJob = await fetch(`${base}/api/map/generate`, { method: 'POST', headers, signal: mapCtl.signal });
+    assert.equal(mapJob.status, 200);
+    const status = await (await fetch(`${base}/api/map/status`, { headers })).json();
+    assert.equal(status.job, 'generate');
+    assert.equal(status.sitemapJob, 'sitemap');
+    // ...but each lock still allows one job at a time
+    assert.equal((await fetch(`${base}/api/docs/link`, { method: 'POST', headers })).status, 409);
     const again = await fetch(`${base}/api/sitemap/generate`, { method: 'POST', headers });
     assert.equal(again.status, 409);
+    mapCtl.abort();
+    await mapJob.text().catch(() => {});
     release();
     const events = (await (await pending).text()).trim().split('\n').map((line) => JSON.parse(line));
     assert.ok(events.some((event) => event.type === 'progress'));
@@ -180,4 +189,20 @@ test('sitemap prompt carries guidance and distinguishes incomplete analysis from
     assert.match(prompt, /incomplete/);
     assert.match(prompt, /screens without URLs/);
     assert.match(prompt, /never change files/);
+});
+
+test('starter map endpoint writes a folder map only when there is no map yet', async (t) => {
+    const { root } = shop(t);
+    const { server } = await startServer({ root, port: 49000 + Math.floor(Math.random() * 1000), findFreePort: true });
+    t.after(() => { server.closeAllConnections(); server.close(); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const post = () => fetch(`${base}/api/map/starter`, { method: 'POST', headers: { 'x-map': '1' } });
+    assert.equal((await post()).status, 409, 'the example already has a map');
+    rmSync(path.join(root, '.repo-map', 'map.json'));
+    const res = await post();
+    assert.equal(res.status, 200);
+    assert.ok((await res.json()).nodes > 0);
+    const map = JSON.parse(readFileSync(path.join(root, '.repo-map', 'map.json'), 'utf8'));
+    assert.equal(map.starter, true);
+    assert.equal((await post()).status, 409);
 });

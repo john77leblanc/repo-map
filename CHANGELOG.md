@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+
+- **Breaking:** remove the `repo-map generate` command and the terminal "Draft the map now?" prompt. Scripts using `repo-map generate --if-missing` need updating. The first map is now built in the browser. Use **Redraw map** in Settings to redraw the whole map.
+
+- Add a first-run starter screen. When a repo has no map, the app opens on it. Pick the AI tool, model and effort (saved as the map agent in `.repo-map/local.json`), optionally tick **Also build the sitemap** (off by default), and press **Build**. The map and sitemap build in parallel, each with its own progress, **Stop** and **Retry**. **Open map** appears once the map is ready while the sitemap keeps going. Without an AI tool, **Start from folders instead** writes the folder-based starter map.
+
+- Give sitemap generation its own server job lock, so it runs alongside a map update, redraw or docs relink. `GET /api/map/status` now also reports `sitemapJob`.
+
+- Non-interactive `repo-map` no longer writes a folder starter map; the browser starter screen offers it instead.
+
 ## 0.11.0
 
 - Add a sitemap trace **Show** control with a **Trace screens** option that hides nearby context, alongside **Trace + nearby** and **Whole application**.

@@ -17,7 +17,7 @@ Everything runs on your machine. The server listens on `localhost` only, and no 
 ## Requirements
 
 - Node.js >=22.12
-- Optional: an AI tool for tracing and `generate`. Any one of [Claude Code](https://docs.claude.com/en/docs/claude-code), an OpenAI-compatible API key, a local model server (Ollama, LM Studio), or a CLI like Codex or Gemini. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). The map, search and shared trace codes work without one.
+- Optional: an AI tool for tracing and drawing the map. Any one of [Claude Code](https://docs.claude.com/en/docs/claude-code), an OpenAI-compatible API key, a local model server (Ollama, LM Studio), or a CLI like Codex or Gemini. See [SETUP.md](SETUP.md#4-choose-an-ai-tool). The map, search and shared trace codes work without one.
 
 Node >=22.12 is required. The backend uses only Node built-ins. React, React DOM, MobX, observer bindings, TypeScript, Vite, Vitest, Playwright and related frontend tooling are devDependencies. Browser code is bundled into git-ignored `dist/`. Registry packages ship prebuilt assets and require no runtime build tools.
 
@@ -58,7 +58,7 @@ All AI responses use shared JSON Schema contracts and are validated before use. 
 
 **Keeping it current:** the map remembers the commit it was drawn from. Map and documentation issues show a notification icon on **Settings**, which shows what needs attention and offers **Update map**, **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. Settings also holds the trace AI preference used for new traces and flowchart redraws. Use **Dismiss notification** in Settings to hide the icon for the current issue; dismissal is remembered in this browser, and new issues notify again. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
 
-The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. Without an AI tool, repo-map starts you with one card per folder, which you can fill in by hand or draft later with `repo-map generate`.
+The first map is a draft: read it through, fix descriptions, collapse noisy groups, and mark guessed links `"inferred": true`. You build it in the browser: when a repo has no map yet, repo-map opens on a starter screen where you pick the AI tool, model and effort, optionally tick **Also build the sitemap**, and press **Build**. The map and sitemap build in parallel, each with its own progress. Without an AI tool, **Start from folders instead** gives you one card per folder, which you can fill in by hand or redraw later from Settings.
 
 Want to see it first? Clone this repo, run `npm ci`, then `npm run example` (builds before serving).
 
@@ -70,7 +70,6 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 |------------|--------------|
 | *(none)* or `start` | Set up anything that's missing (asking only when it has to), then open the map |
 | `init`     | Create `.repo-map/` with a starter `config.json` |
-| `generate` | Draft `map.json` with your AI tool (read-only), then link documentation to its cards (`--no-docs` to skip) |
 | `docs`     | Link documentation, agent guidance and code comments to the map's cards again (`.repo-map/docs.json`); `--check` for scripts |
 | `ai <tool>` | Choose the default AI tool: `claude`, `openai`, `api`, `ollama`, `lmstudio`, `codex`, `gemini`, `command`, `auto`, `none`, with optional `--model` and `--effort`; `--for generate` sets the one that draws the map; `ai show` prints the settings in effect |
 | `doctor`   | List the AI tools found, with their models and effort levels, and check the ones traces and the map will use (`--json` for scripts) |
@@ -136,7 +135,7 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 
 ### docs.json
 
-Written by the docs pass (`generate`, `repo-map docs`, **Relink docs**), and committed with `map.json`:
+Written by the docs pass (after building or redrawing the map, `repo-map docs`, **Relink docs**), and committed with `map.json`:
 
 ```json
 { "commit": "…", "links": { "checkout-page": [
@@ -170,7 +169,7 @@ The independent `.repo-map/sitemap.json` is suitable for committing. Version 1 c
 
 Flowcharts and sitemaps share the same zoom, **Fit**, **Diagram key**, export, and generation toolbar. Sitemap's key explains screens, navigation, journey numbers, surrounding context, and proposed changes. **Copy Mermaid** and **Download SVG** export the displayed application/journey, including filters and proposed changes; SVG preserves theme colors and dimmed context.
 
-Use **More > Show info** for sitemap freshness, snapshot details, and analysis notes, or **More > Hide details** to give the diagram the full width; selecting a screen reopens its details. Journey notes expand for the selected step. **More > Refresh status** reloads the saved result without AI; **Regenerate** explicitly refreshes the analysis. Failed or stopped generation keeps the previous result. Generation shares the map/docs job lock and does not run automatically with architecture generation. Sitemap generation reads code only; it does not crawl a running site.
+Use **More > Show info** for sitemap freshness, snapshot details, and analysis notes, or **More > Hide details** to give the diagram the full width; selecting a screen reopens its details. Journey notes expand for the selected step. **More > Refresh status** reloads the saved result without AI; **Regenerate** explicitly refreshes the analysis. Failed or stopped generation keeps the previous result. Generation has its own job slot, so it can run alongside a map update or redraw; on the first-run starter screen it is opt-in and builds in parallel with the map. Sitemap generation reads code only; it does not crawl a running site.
 
 ## Safety
 

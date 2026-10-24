@@ -19,7 +19,8 @@ export interface MapStatus {
     files?: string[];
     commitsSince?: number;
     tooBig?: boolean;
-    job?: JobKind | 'sitemap' | null;
+    job?: JobKind | null;
+    sitemapJob?: 'sitemap' | null;
     updating?: boolean;
     docs?: {
         linked?: boolean;

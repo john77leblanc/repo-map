@@ -5,7 +5,6 @@
  * OpenAI-compatible API including local models). Each repo keeps its own .repo-map/ folder.
  *
  *   repo-map init       create .repo-map/config.json for this repo
- *   repo-map generate   draft .repo-map/map.json with your AI tool
  *   repo-map doctor     check which AI tool will be used and whether it works
  *   repo-map validate   check map.json for broken ids, groups and paths
  *   repo-map serve      open the map on http://localhost:4477
@@ -17,7 +16,6 @@ import { agentsSummary, checkApi, detectProvider } from '../lib/ai/index.mjs';
 import { MAP_DIR, globalAiFile, findRepoRoot, loadConfig, loadMap, withDefaults } from '../lib/config.mjs';
 import { AI_PRESETS, aiPatch, writeAiSettings } from '../lib/settings.mjs';
 import { describeLinks, docsStatus, linkDocs, loadDocs } from '../lib/docs.mjs';
-import { generateMap } from '../lib/generate.mjs';
 import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
 import { runStart } from '../lib/start.mjs';
@@ -38,8 +36,6 @@ Commands
               command, auto or none.  \`repo-map ai show\` prints the effective settings
   doctor      List the AI tools found, with their models and effort levels, and check
               the ones traces and the map will use
-  generate    Draft .repo-map/map.json with your AI tool (writes map.draft.json if a map exists),
-              then link the repo's documentation to its cards
   update      Bring map.json up to date with the code changed since it was last evaluated
   docs        Link the repo's documentation (docs, agent guidance, code comments) to the
               map's cards again (.repo-map/docs.json)
@@ -71,11 +67,6 @@ ai
   --for generate      Save as the tool/model/effort for drawing and updating the map,
                       instead of the default for traces
 
-generate
-  --force             Overwrite map.json instead of writing map.draft.json
-  --if-missing        Do nothing when map.json already has nodes (safe to re-run)
-  --no-docs           Don't link documentation afterwards
-
 update
   --check             Only report whether the map is out of date (exit code 1 if it is)
   --mark              Record the current commit as evaluated, without changing the map
@@ -102,7 +93,7 @@ const VALUE_FLAGS = {
     '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for',
 };
 const BOOL_FLAGS = {
-    '--force': 'force', '--if-missing': 'ifMissing', '--json': 'json', '--yes': 'yes',
+    '--force': 'force', '--json': 'json', '--yes': 'yes',
     '--global': 'global', '--local': 'local', '--repo': 'repo', '--check': 'check', '--mark': 'mark',
 };
 
@@ -234,38 +225,6 @@ async function readGlobalAi() {
     }
 }
 
-async function cmdGenerate(opts) {
-    const root = resolveRoot(opts);
-    const config = await loadConfig(root);
-    const existing = await loadMap(root);
-    if (opts.ifMissing && existing.nodes.length && !existing.starter) {
-        console.log(`${MAP_DIR}/map.json already has ${existing.nodes.length} nodes; skipping (--if-missing).`);
-        return;
-    }
-    const provider = await detectProvider(config, 'generate');
-    checkRunFlags(provider, opts);
-    if (provider.available) {
-        console.log(`Exploring ${root} with ${provider.label} (read-only). This can take several minutes…`);
-    }
-    const result = await generateMap({
-        root,
-        config,
-        force: opts.force,
-        docs: opts.docs !== false,
-        onProgress: (text) => process.stdout.write(`  ${text}\n`),
-        onStart: stopOnSigint,
-    });
-    const { counts, errors, warnings } = result.check;
-    console.log(`\nWrote ${path.relative(root, result.target)}: ${counts.groups} groups, ${counts.nodes} nodes, ${counts.edges} edges in ${result.seconds}s${result.spend ? ` (${result.spend})` : ''}.`);
-    if (errors.length || warnings.length) {
-        console.log(`${errors.length} errors, ${warnings.length} warnings. Run \`repo-map validate\` for details.`);
-    }
-    reportDocs(result);
-    if (result.draft) {
-        console.log('Review it against map.json, then rename it to map.json (or rerun with --force). Then link its docs with `repo-map docs`.');
-    }
-}
-
 /** Ctrl+C stops the AI run in progress. */
 function stopOnSigint(run) {
     process.on('SIGINT', () => {
@@ -320,8 +279,8 @@ function describeStatus(st) {
         case 'stale': return `Map is out of date: ${st.changed} file${st.changed === 1 ? '' : 's'} under the code folders changed since it was evaluated at ${st.commit.slice(0, 9)}${st.commitsSince ? ` (${st.commitsSince} commit${st.commitsSince === 1 ? '' : 's'} ago)` : ''}.`;
         case 'unrecorded': return 'Map has no recorded commit, so repo-map can’t tell whether it’s current. `repo-map update --mark` records the current one.';
         case 'unknown': return st.reason;
-        case 'starter': return 'Map is a folder-based starter. Draft a full one with `repo-map generate`.';
-        case 'empty': return 'There is no map yet.';
+        case 'starter': return 'Map is a folder-based starter. Redraw it with an AI tool from Settings in the browser.';
+        case 'empty': return 'There is no map yet. Run `repo-map` and build it in the browser.';
         default: return 'Not a git repository; map freshness isn’t tracked.';
     }
 }
@@ -467,7 +426,7 @@ async function main() {
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;
     }
-    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, generate: cmdGenerate, docs: cmdDocs, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
+    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, docs: cmdDocs, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

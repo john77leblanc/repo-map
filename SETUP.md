@@ -1,6 +1,6 @@
 # Setting up repo-map
 
-This guide covers installing repo-map, adding it to a repo, and choosing the AI tool that powers plain-language traces and `repo-map generate`.
+This guide covers installing repo-map, adding it to a repo, and choosing the AI tool that powers plain-language traces and draws the map.
 
 You don't need an AI tool to use the map. Without one you can still browse it, search it, follow connections, and open traces that teammates share as trace codes. An AI tool is only needed to run new traces and to draft a map.
 
@@ -26,14 +26,14 @@ The first run asks only what it needs:
 
 1. **Map details** (only if the repo has no `.repo-map/` yet): a name, the folders that hold code, and a one-line description. Press Enter to accept each suggestion.
 2. **AI tool** (only if none is working yet): it lists what it finds on your machine (Claude Code, a running Ollama or LM Studio, Codex, Gemini) plus OpenAI, or **Skip**. Your choice is saved for every repo in `~/.config/repo-map/ai.json`. An OpenAI key you paste is used for that session only and never saved to a file.
-3. **Draft the map** (only if there isn't one): with your AI tool, which takes a few minutes, or, if you skipped AI, from your folder structure.
-4. **Open the map** in your browser. If port 4477 is taken, it uses the next free one.
+3. **Open the browser.** If port 4477 is taken, it uses the next free one.
+4. **Build the map** (only if there isn't one). The browser opens on a starter screen: pick the AI tool, model and effort, optionally tick **Also build the sitemap**, and press **Build**. The map and sitemap run side by side, each with its own progress line and **Stop** button, and usually take a few minutes. Your choice is saved for you in this repo (`.repo-map/local.json`) and can be changed later in **Settings / Map agent**. Without an AI tool, choose **Start from folders instead** for one card per code folder.
 
 After that, `npx repo-map` (or `npm run map`) just opens the map. Teammates joining a repo that already has a map get only step 2, and only if they don't have an AI tool set up yet.
 
-`npx @whitemane/repo-map` does the same without installing anything. When there's no terminal to ask questions in (CI, a pipe, or `--yes`), it uses the defaults, skips the AI draft and the browser, and starts from your folders.
+`npx @whitemane/repo-map` does the same without installing anything. When there's no terminal to ask questions in (CI, a pipe, or `--yes`), it uses the defaults and serves without opening the browser; the starter screen is waiting when you open it.
 
-While startup drafts or updates the map and links documentation, a terminal spinner (`| / - \`) shows that work is continuing, even between progress messages. It clears when the work finishes, fails, or is stopped with Ctrl+C. Animation is only enabled for terminal output; standalone `generate`, `update`, and `docs` commands keep their plain progress output.
+While startup updates a stale map, a terminal spinner (`| / - \`) shows that work is continuing, even between progress messages. It clears when the work finishes, fails, or is stopped with Ctrl+C. Animation is only enabled for terminal output; standalone `update` and `docs` commands keep their plain progress output.
 
 Everything else in this guide is for when you want more control.
 
@@ -48,14 +48,14 @@ npm install --save-dev @whitemane/repo-map
 npx repo-map init --name "Shop Map" --roots src --context "A React storefront. Pages live in src/pages, shared state in src/stores, API clients in src/api."
 npx repo-map ai claude --repo            # optional: the team's default AI tool, saved in config.json
 npx repo-map doctor                      # exits 1 if no AI tool is ready
-npx repo-map generate --if-missing       # drafts map.json; does nothing if one already exists
-npx repo-map validate                    # exits 1 on errors
 npm pkg set scripts.map="repo-map"
+npm run map                              # build the map from the browser's starter screen
+npx repo-map validate                    # exits 1 on errors
 git add .repo-map package.json package-lock.json
 git commit -m "chore: add repo-map"
 ```
 
-`generate` is the one step whose output varies, because an AI tool writes the draft. Review it, then commit `map.json`: from then on, everyone sees the same map, and `--if-missing` turns re-runs into no-ops.
+Building the map is the one step whose output varies, because an AI tool writes it. It happens in the browser so you can pick the model and watch progress. Review the result, then commit `map.json`: from then on, everyone sees the same map.
 
 ### Set up your machine (once per person)
 
@@ -90,7 +90,7 @@ npx repo-map update --check   # optional: fails when the map hasn't been updated
 
 `npx repo-map doctor --json` prints a machine-readable status, `{ "ready": true, "provider": "claude", "map": { … }, "agents": [ … ] }`, and exits 1 when tracing isn't available.
 
-To draw or update the map with a particular tool in a script, pass it for that run: `npx repo-map generate --provider claude --model opus --effort high`.
+To update the map with a particular tool in a script, pass it for that run: `npx repo-map update --provider claude --model opus --effort high`. The first map is built in the browser.
 
 The rest of this guide explains each step in more detail.
 
@@ -177,12 +177,11 @@ Then:
 
 ```shell
 repo-map doctor      # confirms which AI tool will be used (section 5)
-repo-map generate    # the AI tool explores the repo read-only and drafts .repo-map/map.json
+repo-map serve       # opens on http://localhost:4477; build the map from the starter screen
 repo-map validate    # checks ids, groups, kinds and paths
-repo-map serve       # opens on http://localhost:4477
 ```
 
-`generate` gives you a first draft. Read it through, fix descriptions, close noisy groups (`"open": false`), and mark guessed links `"inferred": true`. You can also write or edit `map.json` by hand; the format is described in the [README](README.md#mapjson).
+The starter screen's **Build** gives you a first draft. Read it through, fix descriptions, close noisy groups (`"open": false`), and mark guessed links `"inferred": true`. You can also write or edit `map.json` by hand; the format is described in the [README](README.md#mapjson).
 
 **Commit** `.repo-map/config.json`, `.repo-map/map.json` and `.repo-map/.gitignore`. The `.gitignore` keeps saved traces (`traces/`) and personal settings (`local.json`) out of git.
 
@@ -341,8 +340,9 @@ From a terminal:
 repo-map update            # update from the diff
 repo-map update --check    # report only; exits 1 when the map is out of date (useful in CI)
 repo-map update --mark     # record the current commit without changing the map
-repo-map generate --force  # redraw the whole map instead (for big refactors)
 ```
+
+For big refactors, redraw the whole map with **Redraw map** in the browser's Settings.
 
 After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: Settings offers **Mark as current**, which does the same as `update --mark`.
 
@@ -376,7 +376,7 @@ Each diagram's **Diagram key** button is an accordion beside its controls, colla
 
 At repository home, open **Sitemap**, then **Generate sitemap**. Configure the tool, model, and effort under **Settings → Map agent**; sitemap generation uses the same settings as architecture generation. There is no extra dependency or automatic AI run when switching views. Saved results live in `.repo-map/sitemap.json` and can be committed for teammates.
 
-Use the application selector for repositories with multiple applications. Select a screen for route patterns, navigation conditions, and code references. **No user-facing screens found** is a valid backend-only result; **Analysis incomplete** lists gaps. If expected screens are absent, check that their code is included in `codeRoots` and accessible to the configured AI tool, then regenerate. Invalid or inaccessible evidence is omitted and disclosed. A failed run preserves the previous sitemap. **Stop** cancels generation; map updates, redraws, docs linking, and sitemap generation run one at a time.
+Use the application selector for repositories with multiple applications. Select a screen for route patterns, navigation conditions, and code references. **No user-facing screens found** is a valid backend-only result; **Analysis incomplete** lists gaps. If expected screens are absent, check that their code is included in `codeRoots` and accessible to the configured AI tool, then regenerate. Invalid or inaccessible evidence is omitted and disclosed. A failed run preserves the previous sitemap. **Stop** cancels generation. Map updates, redraws and docs linking run one at a time; sitemap generation has its own slot and can run alongside them.
 
 Open **More > Show info** for commit freshness, uncommitted changes, snapshot details, and analysis notes. Empty results show their explanation automatically. **More > Show/Hide details** toggles the screen inspector; selecting a screen reopens it. Journey notes expand for the selected step. **More > Refresh status** reloads the saved artifact; **Regenerate** performs another AI analysis. Escape or an outside click closes More.
 
@@ -388,7 +388,7 @@ New flowcharts use **Execution lanes** when multiple execution participants are 
 
 Diagram canvases fill the available height beneath their controls and expanded key, with scrolling inside the canvas. The architecture scrollbar sits at the bottom of the screen. On narrow screens, the sidebar stacks above the diagram and scrolls independently, leaving the remaining height for the canvas.
 
-After drawing the map, `generate` runs a second pass with the map's tool that reads the repo's documents and links their sections to the cards they explain:
+After drawing the map (starter screen **Build** or **Redraw map**), repo-map runs a second pass with the map's tool that reads the repo's documents and links their sections to the cards they explain:
 
 - **Agent guidance** (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, Copilot and Cursor rules), listed first on each card. These files are also given to every AI run as context about the repo.
 - **Docs**: `README`s, `docs/`, ADRs and other markdown, per `docs` in config.json.
@@ -399,7 +399,6 @@ The links are saved in `.repo-map/docs.json`; commit it with `map.json`. An upda
 ```shell
 repo-map docs              # link docs to the cards again
 repo-map docs --check      # exits 1 when documents changed since they were linked
-repo-map generate --no-docs   # draw the map without the docs pass
 ```
 
 ## 5. Check your setup with `repo-map doctor`

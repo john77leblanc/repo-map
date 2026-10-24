@@ -9,7 +9,7 @@ const source = readFileSync(new URL('../lib/start.mjs', import.meta.url), 'utf8'
     .replace(/^import .*;\r?$/gm, '')
     .replace(/^export .*;\r?$/gm, '');
 
-for (const operation of ['draft', 'runUpdate']) {
+for (const operation of ['runUpdate']) {
     for (const outcome of ['success', 'failure', 'interrupt']) {
         test(`startup ${operation} clears its spinner on ${outcome}`, async (t) => {
             t.mock.timers.enable({ apis: ['setInterval'] });
@@ -45,14 +45,11 @@ for (const operation of ['draft', 'runUpdate']) {
                     docs: {},
                 };
             };
-            const functions = runInNewContext(`${source}\n({ draft, runUpdate });`, {
+            const functions = runInNewContext(`${source}\n({ runUpdate });`, {
                 process: proc,
                 console: { log: (text = '') => { output += `${text}\n`; } },
                 createSpinner: (label) => createSpinner(label, proc.stdout),
-                generateMap: agent,
                 updateMap: agent,
-                MAP_DIR: '.repo-map',
-                describeLinks: () => 'Linked documentation.',
             });
             await functions[operation]('/fake-repo', {});
             assert.equal(proc.listenerCount('SIGINT'), 0);
@@ -60,7 +57,7 @@ for (const operation of ['draft', 'runUpdate']) {
             t.mock.timers.tick(1000);
             assert.equal(output, finished);
             const message = outcome === 'success'
-                ? (operation === 'draft' ? 'Drafted ' : 'Updated the map:')
+                ? 'Updated the map:'
                 : (outcome === 'interrupt' ? 'Stopped ' : "Couldn't ");
             const messageAt = output.indexOf(message);
             assert.ok(messageAt > 0);

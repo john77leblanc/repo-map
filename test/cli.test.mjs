@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -72,7 +72,7 @@ test('doctor --json reports readiness with an exit code', () => {
     assert.equal(JSON.parse(r.stdout).ready, false);
 });
 
-test('generate --if-missing skips when a map exists, and validate passes', () => {
+test('generate is no longer a command (the first map is built in the browser), and validate passes', () => {
     const s = sandbox();
     s.run('init', '--roots', 'src');
     writeFileSync(path.join(s.repo, '.repo-map', 'map.json'), JSON.stringify({
@@ -80,9 +80,9 @@ test('generate --if-missing skips when a map exists, and validate passes', () =>
         nodes: [{ id: 'app', group: 'g', kind: 'service', path: 'src', desc: 'The app.' }],
         edges: [],
     }));
-    const gen = s.run('generate', '--if-missing');
-    assert.equal(gen.status, 0);
-    assert.match(gen.stdout, /skipping/);
+    const gen = s.run('generate');
+    assert.equal(gen.status, 1);
+    assert.doesNotMatch(gen.stdout, /^ {2}generate /m);
     assert.equal(s.run('validate').status, 0);
 });
 
@@ -134,9 +134,8 @@ test('running with no command sets everything up without questions when there is
     });
     child.kill();
     assert.match(out, /Created \.repo-map\/config\.json/);
-    assert.match(out, /Started a map from your folders/);
+    assert.match(out, /No map yet\. Build it in the browser/);
     assert.match(out, /→ http:\/\/localhost:\d+/);
-    const map = s.read('.repo-map/map.json');
-    assert.equal(map.starter, true);
-    assert.ok(map.nodes.some((n) => n.path === 'src/api'));
+    // the first map is built from the browser's starter screen, not here
+    assert.equal(existsSync(path.join(s.repo, '.repo-map', 'map.json')), false);
 });
