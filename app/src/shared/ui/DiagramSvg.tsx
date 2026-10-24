@@ -14,7 +14,19 @@ interface DiagramViewModel {
     pick?(id: string): void;
     /** Nodes and layout edge indices to emphasize while the rest dims. */
     highlight?: { nodes: string[]; edges: number[] } | null;
+    /** Pointer or keyboard focus entering (id) or leaving (null) a node. */
+    hoverNode?(id: string | null): void;
+    /** Pointer entering (layout edge index) or leaving (null) a path or its caption. Hover only, no click. */
+    hoverEdge?(index: number | null): void;
 }
+
+const nodeId = (target: EventTarget | null) =>
+    (target instanceof Element ? target.closest<SVGElement>('.fn')?.dataset.id : undefined) || null;
+/** Layout edge index under the pointer: a path's wide hit area or its caption. */
+const edgeIndex = (target: EventTarget | null) => {
+    const item = target instanceof Element ? target.closest<SVGElement>('.fe-hit, .fl') : null;
+    return item?.dataset.i ? Number(item.dataset.i) : null;
+};
 
 /** React owns the host; only this adapter mutates its generated SVG descendants. */
 const DiagramSvg = observer(function DiagramSvg({
@@ -39,6 +51,15 @@ const DiagramSvg = observer(function DiagramSvg({
                 'beforeend',
                 '<marker id="fc-arrow-on" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa on" d="M0 0.5L7.5 4L0 7.5z"/></marker>'
             );
+        // Wide invisible copies of each path make thin connectors easy to hover.
+        // Interactive view only, so exported SVGs stay unchanged.
+        host.current.querySelectorAll<SVGPathElement>('.fe').forEach((path) => {
+            const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            hit.setAttribute('class', 'fe-hit');
+            hit.setAttribute('d', path.getAttribute('d') || '');
+            hit.dataset.i = path.dataset.i || '';
+            path.parentNode?.appendChild(hit);
+        });
         if (canvas.current)
             vm.fit(canvas.current.clientWidth, canvas.current.clientHeight, initialZoom);
     }, [svg, vm, initialZoom]);
@@ -47,7 +68,6 @@ const DiagramSvg = observer(function DiagramSvg({
         if (!element || !layout) return;
         element.setAttribute('width', String(Math.round(layout.width * vm.scale)));
         element.setAttribute('height', String(Math.round(layout.height * vm.scale)));
-        element.classList.toggle('picking', !!vm.selectedId);
         element
             .querySelectorAll<SVGElement>('.fn')
             .forEach((node) => node.classList.toggle('sel', node.dataset.id === vm.selectedId));
@@ -72,6 +92,9 @@ const DiagramSvg = observer(function DiagramSvg({
         element.querySelectorAll<SVGElement>('.fe, .fl').forEach((item) => item.classList.toggle('hl', edges.has(item.dataset.i || '')));
         element.querySelectorAll<SVGElement>('.fe').forEach((path) => path.setAttribute('marker-end',
             `url(#${path.classList.contains('hl') || path.classList.contains('on') ? 'fc-arrow-on' : 'fc-arrow'})`));
+        // Highlighted captions move to the end of their layer so other captions never cover them.
+        const captions = element.querySelector('.fl-all');
+        captions?.querySelectorAll('.fl.hl').forEach((label) => captions.appendChild(label));
     }, [svg, highlight, vm.selectedId]);
     useLayoutEffect(() => {
         const element = canvas.current;
@@ -111,7 +134,18 @@ const DiagramSvg = observer(function DiagramSvg({
             <div
                 id={prefix + '-svgbox'}
                 ref={host}
+                onMouseOver={(event) => {
+                    const id = nodeId(event.target);
+                    const edge = id ? null : edgeIndex(event.target);
+                    if (edge !== null && vm.hoverEdge) vm.hoverEdge(edge);
+                    else vm.hoverNode?.(id);
+                }}
+                onMouseLeave={() => vm.hoverNode?.(null)}
+                onFocus={(event) => vm.hoverNode?.(nodeId(event.target))}
+                onBlur={() => vm.hoverNode?.(null)}
                 onClick={(event) => {
+                    // Paths and captions are hover-only; clicking them keeps the current selection.
+                    if (edgeIndex(event.target) !== null) return;
                     const node = (event.target as Element).closest<SVGElement>('.fn');
                     if (node?.dataset.id && vm.pick) return vm.pick(node.dataset.id);
                     vm.select(

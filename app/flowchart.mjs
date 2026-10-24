@@ -447,6 +447,58 @@ function r1(v) {
     return Math.round(v * 10) / 10;
 }
 
+const CAPTION_PAD = 4;
+
+/** Caption text and box for an edge, or null when it has no caption. */
+function captionBox(e) {
+    const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
+    if (!caption || !e.labelAt) {
+        return null;
+    }
+    const [lx, y, anchor] = e.labelAt;
+    const w = caption.length * 6.1 + 10;
+    return { caption, w, y, x: anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2 };
+}
+
+/**
+ * Branch captions extend away from their shared source, starting at the point
+ * on the path, so sibling captions do not meet between the two destinations.
+ */
+function anchorBranchCaptions(layout, gap = 4) {
+    const byId = new Map(layout.nodes.map((n) => [n.id, n]));
+    for (const e of layout.edges) {
+        if (e.back || !e.labelAt || layout.edges.filter((o) => o.from === e.from && !o.back).length < 2) {
+            continue;
+        }
+        const from = byId.get(e.from);
+        const to = byId.get(e.to);
+        if (from && to && Math.abs(from.cx - to.cx) > 20) {
+            e.labelAt[2] = to.cx < from.cx ? 'end' : 'start';
+        }
+        // A caption running past the left edge extends rightward from the same point instead.
+        if (e.labelAt[2] === 'end' && (captionBox(e)?.x ?? Infinity) - gap < CAPTION_PAD) {
+            e.labelAt[2] = 'start';
+        }
+        if (e.labelAt[2] === 'end') {
+            e.labelAt[0] -= gap;
+        } else if (e.labelAt[2] === 'start') {
+            e.labelAt[0] += gap;
+        }
+    }
+    return layout;
+}
+
+/** Widen the canvas to fit every caption. Captions never move off their paths. */
+function fitCaptions(layout) {
+    for (const e of layout.edges) {
+        const box = captionBox(e);
+        if (box) {
+            layout.width = Math.max(layout.width, Math.ceil(box.x + box.w + CAPTION_PAD));
+        }
+    }
+    return layout;
+}
+
 const escXml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function shapeOf(n) {
@@ -474,17 +526,6 @@ function renderFlowSvg(layout, { title = '' } = {}) {
     layout.edges.forEach((e, i) => {
         parts.push(`<path class="fe${e.context ? ' context' : ''}${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
     });
-    parts.push('</g><g class="fl-all">');
-    layout.edges.forEach((e, i) => {
-        const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
-        if (!caption) {
-            return;
-        }
-        const [lx, ly, anchor] = e.labelAt;
-        const w = caption.length * 6.1 + 10;
-        const x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-        parts.push(`<g class="fl${e.context ? ' context' : ''}" data-i="${i}"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
-    });
     parts.push('</g>');
     layout.nodes.forEach((n) => {
         const label = `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
@@ -494,8 +535,18 @@ function renderFlowSvg(layout, { title = '' } = {}) {
         parts.push(`<text x="${r1(n.cx)}" y="${r1(top)}" text-anchor="middle">${n.lines.map((l, i) => `<tspan x="${r1(n.cx)}"${i ? ` dy="${LINE_H}"` : ''}>${escXml(l)}</tspan>`).join('')}</text>`);
         parts.push('</g>');
     });
+    // Captions paint above boxes so a box never hides the label on its path.
+    parts.push('<g class="fl-all">');
+    layout.edges.forEach((e, i) => {
+        const box = captionBox(e);
+        if (!box) {
+            return;
+        }
+        parts.push(`<g class="fl${e.context ? ' context' : ''}" data-i="${i}"><rect x="${r1(box.x)}" y="${r1(box.y - 9)}" width="${r1(box.w)}" height="17" rx="3"/><text x="${r1(box.x + box.w / 2)}" y="${r1(box.y + 3.5)}" text-anchor="middle">${escXml(box.caption)}</text></g>`);
+    });
+    parts.push('</g>');
     parts.push('</svg>');
     return parts.join('');
 }
 
-export { layoutFlow, placeRow, renderFlowSvg, wrap };
+export { anchorBranchCaptions, fitCaptions, layoutFlow, placeRow, renderFlowSvg, wrap };

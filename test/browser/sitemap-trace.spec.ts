@@ -40,7 +40,9 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await expect(page.locator('#sitemap-svgbox [data-id="proposal-guest"]')).toHaveClass(/hl/);
     await expect(page.locator('#sitemap-svgbox .fe.hl')).toHaveCount(1);
     await page.mouse.move(0, 0);
-    await expect(page.locator('#sitemap-svgbox .hl')).toHaveCount(0);
+    // The open step keeps its screen pinned: cart and its links stay in focus.
+    await expect(page.locator('#sitemap-svgbox [data-id="cart"]')).toHaveClass(/hl/);
+    await expect(page.locator('#sitemap-svgbox svg')).toHaveClass(/hovering/);
     await page.locator('#sitemap-svgbox [data-id="checkout"]').focus();
     await page.keyboard.press('Enter');
     await page.getByText('Original screen', { exact: true }).click();
@@ -51,17 +53,26 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
         const svg = element as SVGSVGElement;
         const boxes = [...svg.querySelectorAll<SVGGElement>('.fl')].map((label) => ({
             rect: label.querySelector('rect')!.getBBox(), text: label.querySelector('text')!.getBBox(),
+            path: svg.querySelector<SVGPathElement>(`.fe[data-i="${label.dataset.i}"]`)!,
         }));
-        const overlap = (a: DOMRect, b: DOMRect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        // A caption is on its path when some point of the path lies within a few pixels of its box.
+        const onPath = ({ rect, path }: { rect: DOMRect; path: SVGPathElement }) => {
+            const length = path.getTotalLength();
+            for (let at = 0; at <= length; at += 2) {
+                const { x, y } = path.getPointAtLength(at);
+                if (x >= rect.x - 6 && x <= rect.x + rect.width + 6 && y >= rect.y - 6 && y <= rect.y + rect.height + 6) return true;
+            }
+            return false;
+        };
         return {
             inside: boxes.every(({ rect }) => rect.x >= 0 && rect.x + rect.width <= svg.viewBox.baseVal.width),
             fits: boxes.every(({ rect, text }) => text.x >= rect.x - 0.5 && text.x + text.width <= rect.x + rect.width + 0.5),
-            separate: boxes.every((a, i) => boxes.every((b, j) => i === j || !overlap(a.rect, b.rect))),
+            attached: boxes.every(onPath),
         };
     });
-    expect(await captions()).toEqual({ inside: true, fits: true, separate: true });
+    expect(await captions()).toEqual({ inside: true, fits: true, attached: true });
     await page.getByLabel('Show').selectOption('nearby');
-    expect(await captions()).toEqual({ inside: true, fits: true, separate: true });
+    expect(await captions()).toEqual({ inside: true, fits: true, attached: true });
     await page.getByLabel('Show').selectOption('app');
     await page.screenshot({ path: testInfo.outputPath('sitemap-proposal.png') });
     await page.getByRole('tab', { name: 'Sitemap', exact: true }).focus();

@@ -3,6 +3,7 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
 import type { MapNode, RepoMap, Trace } from '../../models/types';
 import { proposalMap } from '../../../../lib/proposal.mjs';
+import { neighborhood } from '../../shared/diagramFocus';
 
 export interface ArchitectureDependencies {
     repo: RepositoryModel;
@@ -63,16 +64,7 @@ export class ArchitectureViewModel {
     }
     get relevant(): Set<string> | null {
         const active = this.active;
-        if (active) {
-            const result = new Set(active);
-            this.map.edges
-                .filter((e) => !this.hidden[e.type] && (active.has(e.from) || active.has(e.to)))
-                .forEach((e) => {
-                    result.add(e.from);
-                    result.add(e.to);
-                });
-            return result;
-        }
+        if (active) return neighborhood(this.map.edges.filter((e) => !this.hidden[e.type]), active).nodes;
         return this.trace
             ? new Set([
                   ...this.trace.steps.map((s) => s.id),

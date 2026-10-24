@@ -133,7 +133,10 @@ it('bundles screen details and From/To navigation tabs into journey steps, with 
     expect(container.querySelector('[data-id="checkout"]')?.classList.contains('hl')).toBe(true);
     expect(container.querySelectorAll('.fe.hl')).toHaveLength(1);
     fireEvent.mouseLeave(checkout);
-    expect(container.querySelector('.hl')).toBeNull();
+    // Leaving falls back to the pinned (selected) screen and its neighbours.
+    expect(vm.highlight?.nodes[0]).toBe('cart');
+    expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
+    expect(container.querySelectorAll('.fe.hl')).toHaveLength(vm.highlight!.edges.length);
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'Step 2 · cart' }));
     expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
     fireEvent.mouseLeave(screen.getByRole('button', { name: 'Step 2 · cart' }));

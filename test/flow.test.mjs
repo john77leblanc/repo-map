@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { layoutFlow, placeRow, renderFlowSvg, wrap } from '../app/flowchart.mjs';
+import { anchorBranchCaptions, fitCaptions, layoutFlow, placeRow, renderFlowSvg, wrap } from '../app/flowchart.mjs';
 import { withDefaults } from '../lib/config.mjs';
 import { flowToMermaid, normalizeFlow } from '../lib/flow.mjs';
 import { flowPrompt, tracePrompt } from '../lib/prompts.mjs';
@@ -301,4 +301,30 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
     assert.equal(mod.status, 200);
     assert.match(mod.headers.get('content-type'), /javascript/);
     assert.equal((await fetch(`${base}/lib/server.mjs`)).status, 404, 'only the browser modules are served');
+});
+
+test('caption helpers keep captions on their paths and widen the canvas to fit', () => {
+    const flow = {
+        nodes: [{ id: 'a', type: 'decision', label: 'Pick?' }, { id: 'b', type: 'process', label: 'Left' }, { id: 'c', type: 'process', label: 'Right' }],
+        edges: [{ from: 'a', to: 'b', label: 'a fairly long left branch caption' }, { from: 'a', to: 'c', label: 'an even longer right branch caption here' }],
+    };
+    const layout = layoutFlow(flow, { lanes: false });
+    const before = layout.edges.map((e) => [...e.labelAt]);
+    anchorBranchCaptions(layout);
+    layout.edges.forEach((e, i) => {
+        assert.ok(Math.abs(e.labelAt[0] - before[i][0]) <= 4, 'branch caption stays at its path point');
+        assert.equal(e.labelAt[1], before[i][1]);
+    });
+    const anchored = layout.edges.map((e) => [...e.labelAt]);
+    const width = layout.width;
+    fitCaptions(layout);
+    assert.deepEqual(layout.edges.map((e) => e.labelAt), anchored, 'fitCaptions never moves captions');
+    assert.ok(layout.width >= width);
+    for (const e of layout.edges) {
+        const w = e.label.length * 6.1 + 10;
+        const x = e.labelAt[2] === 'start' ? e.labelAt[0] : e.labelAt[2] === 'end' ? e.labelAt[0] - w : e.labelAt[0] - w / 2;
+        assert.ok(x >= 0 && x + w <= layout.width, 'caption fits the canvas');
+    }
+    const svg = renderFlowSvg(layout);
+    assert.ok(svg.lastIndexOf('class="fn') < svg.indexOf('class="fl-all"'), 'captions render above boxes');
 });

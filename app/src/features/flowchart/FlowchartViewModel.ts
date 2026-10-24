@@ -2,7 +2,8 @@
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentPick, Flow, Trace, StreamResult } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
-import { layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
+import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
+import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
 import { normalizeFlow, flowToMermaid, flowLanes } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
@@ -26,6 +27,7 @@ export class FlowchartViewModel {
     error = false;
     copied = false;
     compact = false;
+    readonly focus = new DiagramFocusModel({ layout: () => this.layout, selected: () => this.selectedId });
     private controller: AbortController | null = null;
     private revision = 0;
     private disposed = false;
@@ -39,6 +41,7 @@ export class FlowchartViewModel {
             this,
             {
                 deps: false,
+                focus: false,
                 trace: observableRef,
                 controller: false,
                 revision: false,
@@ -52,7 +55,17 @@ export class FlowchartViewModel {
         return this.deps.repo;
     }
     get layout() {
-        return this.trace?.flow ? layoutFlow(this.trace.flow, { lanes: !this.compact }) : null;
+        return this.trace?.flow ? fitCaptions(layoutFlow(this.trace.flow, { lanes: !this.compact })) : null;
+    }
+    /** What DiagramSvg keeps bright: the hovered node, else the selected one, with its links and neighbours. */
+    get highlight() {
+        return this.focus.highlight;
+    }
+    hoverNode(id: string | null) {
+        this.focus.hover(id);
+    }
+    hoverEdge(index: number | null) {
+        this.focus.hoverEdge(index);
     }
     get hasLanes() {
         return !!this.trace?.flow && flowLanes(this.trace.flow).filter((lane: { id: string }) => lane.id).length >= 2;
@@ -92,6 +105,7 @@ export class FlowchartViewModel {
         this.trace = trace ? (isObservable(trace) ? trace : observable(trace)) : null;
         this.copied = false;
         this.selectedId = null;
+        this.focus.reset();
         this.status = '';
         this.error = false;
     }
@@ -173,6 +187,7 @@ export class FlowchartViewModel {
             runInAction(() => {
                 this.trace = updated;
                 this.selectedId = null;
+                this.focus.reset();
                 this.status = '';
             });
             await this.deps.saveTrace(updated);

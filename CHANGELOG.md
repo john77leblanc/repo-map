@@ -10,6 +10,10 @@
 
 - Non-interactive `repo-map` no longer writes a folder starter map; the browser starter screen offers it instead.
 
+- Keep flowchart and sitemap edge captions on their paths. Captions no longer slide sideways to avoid each other, and they now paint above boxes. The canvas widens instead when a caption would not fit.
+
+- Hovering or focusing a flowchart or sitemap box dims everything except that box, its links, their captions and the neighbouring boxes; highlighted captions move above the rest. A selected box stays in focus after the pointer leaves, matching the architecture map. Hovering a path or its caption (with a wide hit area) highlights that path and the two boxes it joins; paths have no click action. Diagram focus is shared code (`app/src/shared/DiagramFocusModel.ts`, `diagramFocus.ts`), also used by the architecture map for its neighbour lookup.
+
 ## 0.11.0
 
 - Add a sitemap trace **Show** control with a **Trace screens** option that hides nearby context, alongside **Trace + nearby** and **Whole application**.

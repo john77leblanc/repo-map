@@ -3,9 +3,9 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Sitemap, SitemapNavigation, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
 import { plain } from '../../models/trace';
 import { normalizeSitemapTrace, composeSitemapTrace } from '../../../../lib/sitemap-trace.mjs';
-import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import type { Services } from '../../shared/services/contracts';
-import { layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
+import { anchorBranchCaptions, fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
+import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
 import { flowToMermaid } from '../../../../lib/flow.mjs';
 import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
@@ -16,32 +16,6 @@ type ConnectionTab = 'from' | 'to';
 type NavEdge = SitemapNavigation & { status?: ChangeStatus; rationale?: string; index?: number };
 /** One navigation link seen from a screen: `other` is the screen at the far end. */
 interface Connection { edge: NavEdge; nav: number; other: string; journey: boolean; original: SitemapNavigation | null }
-
-type Caption = { status?: string; label?: string; labelAt?: [number, number, string] };
-
-/**
- * Keep caption boxes inside the canvas and off each other. Boxes use the same
- * width estimate as renderFlowSvg; a later box would otherwise paint over the
- * start of an earlier caption on the same row. Widens the layout when needed.
- */
-function separateCaptions(layout: { width: number; edges: Caption[] }) {
-    const PAD = 4;
-    const boxes = layout.edges.flatMap((edge) => {
-        const caption = [CHANGE_LABELS[edge.status as ChangeStatus], edge.label].filter(Boolean).join(': ');
-        if (!caption || !edge.labelAt) return [];
-        const w = caption.length * 6.1 + 10;
-        const [lx, y, anchor] = edge.labelAt;
-        const x = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-        return [{ edge, w, y, x: Math.max(PAD, Math.min(layout.width - w - PAD, x)) }];
-    }).sort((a, b) => a.x - b.x);
-    boxes.forEach((box, i) => {
-        for (const before of boxes.slice(0, i))
-            if (Math.abs(before.y - box.y) < 19 && box.x < before.x + before.w + PAD) box.x = before.x + before.w + PAD;
-        layout.width = Math.max(layout.width, Math.ceil(box.x + box.w + PAD));
-        const anchor = box.edge.labelAt![2];
-        box.edge.labelAt![0] = anchor === 'start' ? box.x : anchor === 'end' ? box.x + box.w : box.x + box.w / 2;
-    });
-}
 
 class SitemapViewModel {
     sitemap: Sitemap | null = null;
@@ -63,6 +37,11 @@ class SitemapViewModel {
     busy = false;
     message = '';
     error = false;
+    readonly focus = new DiagramFocusModel({
+        layout: () => this.layout,
+        selected: () => this.selectedId,
+        override: () => this.panelHighlight,
+    });
     private controller: AbortController | null = null;
     private disposed = false;
     private copyRevision = 0;
@@ -70,7 +49,7 @@ class SitemapViewModel {
 
     constructor(readonly deps: { repo: RepositoryModel; services: Services; getPick?: () => AgentPick; saveTrace?: (trace: Trace) => Promise<void> }) {
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision' | 'copyTimer'>(this, {
-            deps: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
+            deps: false, focus: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
             copyRevision: false, copyTimer: false,
         }, { autoBind: true });
     }
@@ -107,22 +86,27 @@ class SitemapViewModel {
         this.selectedId = null;
         this.stepIndex = null;
         this.highlightIds = null;
+        this.focus.reset();
         this.appId = this.displayed?.screens.find((s) => this.involved.has(s.id))?.app || this.applications[0]?.id || '';
     }
     get wholeApplication() { return this.scope === 'app'; }
-    setScope(scope: SitemapScope) { this.resetCopy(); this.scope = scope; this.highlightIds = null; }
+    setScope(scope: SitemapScope) { this.resetCopy(); this.scope = scope; this.highlightIds = null; this.focus.reset(); }
     setConnectionTab(tab: ConnectionTab) { this.connectionTab = tab; }
     hoverConnection(connection: Connection | null) {
         this.highlightIds = connection ? { nodes: [connection.edge.from, connection.edge.to], navs: [connection.nav] } : null;
     }
     hoverScreen(id: string | null) { this.highlightIds = id ? { nodes: [id], navs: [] } : null; }
-    /** Layout indices for DiagramSvg; hidden screens and links are skipped. */
-    get highlight() {
+    /** Side-panel hover as layout indices; hidden screens and links are skipped. */
+    get panelHighlight() {
         if (!this.highlightIds || !this.layout) return null;
         const navs = new Set(this.highlightIds.navs);
         const edges = this.layout.edges.flatMap((edge: { nav?: number }, i: number) => navs.has(edge.nav ?? -1) ? [i] : []);
         return { nodes: this.highlightIds.nodes, edges };
     }
+    /** What DiagramSvg keeps bright: side-panel hover, then diagram hover, then the selected screen. */
+    get highlight() { return this.focus.highlight; }
+    hoverNode(id: string | null) { this.focus.hover(id); }
+    hoverEdge(index: number | null) { this.focus.hoverEdge(index); }
     toggleInfo() { this.infoOpen = !this.infoOpen; }
     toggleDetails() { this.detailsOpen = !this.detailsOpen; }
     setActionsOpen(open: boolean) { this.actionsOpen = open; }
@@ -211,21 +195,7 @@ class SitemapViewModel {
     }
     get layout() {
         if (!this.graph.nodes.length) return null;
-        const layout = layoutFlow(this.graph, { lanes: false });
-        // Branch captions extend away from their shared origin, rather than
-        // colliding in the center between two destination screens.
-        const GAP = 4;
-        for (const edge of layout.edges) {
-            if (edge.back || !edge.labelAt || layout.edges.filter((e) => e.from === edge.from && !e.back).length < 2) continue;
-            const from = layout.nodes.find((n: { id: string; x: number; w: number }) => n.id === edge.from);
-            const to = layout.nodes.find((n: { id: string; x: number; w: number }) => n.id === edge.to);
-            if (from && to && Math.abs(from.x + from.w / 2 - to.x - to.w / 2) > 20)
-                edge.labelAt[2] = to.x + to.w / 2 < from.x + from.w / 2 ? 'end' : 'start';
-            if (edge.labelAt[2] === 'end') edge.labelAt[0] = Number(edge.labelAt[0]) - GAP;
-            if (edge.labelAt[2] === 'start') edge.labelAt[0] = Number(edge.labelAt[0]) + GAP;
-        }
-        separateCaptions(layout);
-        return layout;
+        return fitCaptions(anchorBranchCaptions(layoutFlow(this.graph, { lanes: false })));
     }
     get svg() { return this.layout ? renderFlowSvg(this.layout, { title: 'Screens and navigation' }) : ''; }
     get exportName() { return this.trace?.title || this.repo.bootstrap?.config.name || ''; }
@@ -291,6 +261,7 @@ class SitemapViewModel {
         this.appId = id;
         this.selectedId = null;
         this.highlightIds = null;
+        this.focus.reset();
     }
     zoom(factor: number) { this.scale = Math.max(0.15, Math.min(2.5, this.scale * factor)); }
     fit(width: number, height: number, zoom = 1) {
@@ -373,6 +344,7 @@ class SitemapViewModel {
                 this.appId = this.displayed?.screens.find((s) => this.involved.has(s.id))?.app || this.applications[0]?.id || '';
                 this.selectedId = null;
                 this.stepIndex = null;
+                this.focus.reset();
                 this.message = 'Sitemap output ready.';
             });
             await this.deps.saveTrace?.(trace);
