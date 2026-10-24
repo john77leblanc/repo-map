@@ -26,21 +26,43 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await expect(page.locator('#sitemap-svgbox .change-removed.fe')).toHaveCount(1);
     await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveClass(/context/);
     await expect(page.locator('#sitemap-svgbox [data-id="account"]')).toHaveCount(0);
-    await page.getByRole('region', { name: 'Screen journey' }).getByRole('button', { name: 'cart', exact: true }).last().click();
-    await expect(page.getByRole('heading', { name: 'Step 3', exact: true })).toBeVisible();
+    await page.getByLabel('Show').selectOption('trace');
+    await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveCount(0);
+    await page.getByLabel('Show').selectOption('nearby');
+    const step3 = page.getByRole('region', { name: 'Screen journey' }).getByRole('button', { name: 'Step 3 · cart', exact: true });
+    await step3.click();
+    await expect(step3).toHaveAttribute('aria-expanded', 'true');
+    const step3Panel = page.getByRole('region', { name: 'Step 3 · cart', exact: true });
+    await expect(step3Panel).toContainText('Return to edit items');
+    await expect(step3Panel.getByRole('tab', { name: 'To (2)' })).toHaveAttribute('aria-selected', 'true');
+    await step3Panel.getByRole('button', { name: 'Guest details', exact: true }).hover();
+    await expect(page.locator('#sitemap-svgbox svg')).toHaveClass(/hovering/);
+    await expect(page.locator('#sitemap-svgbox [data-id="proposal-guest"]')).toHaveClass(/hl/);
+    await expect(page.locator('#sitemap-svgbox .fe.hl')).toHaveCount(1);
+    await page.mouse.move(0, 0);
+    await expect(page.locator('#sitemap-svgbox .hl')).toHaveCount(0);
     await page.locator('#sitemap-svgbox [data-id="checkout"]').focus();
     await page.keyboard.press('Enter');
     await page.getByText('Original screen', { exact: true }).click();
     await expect(page.getByRole('region', { name: 'Proposed screen change' })).toContainText('/checkout');
-    await page.getByLabel('Whole application').check();
+    await page.getByLabel('Show').selectOption('app');
     await expect(page.locator('#sitemap-svgbox [data-id="account"]')).toHaveCount(1);
-    expect(await page.locator('#sitemap-svgbox svg').evaluate((element) => {
+    const captions = async () => page.locator('#sitemap-svgbox svg').evaluate((element) => {
         const svg = element as SVGSVGElement;
-        return [...svg.querySelectorAll<SVGGraphicsElement>('.fl rect')].every((label) => {
-            const bounds = label.getBBox();
-            return bounds.x >= 0 && bounds.x + bounds.width <= svg.viewBox.baseVal.width;
-        });
-    })).toBe(true);
+        const boxes = [...svg.querySelectorAll<SVGGElement>('.fl')].map((label) => ({
+            rect: label.querySelector('rect')!.getBBox(), text: label.querySelector('text')!.getBBox(),
+        }));
+        const overlap = (a: DOMRect, b: DOMRect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        return {
+            inside: boxes.every(({ rect }) => rect.x >= 0 && rect.x + rect.width <= svg.viewBox.baseVal.width),
+            fits: boxes.every(({ rect, text }) => text.x >= rect.x - 0.5 && text.x + text.width <= rect.x + rect.width + 0.5),
+            separate: boxes.every((a, i) => boxes.every((b, j) => i === j || !overlap(a.rect, b.rect))),
+        };
+    });
+    expect(await captions()).toEqual({ inside: true, fits: true, separate: true });
+    await page.getByLabel('Show').selectOption('nearby');
+    expect(await captions()).toEqual({ inside: true, fits: true, separate: true });
+    await page.getByLabel('Show').selectOption('app');
     await page.screenshot({ path: testInfo.outputPath('sitemap-proposal.png') });
     await page.getByRole('tab', { name: 'Sitemap', exact: true }).focus();
     await page.keyboard.press('Home');

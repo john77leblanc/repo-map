@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { observable } from 'mobx';
 import { fixture, raw, flow } from '../traces/testFixtures';
@@ -46,7 +46,7 @@ it('exports the visible journey and proposals with standalone context styling', 
     expect(svg).toContain('change-modified');
     expect(svg).not.toContain('class="fn t-process sel');
     expect(svg).not.toContain('isolated');
-    vm.toggleContext();
+    vm.setScope('app');
     vm.downloadSvg(() => '#fff');
     expect(vi.mocked(services.browser.download).mock.calls[1][1]).toContain('isolated');
     const { container } = render(<SitemapWorkspace vm={vm} />);
@@ -86,21 +86,76 @@ it('shows repeated journey steps, nearby context, cross-application navigation, 
     expect(container.querySelector('[data-id="cart"]')?.textContent).toContain('1, 2. cart');
     expect(screen.queryByText('Review cart')).toBeNull();
     expect(screen.queryByText('Edit cart')).toBeNull();
-    fireEvent.click(screen.getAllByRole('button', { name: 'cart' })[1]);
+    const step2 = screen.getByRole('button', { name: 'Step 2 · cart' });
+    fireEvent.click(step2);
+    expect(step2.getAttribute('aria-expanded')).toBe('true');
     expect(screen.queryByText('Review cart')).toBeNull();
-    expect(screen.getByText('Edit cart')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Step 2' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Step 2 · cart' }).textContent).toContain('Edit cart');
+    fireEvent.click(step2);
+    expect(step2.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Edit cart')).toBeNull();
+    expect(vm.selectedId).toBe('cart');
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'trace' } });
+    expect(container.querySelector('[data-id="admin"]')).toBeNull();
+    expect(container.querySelector('[data-id="cart"]')).not.toBeNull();
+    expect(container.querySelector('[data-id="checkout"]')).not.toBeNull();
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'nearby' } });
     fireEvent.keyDown(container.querySelector('[data-id="checkout"]')!, { key: 'Enter' });
     expect(screen.getByText('Accept guests')).toBeTruthy();
     fireEvent.click(screen.getByText('Original screen'));
     expect(screen.getByText('/checkout')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Whole application'));
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'app' } });
     expect(container.querySelector('[data-id="isolated"]')).not.toBeNull();
     expect(screen.getByLabelText('Application')).toBeTruthy();
     vi.mocked(services.api.get).mockResolvedValue({ sitemap: { ...base, screens: [] }, status: { state: 'stale' } });
     await act(() => vm.load());
     expect(vm.output?.base.screens.length).toBe(5);
     expect(JSON.stringify(output.base)).toBe(before);
+    vm.dispose();
+});
+
+it('bundles screen details and From/To navigation tabs into journey steps, with hover highlighting', () => {
+    const { repo, services } = fixture();
+    const vm = new SitemapViewModel({ repo, services });
+    vm.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal', sitemap: output }, repo.map)));
+    const { container } = render(<SitemapWorkspace vm={vm} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Step 1 · cart' }));
+    const panel = screen.getByRole('region', { name: 'Step 1 · cart' });
+    expect(panel.textContent).toContain('/cart');
+    expect(within(panel).getByRole('tab', { name: 'From (0)' }).hasAttribute('disabled')).toBe(true);
+    expect(within(panel).getByRole('tab', { name: 'To (2)' }).getAttribute('aria-selected')).toBe('true');
+    const items = [...panel.querySelectorAll('.sitemap-connection')];
+    expect(items.map((item) => item.querySelector('button')?.textContent)).toEqual(['checkout', 'Admin: admin']);
+    expect(items[1].classList.contains('context')).toBe(true);
+    const checkout = within(panel).getByRole('button', { name: 'checkout' });
+    fireEvent.mouseEnter(checkout);
+    expect(container.querySelector('#sitemap-svgbox svg')?.classList.contains('hovering')).toBe(true);
+    expect(container.querySelector('[data-id="checkout"]')?.classList.contains('hl')).toBe(true);
+    expect(container.querySelectorAll('.fe.hl')).toHaveLength(1);
+    fireEvent.mouseLeave(checkout);
+    expect(container.querySelector('.hl')).toBeNull();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Step 2 · cart' }));
+    expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
+    fireEvent.mouseLeave(screen.getByRole('button', { name: 'Step 2 · cart' }));
+    // A non-journey screen shows its details below the journey.
+    fireEvent.click(checkout);
+    expect(vm.stepIndex).toBeNull();
+    const selected = screen.getByRole('region', { name: 'Selected screen' });
+    expect(within(selected).getByRole('tab', { name: 'From (1)' })).toBeTruthy();
+    expect(within(selected).getByRole('tab', { name: 'To (1)' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(within(selected).getByRole('tab', { name: 'From (1)' }));
+    fireEvent.click(within(selected).getByRole('button', { name: 'cart' }));
+    expect(vm.stepIndex).toBe(0);
+    // Diagram clicks step through repeat visits, then clear.
+    fireEvent.click(container.querySelector('[data-id="cart"]')!);
+    expect(vm.stepIndex).toBe(1);
+    fireEvent.click(container.querySelector('[data-id="cart"]')!);
+    expect(vm.selectedId).toBeNull();
+    // Selecting a hidden screen widens the Show scope.
+    vm.setScope('trace');
+    vm.select('receipt');
+    expect(vm.scope).toBe('nearby');
+    expect(container.querySelector('[data-id="receipt"]')).not.toBeNull();
     vm.dispose();
 });
 

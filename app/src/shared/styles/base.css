@@ -442,9 +442,25 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* Trace journeys retain nearby navigation as secondary context. */
 .sitemap-workspace .fc .context.sel, .sitemap-workspace .fc .context:focus { opacity: 1; }
 .sitemap-workspace .fc.picking .fe:not(.context) { opacity: 1; }
-.sitemap-journey { padding-left: 1.5rem; }
-.sitemap-journey li { margin-bottom: .5rem; }
-.sitemap-journey button[aria-pressed="true"] { outline: 2px solid currentColor; }
+.sitemap-journey { list-style: none; padding: 0; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 6px; }
+.sitemap-journey li + li { border-top: 1px solid var(--line); }
+.sitemap-step { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 9px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.sitemap-step::before { content: ''; flex: none; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.sitemap-step[aria-expanded="true"] { font-weight: 600; }
+.sitemap-step[aria-expanded="true"]::before { transform: rotate(45deg); }
+.sitemap-step:hover, .sitemap-step:focus-visible { background: var(--soft); }
+.sitemap-step-panel { padding: 0 9px 8px 21px; }
+.sitemap-step-panel p { margin: 0 0 6px; }
+.sitemap-step-panel .sitemap-screen-details { margin-top: 8px; }
+.sitemap-screen-details h4 { margin: 10px 0 4px; }
+.sitemap-nav-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.sitemap-nav-tabs [role="tab"] { padding: 4px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; cursor: pointer; }
+.sitemap-nav-tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--http); font-weight: 600; }
+.sitemap-nav-tabs [role="tab"]:disabled { opacity: .45; cursor: default; }
+.sitemap-nav-tabs [role="tab"]:focus-visible { outline: 2px solid var(--http); outline-offset: -2px; }
+.sitemap-nav .sitemap-connection:first-child { border-top: 0; margin-top: 0; }
+.sitemap-connection.context { opacity: .65; }
+.sitemap-connection p { margin: 0 0 4px; }
 
 .trace-title-skeleton{display:inline-block;width:70%;min-width:130px;max-width:260px;height:1em;border-radius:4px;color:transparent;background:linear-gradient(100deg,var(--soft) 20%,var(--line) 45%,var(--soft) 70%);background-size:220% 100%;animation:trace-shimmer 1.4s ease-in-out infinite;vertical-align:middle}
 .trace-job .status{display:block;margin-top:9px}

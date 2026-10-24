@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0
+
+- Add a sitemap trace **Show** control with a **Trace screens** option that hides nearby context, alongside **Trace + nearby** and **Whole application**.
+
+- Show sitemap journey steps as an accordion. Each open step holds its note, screen details, proposed change, code references and **From** / **To** navigation tabs with counts; nearby links are listed after journey links and dimmed. Hovering a connection or step highlights it on the diagram. Clicking a journey screen or connection opens that screen's step, stepping through repeat visits.
+
+- Keep sitemap edge captions inside the canvas and stop neighbouring caption boxes covering each other.
+
 ## 0.10.0
 
 - Align flowchart and sitemap controls through a shared toolbar. Add a sitemap Diagram key, Mermaid copy, and standalone SVG downloads for the displayed graph; move Info, Details, and Refresh status into a compact, keyboard-accessible More dropdown.

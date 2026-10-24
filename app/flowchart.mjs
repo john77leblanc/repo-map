@@ -475,7 +475,7 @@ function renderFlowSvg(layout, { title = '' } = {}) {
         parts.push(`<path class="fe${e.context ? ' context' : ''}${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
     });
     parts.push('</g><g class="fl-all">');
-    layout.edges.forEach((e) => {
+    layout.edges.forEach((e, i) => {
         const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
         if (!caption) {
             return;
@@ -483,7 +483,7 @@ function renderFlowSvg(layout, { title = '' } = {}) {
         const [lx, ly, anchor] = e.labelAt;
         const w = caption.length * 6.1 + 10;
         const x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-        parts.push(`<g class="fl${e.context ? ' context' : ''}"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
+        parts.push(`<g class="fl${e.context ? ' context' : ''}" data-i="${i}"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
     });
     parts.push('</g>');
     layout.nodes.forEach((n) => {

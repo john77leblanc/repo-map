@@ -7,9 +7,77 @@ import { SitemapLegend } from './SitemapLegend';
 import { SITEMAP_CSS } from './styles';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { FC_CSS, UI_CSS } from '../flowchart/styles';
-import type { SitemapViewModel } from './SitemapViewModel';
+import type { SitemapViewModel, SitemapScope, ConnectionTab } from './SitemapViewModel';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
-import type { SitemapNavigation, ChangeStatus } from '../../models/types';
+import type { CodeRef } from '../../models/types';
+
+/** Everything about one screen: shown inside its journey step, or below the journey otherwise. */
+const ScreenDetails = observer(function ScreenDetails({ vm, id, stepRefs }: { vm: SitemapViewModel; id: string; stepRefs?: CodeRef[] }) {
+    const screen = vm.screen(id);
+    if (!screen) return null;
+    const change = vm.changeFor(id);
+    const original = vm.originalFor(id);
+    return <div className="sitemap-screen-details">
+        {screen.route && <p><code>{screen.route}</code></p>}
+        <p>{screen.detail}</p>
+        {change && <section aria-label="Proposed screen change">
+            <h4>{CHANGE_LABELS[change.status]}</h4><p>{change.rationale}</p>
+            {original && <details><summary>Original screen</summary><p>{original.label} — <code>{original.route}</code></p><p>{original.detail}</p></details>}
+        </section>}
+        {(!!stepRefs?.length || screen.refs.length > 0) && <div className="refs">
+            {stepRefs?.map((reference, index) => <CodeReference key={`step:${index}`} reference={reference} repo={vm.repo} />)}
+            {screen.refs.map((reference, index) => <CodeReference key={`${id}:${index}`} reference={reference} repo={vm.repo} />)}
+        </div>}
+        <ConnectionTabs vm={vm} id={id} />
+    </div>;
+});
+
+const ConnectionTabs = observer(function ConnectionTabs({ vm, id }: { vm: SitemapViewModel; id: string }) {
+    const nav = vm.navFor(id);
+    if (!nav.from.length && !nav.to.length) return <p className="hint">No navigation found in code.</p>;
+    const tabs: [ConnectionTab, string][] = [['from', 'From'], ['to', 'To']];
+    const active = nav[vm.connectionTab].length ? vm.connectionTab : vm.connectionTab === 'to' ? 'from' : 'to';
+    const panel = `sitemap-nav-${id}-${active}`;
+    return <section className="sitemap-nav" aria-label="Navigation">
+        <h4>Navigation</h4>
+        <div className="sitemap-nav-tabs" role="tablist" aria-label="Navigation direction">
+            {tabs.map(([tab, label]) => <button key={tab} type="button" role="tab" id={`sitemap-nav-${id}-${tab}-tab`}
+                aria-selected={active === tab} aria-controls={panel} tabIndex={active === tab ? 0 : -1}
+                disabled={!nav[tab].length} onClick={() => vm.setConnectionTab(tab)}
+                onKeyDown={(e) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+                    e.preventDefault();
+                    const buttons = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') || [])];
+                    const index = buttons.indexOf(e.currentTarget);
+                    const target = buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1
+                        : (index + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length];
+                    if (target) { target.focus(); target.click(); }
+                }}>
+                {label} ({nav[tab].length})
+            </button>)}
+        </div>
+        <div role="tabpanel" id={panel} aria-labelledby={`sitemap-nav-${id}-${active}-tab`}>
+            {nav[active].map((connection) => {
+                const { edge, original } = connection;
+                return <div className={'sitemap-connection' + (connection.journey ? '' : ' context')} key={connection.nav}>
+                    <p><button className="btn sm" onClick={() => vm.select(connection.other)}
+                        onMouseEnter={() => vm.hoverConnection(connection)} onMouseLeave={() => vm.hoverConnection(null)}
+                        onFocus={() => vm.hoverConnection(connection)} onBlur={() => vm.hoverConnection(null)}>
+                        {vm.screenLabel(connection.other)}
+                    </button>{!connection.journey && <span className="hint"> · nearby</span>}</p>
+                    {edge.label && <p>{edge.label}</p>}
+                    {edge.condition && <p>When: {edge.condition}</p>}
+                    {edge.status && <><p>{CHANGE_LABELS[edge.status]}: {edge.rationale}</p>
+                        {original && <details><summary>Original navigation</summary>
+                            <p>{original.from} → {original.to}: {original.label}</p><p>{original.condition}</p>
+                        </details>}
+                    </>}
+                    {edge.refs.length > 0 && <div className="refs">{edge.refs.map((reference, i) => <CodeReference key={i} reference={reference} repo={vm.repo} />)}</div>}
+                </div>;
+            })}
+        </div>
+    </section>;
+});
 
 const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: SitemapViewModel }) {
     const root = useRef<HTMLElement>(null);
@@ -23,8 +91,12 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                             {vm.applications.map(app => <option key={app.id} value={app.id}>{app.label}</option>)}
                         </select>
                     </label>}
-                    {vm.output?.applicability === 'relevant' && <label>
-                        <input type="checkbox" checked={vm.wholeApplication} onChange={vm.toggleContext} /> Whole application
+                    {vm.output?.applicability === 'relevant' && <label>Show{' '}
+                        <select aria-label="Show" value={vm.scope} onChange={event => vm.setScope(event.target.value as SitemapScope)}>
+                            <option value="trace">Trace screens</option>
+                            <option value="nearby">Trace + nearby</option>
+                            <option value="app">Whole application</option>
+                        </select>
                     </label>}
                 </>}
                 diagramKey={{ id: 'sitemap-key', open: vm.keyOpen, toggle: vm.toggleKey }}
@@ -77,46 +149,28 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     {!!vm.output?.steps.length && <section aria-label="Screen journey">
                         <h3>Journey</h3>
                         <ol className="sitemap-journey">
-                            {vm.output.steps.map((step, index) => <li key={index}>
-                                <button className="btn" aria-pressed={vm.stepIndex === index} onClick={() => vm.selectStep(index)}>
-                                    {vm.screenLabel(step.screen)}
-                                </button>
-                                {vm.stepIndex === index && <p>{step.note}</p>}
-                            </li>)}
+                            {vm.output.steps.map((step, index) => {
+                                const open = vm.stepIndex === index;
+                                return <li key={index}>
+                                    <button className="sitemap-step" id={`sitemap-step-head-${index}`} aria-expanded={open}
+                                        aria-controls={`sitemap-step-${index}`} onClick={() => vm.selectStep(index)}
+                                        onMouseEnter={() => vm.hoverScreen(step.screen)} onMouseLeave={() => vm.hoverScreen(null)}
+                                        onFocus={() => vm.hoverScreen(step.screen)} onBlur={() => vm.hoverScreen(null)}>
+                                        Step {index + 1} · {vm.screenLabel(step.screen)}
+                                    </button>
+                                    {open && <div className="sitemap-step-panel" id={`sitemap-step-${index}`} role="region"
+                                        aria-labelledby={`sitemap-step-head-${index}`}>
+                                        <p>{step.note}</p>
+                                        <ScreenDetails vm={vm} id={step.screen} stepRefs={step.refs} />
+                                    </div>}
+                                </li>;
+                            })}
                         </ol>
                     </section>}
-                    {vm.selected ? <>
+                    {vm.selected && !vm.output?.steps.some((step) => step.screen === vm.selectedId) ? <section aria-label="Selected screen">
                         <h3>{vm.screenLabel(vm.selected.id)}</h3>
-                        {vm.selected.route && <p><code>{vm.selected.route}</code></p>}
-                        <p>{vm.selected.detail}</p>
-                        {vm.selectedStep && <section aria-label="Journey step details">
-                            <h4>Step {vm.stepIndex! + 1}</h4>
-                            <div className="refs">{vm.selectedStep.refs.map((reference, index) => <CodeReference key={index} reference={reference} repo={vm.repo} />)}</div>
-                        </section>}
-                        {vm.selectedChange && <section aria-label="Proposed screen change">
-                            <h4>{CHANGE_LABELS[vm.selectedChange.status]}</h4><p>{vm.selectedChange.rationale}</p>
-                            {vm.original && <details><summary>Original screen</summary><p>{vm.original.label} — <code>{vm.original.route}</code></p><p>{vm.original.detail}</p></details>}
-                        </section>}
-                        <div className="refs">{vm.selected.refs.map((reference, index) => <CodeReference key={`${vm.selectedId}:${index}`} reference={reference} repo={vm.repo} />)}</div>
-                        {vm.connections.length > 0 && <h4>Navigation</h4>}
-                        {vm.connections.map((edge, index) => {
-                            const change = edge as SitemapNavigation & { status?: ChangeStatus; rationale?: string; index?: number };
-                            const original = change.index === undefined ? null : vm.output?.base.navigation[change.index];
-                            const outgoing = edge.from === vm.selectedId;
-                            const other = outgoing ? edge.to : edge.from;
-                            return <div className="sitemap-connection" key={`${vm.selectedId}:${index}`}>
-                                <p>{outgoing ? 'To ' : 'From '}<button className="btn sm" onClick={() => vm.select(other)}>{vm.screenLabel(other)}</button></p>
-                                {edge.label && <p>{edge.label}</p>}
-                                {edge.condition && <p>When: {edge.condition}</p>}
-                                {change.status && <><p>{CHANGE_LABELS[change.status]}: {change.rationale}</p>
-                                    {original && <details><summary>Original navigation</summary>
-                                        <p>{original.from} → {original.to}: {original.label}</p><p>{original.condition}</p>
-                                    </details>}
-                                </>}
-                                <div className="refs">{edge.refs.map((reference, i) => <CodeReference key={i} reference={reference} repo={vm.repo} />)}</div>
-                            </div>;
-                        })}
-                    </> : <p>Select a screen for its routes, navigation conditions, and code references. Arrows show navigation found in code.</p>}
+                        <ScreenDetails vm={vm} id={vm.selected.id} />
+                    </section> : !vm.selected && <p>Select a screen for its routes, navigation conditions, and code references. Arrows show navigation found in code.</p>}
                 </aside>
             </div>}
         </section>

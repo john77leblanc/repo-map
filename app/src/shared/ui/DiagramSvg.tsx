@@ -10,6 +10,10 @@ interface DiagramViewModel {
     fit(width: number, height: number, zoom?: number): void;
     zoom(factor: number): void;
     select(id: string | null): void;
+    /** Node click handler; defaults to toggling `select`. */
+    pick?(id: string): void;
+    /** Nodes and layout edge indices to emphasize while the rest dims. */
+    highlight?: { nodes: string[]; edges: number[] } | null;
 }
 
 /** React owns the host; only this adapter mutates its generated SVG descendants. */
@@ -57,6 +61,18 @@ const DiagramSvg = observer(function DiagramSvg({
             path.setAttribute('marker-end', `url(#${on ? 'fc-arrow-on' : 'fc-arrow'})`);
         });
     }, [svg, layout, vm, vm.scale, vm.selectedId]);
+    const highlight = vm.highlight;
+    useLayoutEffect(() => {
+        const element = host.current?.querySelector('svg');
+        if (!element) return;
+        const nodes = new Set(highlight?.nodes || []);
+        const edges = new Set((highlight?.edges || []).map(String));
+        element.classList.toggle('hovering', !!highlight && (nodes.size > 0 || edges.size > 0));
+        element.querySelectorAll<SVGElement>('.fn').forEach((node) => node.classList.toggle('hl', nodes.has(node.dataset.id || '')));
+        element.querySelectorAll<SVGElement>('.fe, .fl').forEach((item) => item.classList.toggle('hl', edges.has(item.dataset.i || '')));
+        element.querySelectorAll<SVGElement>('.fe').forEach((path) => path.setAttribute('marker-end',
+            `url(#${path.classList.contains('hl') || path.classList.contains('on') ? 'fc-arrow-on' : 'fc-arrow'})`));
+    }, [svg, highlight, vm.selectedId]);
     useLayoutEffect(() => {
         const element = canvas.current;
         if (!element) return;
@@ -97,6 +113,7 @@ const DiagramSvg = observer(function DiagramSvg({
                 ref={host}
                 onClick={(event) => {
                     const node = (event.target as Element).closest<SVGElement>('.fn');
+                    if (node?.dataset.id && vm.pick) return vm.pick(node.dataset.id);
                     vm.select(
                         node?.dataset.id && node.dataset.id !== vm.selectedId
                             ? node.dataset.id

@@ -27,6 +27,11 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
 .fc .fe.on{stroke:var(--http);stroke-width:2.2}
 .fc.picking .fe:not(.on){opacity:.35}
+.fc.hovering .fn:not(.hl),.fc.hovering .fe:not(.hl),.fc.hovering .fl:not(.hl){opacity:.2}
+.fc .fn.hl,.fc .fe.hl,.fc .fl.hl{opacity:1!important}
+.fc .fn.hl .fs{stroke:var(--http);stroke-width:2.6}
+.fc .fe.hl{stroke:var(--http);stroke-width:2.6}
+.fc .fl.hl text{fill:var(--ink)}
 .flegend .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}
 .flegend .lg.act{stroke:var(--sync)} .flegend .lg.dec{stroke:var(--event)} .flegend .lg.err{stroke:var(--err)} .flegend .lg.inf{stroke-dasharray:3 2}
 `;

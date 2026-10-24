@@ -1,6 +1,6 @@
 import { makeAutoObservable, observableRef, runInAction } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { Sitemap, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
+import type { Sitemap, SitemapNavigation, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
 import { plain } from '../../models/trace';
 import { normalizeSitemapTrace, composeSitemapTrace } from '../../../../lib/sitemap-trace.mjs';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
@@ -11,10 +11,42 @@ import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { SITEMAP_CSS } from './styles';
 
+type SitemapScope = 'trace' | 'nearby' | 'app';
+type ConnectionTab = 'from' | 'to';
+type NavEdge = SitemapNavigation & { status?: ChangeStatus; rationale?: string; index?: number };
+/** One navigation link seen from a screen: `other` is the screen at the far end. */
+interface Connection { edge: NavEdge; nav: number; other: string; journey: boolean; original: SitemapNavigation | null }
+
+type Caption = { status?: string; label?: string; labelAt?: [number, number, string] };
+
+/**
+ * Keep caption boxes inside the canvas and off each other. Boxes use the same
+ * width estimate as renderFlowSvg; a later box would otherwise paint over the
+ * start of an earlier caption on the same row. Widens the layout when needed.
+ */
+function separateCaptions(layout: { width: number; edges: Caption[] }) {
+    const PAD = 4;
+    const boxes = layout.edges.flatMap((edge) => {
+        const caption = [CHANGE_LABELS[edge.status as ChangeStatus], edge.label].filter(Boolean).join(': ');
+        if (!caption || !edge.labelAt) return [];
+        const w = caption.length * 6.1 + 10;
+        const [lx, y, anchor] = edge.labelAt;
+        const x = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
+        return [{ edge, w, y, x: Math.max(PAD, Math.min(layout.width - w - PAD, x)) }];
+    }).sort((a, b) => a.x - b.x);
+    boxes.forEach((box, i) => {
+        for (const before of boxes.slice(0, i))
+            if (Math.abs(before.y - box.y) < 19 && box.x < before.x + before.w + PAD) box.x = before.x + before.w + PAD;
+        layout.width = Math.max(layout.width, Math.ceil(box.x + box.w + PAD));
+        const anchor = box.edge.labelAt![2];
+        box.edge.labelAt![0] = anchor === 'start' ? box.x : anchor === 'end' ? box.x + box.w : box.x + box.w / 2;
+    });
+}
+
 class SitemapViewModel {
     sitemap: Sitemap | null = null;
     trace: Trace | null = null;
-    wholeApplication = false;
+    scope: SitemapScope = 'nearby';
     infoOpen = false;
     detailsOpen = true;
     actionsOpen = false;
@@ -24,6 +56,8 @@ class SitemapViewModel {
     freshness: SitemapResult['status'] = { state: 'missing' };
     appId = '';
     selectedId: string | null = null;
+    connectionTab: ConnectionTab = 'to';
+    highlightIds: { nodes: string[]; navs: number[] } | null = null;
     scale = 1;
     loading = false;
     busy = false;
@@ -36,7 +70,7 @@ class SitemapViewModel {
 
     constructor(readonly deps: { repo: RepositoryModel; services: Services; getPick?: () => AgentPick; saveTrace?: (trace: Trace) => Promise<void> }) {
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision' | 'copyTimer'>(this, {
-            deps: false, sitemap: observableRef, trace: observableRef, controller: false, disposed: false,
+            deps: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
             copyRevision: false, copyTimer: false,
         }, { autoBind: true });
     }
@@ -45,8 +79,11 @@ class SitemapViewModel {
     get displayed(): Sitemap | null { return this.output ? composeSitemapTrace(this.output) as Sitemap : this.trace ? null : this.sitemap; }
     get applications() { return this.displayed?.applications || []; }
     get selected() { return this.displayed?.screens.find((screen) => screen.id === this.selectedId) || null; }
-    get selectedChange() { return this.output?.changes.screens.find((screen) => screen.id === this.selectedId); }
-    get original() { return this.output?.base.screens.find((screen) => screen.id === this.selectedId); }
+    screen(id: string) { return this.displayed?.screens.find((screen) => screen.id === id) || null; }
+    changeFor(id: string) { return this.output?.changes.screens.find((screen) => screen.id === id); }
+    originalFor(id: string) { return this.output?.base.screens.find((screen) => screen.id === id); }
+    get selectedChange() { return this.selectedId ? this.changeFor(this.selectedId) : undefined; }
+    get original() { return this.selectedId ? this.originalFor(this.selectedId) : undefined; }
     get selectedStep() { return this.stepIndex === null ? null : this.output?.steps[this.stepIndex]; }
     get involved() {
         const result = new Set(this.output?.steps.map((s) => s.screen) || []);
@@ -66,12 +103,26 @@ class SitemapViewModel {
         this.message = '';
         this.error = false;
         this.trace = trace;
-        this.wholeApplication = false;
+        this.scope = 'nearby';
         this.selectedId = null;
         this.stepIndex = null;
+        this.highlightIds = null;
         this.appId = this.displayed?.screens.find((s) => this.involved.has(s.id))?.app || this.applications[0]?.id || '';
     }
-    toggleContext() { this.resetCopy(); this.wholeApplication = !this.wholeApplication; }
+    get wholeApplication() { return this.scope === 'app'; }
+    setScope(scope: SitemapScope) { this.resetCopy(); this.scope = scope; this.highlightIds = null; }
+    setConnectionTab(tab: ConnectionTab) { this.connectionTab = tab; }
+    hoverConnection(connection: Connection | null) {
+        this.highlightIds = connection ? { nodes: [connection.edge.from, connection.edge.to], navs: [connection.nav] } : null;
+    }
+    hoverScreen(id: string | null) { this.highlightIds = id ? { nodes: [id], navs: [] } : null; }
+    /** Layout indices for DiagramSvg; hidden screens and links are skipped. */
+    get highlight() {
+        if (!this.highlightIds || !this.layout) return null;
+        const navs = new Set(this.highlightIds.navs);
+        const edges = this.layout.edges.flatMap((edge: { nav?: number }, i: number) => navs.has(edge.nav ?? -1) ? [i] : []);
+        return { nodes: this.highlightIds.nodes, edges };
+    }
     toggleInfo() { this.infoOpen = !this.infoOpen; }
     toggleDetails() { this.detailsOpen = !this.detailsOpen; }
     setActionsOpen(open: boolean) { this.actionsOpen = open; }
@@ -79,16 +130,55 @@ class SitemapViewModel {
     selectStep(index: number) {
         const step = this.output?.steps[index];
         if (!step) return;
-        const screen = this.displayed?.screens.find((s) => s.id === step.screen);
+        // Accordion: selecting the open step collapses it and keeps the screen selected.
+        if (this.stepIndex === index) { this.stepIndex = null; return; }
+        this.openStep(index);
+    }
+    private openStep(index: number) {
+        const step = this.output!.steps[index];
+        const screen = this.screen(step.screen);
         if (screen && this.appId !== screen.app) { this.resetCopy(); this.appId = screen.app; }
         this.selectedId = step.screen;
         this.stepIndex = index;
         this.detailsOpen = true;
+        this.connectionTab = this.defaultTab(step.screen, this.output!.steps[index + 1]?.screen);
+        this.ensureVisible(step.screen);
     }
-    get connections() {
-        const visible = new Set(this.graph.nodes.map((node) => node.id));
-        return (this.displayed?.navigation || []).filter((edge) =>
-            (edge.from === this.selectedId || edge.to === this.selectedId) && visible.has(edge.from) && visible.has(edge.to));
+    /** Prefer the tab holding the link to the next journey step, then any non-empty tab. */
+    private defaultTab(id: string, next?: string): ConnectionTab {
+        const { from, to } = this.navFor(id);
+        if (next && to.some((c) => c.other === next)) return 'to';
+        if (next && from.some((c) => c.other === next)) return 'from';
+        return to.length || !from.length ? 'to' : 'from';
+    }
+    /** Widen the Show scope when a selected screen is not on the diagram. */
+    private ensureVisible(id: string) {
+        const shown = () => this.graph.nodes.some((node) => node.id === id);
+        if (!this.output || shown()) return;
+        if (this.scope === 'trace') { this.resetCopy(); this.scope = 'nearby'; }
+        if (shown()) return;
+        this.resetCopy();
+        this.scope = 'app';
+        const screen = this.screen(id);
+        if (screen) this.appId = screen.app;
+    }
+    private isJourneyEdge(edge: SitemapNavigation) {
+        if (!this.output) return true;
+        const same = (e: SitemapNavigation) => e.from === edge.from && e.to === edge.to && e.label === edge.label && e.condition === edge.condition;
+        return this.output.changes.navigation.some(same) || this.output.navigation.some((i) => {
+            const e = this.output!.base.navigation[i];
+            return !!e && same(e);
+        });
+    }
+    /** `from`: links arriving at the screen; `to`: links leaving it. Journey links first. */
+    navFor(id: string) {
+        const all = (this.displayed?.navigation || []) as NavEdge[];
+        const build = (incoming: boolean) => all.flatMap((edge, nav): Connection[] =>
+            (incoming ? edge.to : edge.from) === id ? [{
+                edge, nav, other: incoming ? edge.from : edge.to, journey: this.isJourneyEdge(edge),
+                original: edge.index === undefined ? null : this.output?.base.navigation[edge.index] || null,
+            }] : []).sort((a, b) => Number(b.journey) - Number(a.journey));
+        return { from: build(true), to: build(false) };
     }
     screenLabel(id: string) {
         const screen = this.displayed?.screens.find((item) => item.id === id);
@@ -98,10 +188,13 @@ class SitemapViewModel {
     get graph() {
         const all = this.displayed?.screens || [];
         const own = new Set(all.filter((screen) => screen.app === this.appId).map((screen) => screen.id));
-        const nearby = this.output && !this.wholeApplication;
-        const edges = (this.displayed?.navigation || []).filter((edge) => nearby
-            ? this.involved.has(edge.from) || this.involved.has(edge.to)
-            : own.has(edge.from) || own.has(edge.to));
+        const scope = this.output ? this.scope : 'app';
+        const nearby = scope !== 'app';
+        const edges = (this.displayed?.navigation || []).map((edge, nav) => ({ ...edge, nav })).filter((edge) => scope === 'trace'
+            ? this.involved.has(edge.from) && this.involved.has(edge.to)
+            : scope === 'nearby'
+                ? this.involved.has(edge.from) || this.involved.has(edge.to)
+                : own.has(edge.from) || own.has(edge.to));
         const visible = new Set([...(nearby ? this.involved : own), ...edges.flatMap((edge) => [edge.from, edge.to])]);
         return {
             nodes: all.filter((screen) => visible.has(screen.id)).map((screen) => ({
@@ -112,12 +205,7 @@ class SitemapViewModel {
                 context: !!this.output && !this.involved.has(screen.id),
             })),
             edges: edges.map((edge) => ({ ...edge, label: [edge.label, edge.condition].filter(Boolean).join(' · ').slice(0, 60),
-                context: !!this.output && !this.output.changes.navigation.some((e) =>
-                    e.from === edge.from && e.to === edge.to && e.label === edge.label && e.condition === edge.condition)
-                    && !this.output.navigation.some((i) => {
-                        const e = this.output!.base.navigation[i];
-                        return e.from === edge.from && e.to === edge.to && e.label === edge.label && e.condition === edge.condition;
-                    }),
+                context: !this.isJourneyEdge(edge),
             })),
         };
     }
@@ -126,16 +214,17 @@ class SitemapViewModel {
         const layout = layoutFlow(this.graph, { lanes: false });
         // Branch captions extend away from their shared origin, rather than
         // colliding in the center between two destination screens.
+        const GAP = 4;
         for (const edge of layout.edges) {
             if (edge.back || !edge.labelAt || layout.edges.filter((e) => e.from === edge.from && !e.back).length < 2) continue;
             const from = layout.nodes.find((n: { id: string; x: number; w: number }) => n.id === edge.from);
             const to = layout.nodes.find((n: { id: string; x: number; w: number }) => n.id === edge.to);
             if (from && to && Math.abs(from.x + from.w / 2 - to.x - to.w / 2) > 20)
                 edge.labelAt[2] = to.x + to.w / 2 < from.x + from.w / 2 ? 'end' : 'start';
-            const width = [CHANGE_LABELS[edge.status as ChangeStatus], edge.label].filter(Boolean).join(': ').length * 6.1 + 10;
-            if (edge.labelAt[2] === 'end') edge.labelAt[0] = Math.max(width + 8, Number(edge.labelAt[0]));
-            if (edge.labelAt[2] === 'start') edge.labelAt[0] = Math.max(8, Math.min(layout.width - width - 8, Number(edge.labelAt[0])));
+            if (edge.labelAt[2] === 'end') edge.labelAt[0] = Number(edge.labelAt[0]) - GAP;
+            if (edge.labelAt[2] === 'start') edge.labelAt[0] = Number(edge.labelAt[0]) + GAP;
         }
+        separateCaptions(layout);
         return layout;
     }
     get svg() { return this.layout ? renderFlowSvg(this.layout, { title: 'Screens and navigation' }) : ''; }
@@ -176,16 +265,32 @@ class SitemapViewModel {
         };
         return labels[this.freshness.state] || 'Freshness unknown';
     }
+    /** Diagram node click: steps through repeat visits, then clears the selection. */
+    pick(id: string) {
+        const later = (this.output?.steps || []).some((step, i) => step.screen === id && i > (this.stepIndex ?? -1));
+        this.select(id === this.selectedId && !later ? null : id);
+    }
+    /** Diagram and connection clicks: journey screens open their step (the next visit after the open one). */
     select(id: string | null) {
+        const visits = id ? (this.output?.steps || []).flatMap((step, i) => step.screen === id ? [i] : []) : [];
+        if (visits.length) {
+            const current = this.stepIndex ?? -1;
+            this.openStep(visits.find((i) => i > current) ?? visits[0]);
+            return;
+        }
         this.selectedId = id;
         this.stepIndex = null;
-        if (id) this.detailsOpen = true;
+        if (!id) return;
+        this.detailsOpen = true;
+        this.connectionTab = this.defaultTab(id);
+        this.ensureVisible(id);
     }
     selectApp(id: string) {
         if (!this.applications.some((app) => app.id === id)) return;
         this.resetCopy();
         this.appId = id;
         this.selectedId = null;
+        this.highlightIds = null;
     }
     zoom(factor: number) { this.scale = Math.max(0.15, Math.min(2.5, this.scale * factor)); }
     fit(width: number, height: number, zoom = 1) {
@@ -291,3 +396,4 @@ class SitemapViewModel {
 }
 
 export { SitemapViewModel };
+export type { SitemapScope, ConnectionTab, Connection };
