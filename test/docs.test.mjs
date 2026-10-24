@@ -74,7 +74,7 @@ test('cleanLinks keeps real sections of known cards, guidance first, comments on
     const { dir } = shop();
     const cfg = config();
     const links = await cleanLinks(dir, cfg, MAP, [
-        { node: 'checkout-page', path: 'README.md', start: 1, end: 3, title: 'Readme', why: 'w', kind: 'doc' },
+        { node: 'checkout-page', path: 'README.md', start: 1, end: 3, title: 'Readme', why: 'w', kind: 'doc', kind: 'doc' },
         { node: 'checkout-page', path: 'AGENTS.md', start: 3, end: 9999, title: 'Checkout', why: 'w', kind: 'doc' },
         { node: 'checkout-page', path: 'src/pages/checkout/CheckoutPage.jsx', start: 1, end: 2, title: 'Header', why: 'w', kind: 'comment' },
         { node: 'cart-store', path: 'src/pages/checkout/CheckoutPage.jsx', start: 1, end: 2, title: 'Not its folder', kind: 'comment' },
@@ -127,7 +127,7 @@ async function fakeAi(links, seen = []) {
 test('linkDocs runs the map’s agent and writes docs.json; status and pruning follow the commits', async (t) => {
     const { dir, commit } = shop();
     const seen = [];
-    const ai = await fakeAi([{ node: 'checkout-page', path: 'AGENTS.md', start: 3, end: 6, title: 'Checkout', why: 'How checkout works' }], seen);
+    const ai = await fakeAi([{ node: 'checkout-page', path: 'AGENTS.md', start: 3, end: 6, title: 'Checkout', why: 'How checkout works', kind: 'guide' }], seen);
     t.after(() => ai.server.close());
     const cfg = withDefaults({ codeRoots: ['src/'] }, { localAi: { provider: 'api', api: { baseUrl: ai.url, model: 'fake' } } });
     const map = { ...MAP };
@@ -155,7 +155,7 @@ test('linkDocs runs the map’s agent and writes docs.json; status and pruning f
 
 test('server: doc links in /api/map, saving the map’s agent, and one map job at a time', async (t) => {
     const { dir } = shop();
-    const ai = await fakeAi([{ node: 'checkout-page', path: 'README.md', start: 1, end: 2, title: 'Readme', why: 'w' }]);
+    const ai = await fakeAi([{ node: 'checkout-page', path: 'README.md', start: 1, end: 2, title: 'Readme', why: 'w', kind: 'doc' }]);
     writeFileSync(path.join(dir, '.repo-map', 'local.json'), JSON.stringify({ provider: 'api', api: { baseUrl: ai.url, model: 'fake' } }));
     const { server, port } = await startServer({ root: dir, port: 48000 + Math.floor(Math.random() * 1000), findFreePort: true });
     t.after(() => {

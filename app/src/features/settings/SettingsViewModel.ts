@@ -19,7 +19,7 @@ export interface MapStatus {
     files?: string[];
     commitsSince?: number;
     tooBig?: boolean;
-    job?: JobKind | null;
+    job?: JobKind | 'sitemap' | null;
     updating?: boolean;
     docs?: {
         linked?: boolean;
@@ -108,6 +108,22 @@ export class SettingsViewModel {
     private tick?: ReturnType<typeof setInterval>;
     constructor(readonly deps: SettingsDeps) {
         makeAutoObservable(this, { deps: false }, { autoBind: true });
+    }
+    get repositoryDetails() {
+        const { bootstrap, map } = this.deps.repo;
+        const info = bootstrap?.repo;
+        const label = (count: number, word: string) => count === 1 || /s$/.test(word) ? word
+            : /[^aeiou]y$/.test(word) ? word.slice(0, -1) + 'ies' : word + 's';
+        const services = map.nodes.filter((node) => node.kind === 'service').length;
+        const topics = map.nodes.filter((node) => node.kind === 'topic').length;
+        return {
+            name: info?.github || 'local repo',
+            counts: services + ' ' + label(services, bootstrap?.config.kinds?.service || 'service') + ' \u00b7 ' +
+                topics + ' ' + label(topics, bootstrap?.config.kinds?.topic || 'topic') + ' \u00b7 ' +
+                map.edges.length + ' ' + label(map.edges.length, 'connection'),
+            revision: 'reading ' + (info?.branch || 'detached HEAD') + (info?.sha ? ' @ ' + info.sha.slice(0, 9) : '') +
+                (info?.dirty ? ' (uncommitted changes)' : ''),
+        };
     }
     get available() {
         return !!this.data && !this.data.off && this.data.agents.some((a) => a.available);

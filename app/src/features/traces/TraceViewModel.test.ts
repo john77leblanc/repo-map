@@ -84,6 +84,7 @@ describe('trace normalization and persistence', () => {
                 '/api/trace',
                 { prompt: 'Question', flow: flowchart, agent: 'api' },
                 expect.any(AbortSignal),
+                expect.any(Function),
                 expect.any(Function)
             );
             expect(vm.selected?.outputs).toEqual({ architecture, flowchart });
@@ -546,4 +547,111 @@ it('serializes only portable trace fields and preserves Unicode through a typed 
     expect(serialized).not.toHaveProperty('plan');
     expect(decodeTrace(encodeTrace(trace), repo.map).title).toBe('Checkout → confirmation');
     expect(decodeTrace(encodeTrace(trace), repo.map).pendingFlow).toBe(true);
+});
+
+
+describe('editing saved trace prompts', () => {
+    function editing() {
+        const f = fixture();
+        const vm = new TraceViewModel(f.deps);
+        const original = normalizeTrace({ ...raw, prompt: 'Original question', flow,
+            intent: 'proposal', plan: { tasks: [{ title: 'Old task', detail: 'Old design', files: [] }] } }, f.repo.map);
+        original._doc = 'saved-original';
+        original.createdAt = 123;
+        vm.select(original);
+        vm.editPrompt(vm.selected!);
+        vm.setPrompt('Revised complete question');
+        return { ...f, vm, original };
+    }
+    it('replaces under the same ID, clears plans and leaves output defaults unchanged', async () => {
+        const { vm, services, storage, original } = editing();
+        vm.setOutput('flowchart', false);
+        expect(storage.size).toBe(0);
+        vi.mocked(services.api.stream).mockResolvedValue({ trace: { ...raw, flow } });
+        await vm.runTrace();
+        expect(services.api.stream).toHaveBeenCalledWith('/api/trace', expect.objectContaining({
+            prompt: 'Revised complete question', previousTrace: expect.objectContaining({ prompt: 'Original question' }),
+            architecture: true, flow: false,
+        }), expect.any(AbortSignal), expect.any(Function));
+        const [url, options] = vi.mocked(services.api.request).mock.calls[0];
+        expect(url).toBe('/api/traces/saved-original');
+        expect(options?.method).toBe('PUT');
+        const saved = JSON.parse(String(options?.body));
+        expect(saved.createdAt).toBe(123);
+        expect(saved.prompt).toBe('Revised complete question');
+        expect(saved.plan).toBeUndefined();
+        expect(saved.flow).toBeUndefined();
+        expect(original.plan?.tasks[0].title).toBe('Old task');
+        expect(vm.editing).toBeNull();
+        expect(vm.flowchart).toBe(true);
+        vm.dispose();
+    });
+    it('keeps the original and draft for missing outputs and generation errors', async () => {
+        const { vm, services, original } = editing();
+        vi.mocked(services.api.stream).mockResolvedValue({ trace: raw });
+        await vm.runTrace();
+        expect(services.api.request).not.toHaveBeenCalled();
+        expect(vm.status).toContain('Not all requested outputs');
+        expect(vm.editing?.prompt).toBe('Original question');
+        expect(vm.prompt).toBe('Revised complete question');
+        expect(original.flow).not.toBeNull();
+        vi.mocked(services.api.stream).mockRejectedValue(new Error('Agent failed'));
+        await vm.runTrace();
+        expect(vm.status).toBe('Agent failed');
+        expect(services.api.request).not.toHaveBeenCalled();
+        vm.dispose();
+    });
+    it('cancels without saving late results and restores the draft on reopening', async () => {
+        const { vm, services } = editing();
+        let resolve!: (result: unknown) => void;
+        vi.mocked(services.api.stream).mockImplementation(() => new Promise(r => { resolve = r; }));
+        const run = vm.runTrace();
+        vm.cancelEdit();
+        resolve({ trace: { ...raw, flow } });
+        await run;
+        expect(services.api.request).not.toHaveBeenCalled();
+        expect(vm.selected?.prompt).toBe('Original question');
+        vm.editPrompt(vm.selected!);
+        expect(vm.prompt).toBe('Revised complete question');
+        vm.dispose();
+    });
+    it('retains an unsaved revision for retry while keeping the saved identity', async () => {
+        const { vm, services } = editing();
+        vi.mocked(services.api.stream).mockResolvedValue({ trace: { ...raw, flow } });
+        vi.mocked(services.api.request).mockRejectedValueOnce(new Error('Disk full'));
+        await vm.runTrace();
+        expect(vm.temp?.prompt).toBe('Revised complete question');
+        expect(vm.selected).toBe(vm.temp);
+        expect(vm.temp?._doc).toBe('saved-original');
+        expect(vm.status).toContain('could not be saved');
+        await vm.saveExisting(vm.temp!);
+        expect(vi.mocked(services.api.request).mock.calls[1][0]).toBe('/api/traces/saved-original');
+        expect(vm.temp).toBeNull();
+        vm.dispose();
+    });
+});
+
+
+it('accepts a valid no-relevant-screens result when replacing a Sitemap-only trace', async () => {
+    const { deps, repo, services } = fixture();
+    const base = { version: 1 as const, applicability: 'none' as const, summary: 'No screens',
+        applications: [], screens: [], navigation: [], gaps: [] };
+    const sitemap = { version: 1, base, applicability: 'none', summary: 'This process has no screen journey.',
+        steps: [], navigation: [], changes: { screens: [], navigation: [] }, gaps: [] };
+    const { SitemapViewModel } = await import('../sitemap/SitemapViewModel');
+    deps.sitemap = new SitemapViewModel({ repo, services });
+    deps.sitemap.sitemap = base;
+    const vm = new TraceViewModel(deps);
+    const original = normalizeTrace({ prompt: 'Old question', steps: [], sitemap,
+        outputs: { architecture: false, flowchart: false, sitemap: true } }, repo.map);
+    original._doc = 'screen-only-trace';
+    vm.editPrompt(original);
+    vm.setPrompt('Explain the background process');
+    vi.mocked(services.api.stream).mockResolvedValue({ trace: { steps: [], sitemap } });
+    await vm.runTrace();
+    expect(services.api.request).toHaveBeenCalledWith('/api/traces/screen-only-trace', expect.objectContaining({ method: 'PUT' }));
+    expect(vm.selected?.sitemap?.applicability).toBe('none');
+    expect(vm.editing).toBeNull();
+    vm.dispose();
+    deps.sitemap.dispose();
 });

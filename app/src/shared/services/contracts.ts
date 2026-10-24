@@ -5,7 +5,8 @@ export interface ApiClient {
         url: string,
         body: unknown,
         signal: AbortSignal,
-        onProgress: (text: string) => void
+        onProgress: (text: string) => void,
+        onTitle?: (title: string) => void
     ): Promise<T>;
 }
 export interface StorageService {

@@ -3,9 +3,10 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentPick, Flow, Trace, StreamResult } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import { layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
-import { normalizeFlow, flowToMermaid } from '../../../../lib/flow.mjs';
+import { normalizeFlow, flowToMermaid, flowLanes } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
+import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 
 export interface FlowchartDeps {
     repo: RepositoryModel;
@@ -24,11 +25,13 @@ export class FlowchartViewModel {
     status = '';
     error = false;
     copied = false;
+    compact = false;
     private controller: AbortController | null = null;
     private revision = 0;
     private disposed = false;
     private copyTimer: ReturnType<typeof setTimeout> | null = null;
     constructor(readonly deps: FlowchartDeps) {
+        this.compact = deps.services.storage.get<boolean>(deps.repo.namespace + 'flow-compact', false) === true;
         makeAutoObservable<
             FlowchartViewModel,
             'controller' | 'revision' | 'disposed' | 'copyTimer'
@@ -49,7 +52,18 @@ export class FlowchartViewModel {
         return this.deps.repo;
     }
     get layout() {
-        return this.trace?.flow ? layoutFlow(this.trace.flow) : null;
+        return this.trace?.flow ? layoutFlow(this.trace.flow, { lanes: !this.compact }) : null;
+    }
+    get hasLanes() {
+        return !!this.trace?.flow && flowLanes(this.trace.flow).filter((lane: { id: string }) => lane.id).length >= 2;
+    }
+    get selectedLane() {
+        if (!this.selected || !this.trace?.flow?.lanes?.length) return '';
+        return this.trace.flow.lanes.find((lane) => lane.id === this.selected?.lane)?.label || 'Unassigned';
+    }
+    setCompact(value: boolean) {
+        this.compact = value;
+        this.deps.services.storage.set(this.repo.namespace + 'flow-compact', value);
     }
     get svg() {
         return this.layout ? renderFlowSvg(this.layout, { title: this.trace?.title }) : '';
@@ -208,18 +222,8 @@ export class FlowchartViewModel {
     }
     downloadSvg(resolve: (variable: string) => string) {
         if (!this.layout || !this.trace) return;
-        const css = FC_CSS.replace(/var\((--[\w-]+)\)/g, (_: string, variable: string) =>
-            resolve(variable)
-        );
-        const bg = resolve('--bg').replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
-        const svg = this.svg.replace(
-            /^<svg([^>]*)>/,
-            `<svg$1><style>${css.replace(/</g, '&lt;')}</style><rect width="100%" height="100%" fill="${bg}"/>`
-        );
-        const name = (this.trace.title || 'flowchart')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
+        const svg = standaloneSvg(this.svg, FC_CSS, resolve);
+        const name = diagramFilename(this.trace.title || 'flowchart', 'flowchart');
         this.deps.services.browser.download(name + '.svg', svg, 'image/svg+xml');
     }
     dispose() {

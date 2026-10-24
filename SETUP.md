@@ -230,6 +230,10 @@ The quickest way to save a choice is `repo-map ai <tool>`, shown under each tool
 
 ### Claude Code
 
+repo-map passes a simplified response schema using Claude Code's [`--json-schema` structured output option](https://code.claude.com/docs/en/headless#get-structured-output). Conditional requirements stay in the full prompt contract and local validation. If Claude rejects the schema or does not recognize that flag, repo-map retries once without native structured output, requesting JSON through the prompt with the same model and effort. Both attempts share the original timeout and remain cancellable. Authentication, rate limits and unrelated errors do not trigger this fallback. Other providers receive the schema in the prompt and undergo the same local validation.
+
+Claude's built-in tool set is explicitly restricted to `Read,Grep,Glob`; inherited MCP servers are disabled for these runs. Models accessed through the API provider still need tool-calling support for repository exploration.
+
 1. Install the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
 2. Run `claude` once in a terminal and sign in.
 3. That's it: `auto` picks it up. To use it explicitly: `repo-map ai claude [--model <id>] [--effort <level>]`.
@@ -354,7 +358,7 @@ The sidebar's **Settings** button opens a dedicated panel for map maintenance an
 
 ### Creating and exploring traces
 
-Choose **New trace**, describe a process, and select **Code architecture**, **Flowchart**, or both. At least one output is required. Both are selected initially; later choices are remembered in this browser. Architecture shows the process path on the repository map. Select a saved trace, then use its **Architecture** and **Flowchart** tabs to open outputs on the main canvas.
+Choose **New trace** to open the trace modal, describe a process, and select **Code architecture**, **Flowchart**, or both. Expand **Import a trace code** inside the modal to paste a shared code instead of running an agent. Output choices are stacked vertically; hover or focus their help icons for descriptions. Close or Escape keeps an unsubmitted question and lets a submitted trace keep running. Each running trace has its own sidebar entry, spinner, and early title. Click it to reopen its prompt and progress; use **Stop** there to cancel only that run. Choose **New trace** to run additional traces concurrently. Completed traces save independently without interrupting another draft. Running jobs belong to the current browser tab; keep it open until they finish. At least one output is required. Both are selected initially; later choices are remembered in this browser. Architecture shows the process path on the repository map. Select a saved trace, then use its **Architecture** and **Flowchart** tabs to open outputs on the main canvas.
 
 You can also ask where a hypothetical feature would fit, or how you would change existing behavior. A hidden classification request chooses description or proposal automatically; mixed questions include relevant existing behavior in a proposal. Proposed items are labeled **New**, **Modified**, or **Removed**, with distinct borders and connection styles. They belong only to that trace. Suggested file paths describe future implementation locations; code references still point to verified existing files.
 
@@ -362,11 +366,23 @@ After reviewing placement and rationale, select **Implementation plan**. The mod
 
 Classification uses the selected provider and a designated small model when it appears in that provider's model list (Claude `haiku`, Gemini Flash variants, designated Codex small models, or supported API nano/mini models). Otherwise it uses the selected trace model. It never switches providers. To choose another classification model, add `"ai": { "classify": { "model": "your-small-model", "effort": "low" } }` to `.repo-map/config.json`, or put `"classify": { "model": "your-small-model" }` beside the other AI settings in `.repo-map/local.json`. Use an effort supported by that model, or omit it. No classifier setting is required. Classification is limited to one turn and at most 30 seconds; on failure or invalid output, the main agent classifies and answers in one request. Available usage totals include both requests.
 
-Each saved trace is one question with linked outputs. The sidebar home shows the repository title and details above New trace and the saved trace list. Selecting one replaces the library with its title, prompt, output tabs, and expanded walkthrough and actions. **Back to all traces** returns to the library and whole map. You can add a missing output later without creating a second trace. Deleting a trace removes both outputs. Old traces and import codes keep working. If a flowchart is missing from an otherwise usable answer, its library entry offers a retry; failed saves remain visible with **Retry saving** until you reload.
+Each saved trace is one question with linked outputs. The sidebar home shows the map title above New trace and the saved trace list. Repository identity, component counts, and Git revision are shown under Settings / Repository. Selecting one replaces the library with its title, prompt, output tabs, and expanded walkthrough and actions. **Back to all traces** returns to the library and whole map. Tabs appear only for available outputs. Use **Edit** to select missing outputs and regenerate the same trace. Deleting a trace removes both outputs. Old traces and import codes keep working. Failed saves remain visible with **Retry saving** until you reload.
 
 Click an architecture card or flowchart box for explanations, code references and linked documentation. Flowchart details appear in the selected trace sidebar, without architecture step numbers, step labels or the architecture walkthrough. Relevant code and documentation remain accessible. Switch outputs using its **Architecture** and **Flowchart** tabs. **Back to all traces** returns to the library and whole map without deleting saved data. Trace information stays beside the diagram so it does not shift vertically. Flowchart zoom, Fit, Mermaid and SVG export, redraw, progress and Stop controls sit above the diagram key. Its canvas fills the available height; process details remain in the sidebar. Settings and Back to all traces share the top sidebar control slot.
 
 Each diagram's **Diagram key** button is an accordion beside its controls, collapsed by default. Expanding it reveals the complete key below the controls. Architecture card details open in an overlay centered within the diagram, with explanations, code references, documentation and connection navigation. Its backdrop covers only the diagram, so the sidebar remains interactive by mouse and keyboard. Use **Close details**, Escape, or click its backdrop to dismiss it. Flowchart details remain in the trace sidebar. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
+
+### Sitemap and execution lanes
+
+At repository home, open **Sitemap**, then **Generate sitemap**. Configure the tool, model, and effort under **Settings → Map agent**; sitemap generation uses the same settings as architecture generation. There is no extra dependency or automatic AI run when switching views. Saved results live in `.repo-map/sitemap.json` and can be committed for teammates.
+
+Use the application selector for repositories with multiple applications. Select a screen for route patterns, navigation conditions, and code references. **No user-facing screens found** is a valid backend-only result; **Analysis incomplete** lists gaps. If expected screens are absent, check that their code is included in `codeRoots` and accessible to the configured AI tool, then regenerate. Invalid or inaccessible evidence is omitted and disclosed. A failed run preserves the previous sitemap. **Stop** cancels generation; map updates, redraws, docs linking, and sitemap generation run one at a time.
+
+Open **More > Show info** for commit freshness, uncommitted changes, snapshot details, and analysis notes. Empty results show their explanation automatically. **More > Show/Hide details** toggles the screen inspector; selecting a screen reopens it. Journey notes expand for the selected step. **More > Refresh status** reloads the saved artifact; **Regenerate** performs another AI analysis. Escape or an outside click closes More.
+
+Sitemaps use the flowchart toolbar layout, with **Diagram key**, **Copy Mermaid**, and **Download SVG**. Exports follow the application selection and **Whole application** toggle, including journey numbers and proposed changes. SVG downloads include their own styling, theme colors, and dimmed context. Filenames use the trace or repository name followed by `-sitemap.svg`, falling back to `sitemap.svg`. Export controls are disabled when no diagram exists and work without an AI connection.
+
+New flowcharts use **Execution lanes** when multiple execution participants are known. Same-lane retries stay inside their lane; cross-lane returns route outside the columns. Existing lane-enabled charts use this layout automatically. Lane headings stay visible on an opaque band as you scroll down the chart, so lane borders and arrows cannot show through the header. Switch to **Compact** if the diagram is too wide; the preference is browser-local per repository. Unknown ownership is shown as **Unassigned**, and does not mean the behavior itself was inferred. Older saved traces remain compact until explicitly redrawn. SVG export reflects the chosen layout; Mermaid uses participant subgraphs.
 
 ### Documentation on the cards
 
@@ -411,9 +427,19 @@ To share a trace, anyone who has an AI tool can run it, press **Copy trace code*
 | "doesn't have access to it" | The account is signed in but not entitled to the tool or model. Check your plan, or pick another model or provider. |
 | "hit a usage or rate limit" | Wait and try again, or switch to another model or provider. |
 | "doesn't recognise the configured model" | Fix `model`. For the API provider, `repo-map doctor` lists whether the server knows it. |
-| "answered, but not in the expected JSON shape" | Try again. If it keeps happening, use a stronger model. |
+| "returned an invalid JSON response" | The response violated its JSON Schema contract. The error names the field and expected type or missing value. Traces make one automatic repair request with those errors before failing; this may add time and cost. Retry or choose another model if repair fails. |
 | "ran out of turns" | Ask a narrower question, or raise `maxTurns`. |
 | "Couldn't reach …" | The API server isn't running or the base URL is wrong. For Ollama, run `ollama serve`. |
 | Missing frontend assets | Use Node >=22.12, enable lifecycle scripts, then run `npm ci` and `npm run build` in the checkout. Registry packages include prebuilt assets. |
 | Playwright cannot find Chromium | Run `npx playwright install chromium` once, then retry `npm run test:e2e`. |
 | Port 4477 in use | `repo-map serve --port 4478`, or set `REPO_MAP_PORT`. |
+
+### Sitemap trace outputs
+
+Choose Sitemap when creating a trace, alone or alongside Architecture and Flowchart. It is off by default and the browser remembers your choice. If no repository sitemap exists, use Generate sitemap first; the entered question is preserved. Repository sitemap generation uses map-generation settings; journey and proposal tracing uses the selected trace agent. Stale or incomplete sitemaps retain their warnings and can still be used.
+
+Saved/shared Sitemap outputs contain their own snapshot and can be viewed without AI, even after the repository sitemap changes. Use **Add output**, **Retry**, or **Redraw** on a selected trace to analyze it against the currently saved repository sitemap. Failed or cancelled redraws keep the previous result. Implementation plans include proposed screen and navigation changes.
+
+### Revising trace prompts
+
+Choose **Edit** beneath a saved trace prompt, then **Regenerate**. The current agent selection applies, including when switching providers. Every requested output must succeed before replacement; if one is missing, retry or deselect it. The old implementation plan is cleared on successful regeneration. If saving fails, keep the page open and use **Retry saving** on the revised result. **Stop** leaves the editor open; **Cancel** returns to the original and retains the draft in memory until reload. Prior findings help target code reads but are not a persistent agent session or a token-savings guarantee.

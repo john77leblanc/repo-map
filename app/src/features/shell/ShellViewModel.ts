@@ -5,7 +5,7 @@ import type { Services } from '../../shared/services/contracts';
 export interface ShellDeps {
     repo: RepositoryModel;
     services: Services;
-    onWorkspaceChange?: (workspace: Workspace) => void;
+    onWorkspaceChange?: (workspace: Workspace | 'sitemap') => void;
     onLayoutChange?: () => void;
 }
 export class ShellViewModel {
@@ -13,7 +13,8 @@ export class ShellViewModel {
     collapsed = false;
     dragging = false;
     settingsOpen = false;
-    workspace: Workspace = 'architecture';
+    workspace: Workspace | 'sitemap' = 'architecture';
+    repositoryWorkspace: 'architecture' | 'sitemap' = 'architecture';
     private initialized = false;
     constructor(readonly deps: ShellDeps) {
         makeAutoObservable(this, { deps: false }, { autoBind: true });
@@ -72,7 +73,11 @@ export class ShellViewModel {
         else return false;
         return true;
     }
-    showWorkspace(workspace: Workspace) {
+    showRepository(workspace: 'architecture' | 'sitemap' = this.repositoryWorkspace) {
+        this.repositoryWorkspace = workspace;
+        this.showWorkspace(workspace);
+    }
+    showWorkspace(workspace: Workspace | 'sitemap') {
         this.workspace = workspace;
         this.deps.onWorkspaceChange?.(workspace);
         this.deps.onLayoutChange?.();

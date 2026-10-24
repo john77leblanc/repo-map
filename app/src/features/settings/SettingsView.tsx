@@ -97,6 +97,14 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
     };
     return (
         <div className="pane" id="pane-map">
+            <section aria-labelledby="repository-details-title">
+                <h2 id="repository-details-title">Repository</h2>
+                <p className="repository-details">
+                    <code id="repo-name">{vm.repositoryDetails.name}</code>
+                    <span id="stat">{vm.repositoryDetails.counts}</span>
+                    <span id="repoinfo">{vm.repositoryDetails.revision}</span>
+                </p>
+            </section>
             <section>
                 <div className="settings-map-heading">
                     <h2>This map</h2>
@@ -204,8 +212,8 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
             <section>
                 <h2>Map agent</h2>
                 <p className="hint">
-                    The AI tool, model and effort that draw and update the map and link its
-                    documentation. Saved for you in this repo (<code>.repo-map/local.json</code>).
+                    The AI tool, model and effort that draw and update the map, link its
+                    documentation, and generate the sitemap. Saved for you in this repo (<code>.repo-map/local.json</code>).
                 </p>
                 <AgentPicker
                     {...common}

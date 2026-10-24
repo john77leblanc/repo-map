@@ -8,6 +8,7 @@ import { FlowchartWorkspace, FlowchartDetails } from '../features/flowchart/Flow
 import { TraceHome, SelectedTraceSidebar } from '../features/traces/TraceViews';
 import { PlanModal } from '../features/plans/PlanModal';
 import { CodeReference } from '../shared/ui/CodeReference';
+import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
 
 export const ApplicationContext = createContext<Application | null>(null);
 export function useApplication() {
@@ -15,35 +16,6 @@ export function useApplication() {
     if (!app) throw new Error('Application context is missing.');
     return app;
 }
-const RepositorySummary = observer(function RepositorySummary() {
-    const { repo } = useApplication();
-    const { config, repo: info } = repo.bootstrap!;
-    const plural = (count: number, word: string) =>
-        count === 1 || /s$/.test(word)
-            ? word
-            : /[^aeiou]y$/.test(word)
-              ? word.slice(0, -1) + 'ies'
-              : word + 's';
-    const services = repo.map.nodes.filter((n) => n.kind === 'service').length;
-    const topics = repo.map.nodes.filter((n) => n.kind === 'topic').length;
-    return (
-        <section className="repo-summary" aria-label="Repository">
-            <h1 id="map-name">{config.name}</h1>
-            <p className="sub">
-                <code id="repo-name">{info.github || 'local repo'}</code>
-                <span id="stat">
-                    {services} {plural(services, config.kinds?.service || 'service')} · {topics}{' '}
-                    {plural(topics, config.kinds?.topic || 'topic')} · {repo.map.edges.length}{' '}
-                    {plural(repo.map.edges.length, 'connection')}
-                </span>
-                <span id="repoinfo">
-                    reading {info.branch || 'detached HEAD'} @ {info.sha?.slice(0, 9)}
-                    {info.dirty ? ' (uncommitted changes)' : ''}
-                </span>
-            </p>
-        </section>
-    );
-});
 export const App = observer(function App() {
     const app = useApplication();
     return (
@@ -67,7 +39,6 @@ export const App = observer(function App() {
                     <>
                         <TraceHome
                             vm={app.traces}
-                            repositorySummary={<RepositorySummary />}
                             onRefreshAgents={() => {
                                 void app.settings.loadCatalog(true);
                             }}
@@ -84,16 +55,47 @@ export const App = observer(function App() {
                     </>
                 }
                 main={
-                    app.shell.workspace === 'architecture' ? (
-                        <ArchitectureWorkspace vm={app.architecture} />
-                    ) : (
-                        <FlowchartWorkspace
-                            vm={app.flowchart}
-                            CodeReference={CodeReference}
-                            details={null}
-                            onNewTrace={app.traces.toggleComposer}
-                        />
-                    )
+                    <>
+                        {!app.traces.selected && (
+                            <div className="repository-tabs" role="tablist" aria-label="Repository views">
+                                {(['architecture', 'sitemap'] as const).map((workspace) => (
+                                    <button
+                                        key={workspace}
+                                        className="btn"
+                                        role="tab"
+                                        id={'repository-tab-' + workspace}
+                                        aria-controls={workspace + '-workspace'}
+                                        aria-selected={app.shell.workspace === workspace}
+                                        tabIndex={app.shell.workspace === workspace ? 0 : -1}
+                                        onClick={() => app.shell.showRepository(workspace)}
+                                        onKeyDown={(event) => {
+                                            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                                            event.preventDefault();
+                                            const next = event.key === 'Home' ? 'architecture'
+                                                : event.key === 'End' ? 'sitemap'
+                                                : workspace === 'architecture' ? 'sitemap' : 'architecture';
+                                            app.shell.showRepository(next);
+                                            document.getElementById('repository-tab-' + next)?.focus();
+                                        }}
+                                    >
+                                        {workspace === 'architecture' ? 'Architecture' : 'Sitemap'}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {app.shell.workspace === 'sitemap' ? (
+                            <SitemapWorkspace vm={app.sitemap} />
+                        ) : app.shell.workspace === 'architecture' ? (
+                            <ArchitectureWorkspace vm={app.architecture} />
+                        ) : (
+                            <FlowchartWorkspace
+                                vm={app.flowchart}
+                                CodeReference={CodeReference}
+                                details={null}
+                                onNewTrace={app.traces.toggleComposer}
+                            />
+                        )}
+                    </>
                 }
             />
             <PlanModal vm={app.plans} />

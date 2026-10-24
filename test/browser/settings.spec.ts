@@ -50,6 +50,15 @@ async function openSettings(page: Page) {
 
 test('custom trace model and effort persist, and map settings use the generate API', async ({ page }) => {
     const state = await mockSettings(page); await openSettings(page);
+    await expect(page.locator('#sidebar-home #repo-name, #sidebar-home #stat, #sidebar-home #repoinfo')).toHaveCount(0);
+    await expect(page.locator('#settings-dialog #repo-name')).toHaveText('local repo');
+    await expect(page.locator('#settings-dialog #stat')).toContainText('1 service');
+    await expect(page.locator('#settings-dialog #repoinfo')).toHaveText('reading main @ bbbbbbbbb');
+    const button = await page.locator('#new-trace').boundingBox();
+    const divider = await page.locator('.trace-library-divider').boundingBox();
+    const library = await page.locator('#pane-traces').boundingBox();
+    expect(divider!.y - button!.y - button!.height).toBeLessThanOrEqual(12);
+    expect(library!.y - divider!.y - divider!.height).toBeLessThanOrEqual(12);
     await page.locator('#tpick-agent').selectOption(JSON.stringify(['codex', '*']));
     await page.locator('#tpick-custom').fill('gpt-custom');
     await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null')?.model, namespace + 'pick')).toBe('gpt-custom');
@@ -132,10 +141,12 @@ test('catalog off disables tracing even after a tool was available', async ({ pa
     const state = await mockSettings(page); await openSettings(page);
     await page.locator('#settings-close').click(); await page.locator('#new-trace').click();
     await expect(page.locator('#prompt')).toBeEnabled();
+    await page.locator('#trace-dialog').getByRole('button', { name: 'Close', exact: true }).click();
     await page.locator('#tab-map').click(); state.off = true;
     await page.locator('#tpick-refresh').click();
     await expect(page.locator('#tpick')).toBeHidden();
     await page.locator('#settings-close').click();
+    await page.locator('#new-trace').click();
     await expect(page.locator('#prompt')).toBeDisabled();
     await expect(page.locator('#run')).toBeDisabled();
     expect(state.jobs).toEqual([]); expect(state.unexpected).toEqual([]);
@@ -143,7 +154,7 @@ test('catalog off disables tracing even after a tool was available', async ({ pa
 
 test('server jobs block map actions for every active job kind', async ({ page }) => {
     const state = await mockSettings(page);
-    for (const job of ['update', 'generate', 'docs']) {
+    for (const job of ['update', 'generate', 'docs', 'sitemap']) {
         state.status.job = job; state.status.updating = job === 'update';
         await openSettings(page);
         await expect(page.locator('#ms-update')).toBeDisabled();

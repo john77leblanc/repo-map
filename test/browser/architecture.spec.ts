@@ -3,6 +3,8 @@ import { test as base, expect, type Page } from '@playwright/test';
 // Every scenario reports browser failures, including errors during initial bootstrap.
 const test = base.extend<{ browserErrors: void }>({
     browserErrors: [async ({ page }, use) => {
+        // Layout tests must also run without access to the optional web fonts.
+        await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
         const errors: string[] = [];
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -20,14 +22,16 @@ async function openMap(page: Page) {
     await expect.poll(() => page.locator('.wires path.w').count()).toBeGreaterThan(0);
 }
 
-test('desktop architecture keeps the legacy header inset', async ({ page }) => {
+test('desktop architecture keeps its header inset beneath the repository tabs', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openMap(page);
     const header = page.locator('#architecture-workspace > header.top');
     await expect(header.locator('.canvas-controls > .controls')).toBeVisible();
-    const main = await page.locator('.main').boundingBox();
+    const main = await page.locator('#architecture-workspace').boundingBox();
+    const tabs = await page.getByRole('tablist', { name: 'Repository views' }).boundingBox();
     const search = await page.getByRole('searchbox', { name: 'Find a node' }).boundingBox();
     expect(main).not.toBeNull(); expect(search).not.toBeNull();
+    expect(main!.y).toBeCloseTo(tabs!.y + tabs!.height, 0);
     expect(search!.x - main!.x).toBeCloseTo(28, 0);
     expect(search!.y - main!.y).toBeCloseTo(24, 0);
 });

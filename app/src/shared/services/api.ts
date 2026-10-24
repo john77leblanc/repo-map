@@ -17,13 +17,16 @@ export function createApiClient(fetcher: typeof fetch = fetch): ApiClient {
             return (await response(url, { signal })).json() as Promise<T>;
         },
         async request<T>(url: string, options?: RequestInit) {
-            return (await response(url, options)).json() as Promise<T>;
+            const res = await response(url, options);
+            if (res.status === 204) return undefined as T;
+            return res.json() as Promise<T>;
         },
         async stream<T>(
             url: string,
             body: unknown,
             signal: AbortSignal,
-            onProgress: (text: string) => void
+            onProgress: (text: string) => void,
+            onTitle?: (title: string) => void
         ) {
             const res = await response(url, { method: 'POST', body: JSON.stringify(body), signal });
             if (!res.body) throw new Error('The server returned an empty response.');
@@ -36,6 +39,7 @@ export function createApiClient(fetcher: typeof fetch = fetch): ApiClient {
                 if (!line.trim()) return;
                 const event = JSON.parse(line);
                 if (event.type === 'progress') onProgress(String(event.text || ''));
+                else if (event.type === 'title' && typeof event.title === 'string') onTitle?.(event.title.slice(0, 80));
                 else if (event.type === 'result') result = event as T;
                 else if (event.type === 'error')
                     failure = String(event.message || 'Request failed.');

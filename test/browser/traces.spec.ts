@@ -7,6 +7,25 @@ test.beforeEach(async ({ page }) => {
     await page.route('**/api/traces', route => route.fulfill({ json: { traces: [trace] } }));
     await page.route('**/api/map/status', route => route.fulfill({ json: { state: 'current', docs: { linked: true } } }));
 });
+
+test('deleting a saved trace accepts an empty 204 response and removes its sidebar entry', async ({ page }) => {
+    let deleted = false;
+    await page.route('**/api/traces', route => route.fulfill({ json: { traces: deleted ? [] : [trace] } }));
+    await page.route('**/api/traces/trace-12345678', route => {
+        expect(route.request().method()).toBe('DELETE');
+        deleted = true;
+        return route.fulfill({ status: 204 });
+    });
+    await page.goto('/');
+    await page.locator('.trace-open').click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete trace and all outputs?', exact: true }).click();
+    await expect(page.locator('#sidebar-home')).toBeVisible();
+    await expect(page.locator('#trace-list li')).toHaveCount(0);
+    await expect(page.locator('#saved-empty')).toBeVisible();
+    await expect(page.getByText("Couldn't delete that trace.")).toHaveCount(0);
+    expect(deleted).toBe(true);
+});
 test('saved trace switches outputs, selects flow details, exports and restores the map', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -34,7 +53,8 @@ test('saved trace switches outputs, selects flow details, exports and restores t
 test('legacy trace codes import, survive failed persistence, and remain retryable', async ({ page }) => {
     await page.route('**/api/traces', route => route.request().method() === 'POST' ? route.fulfill({ status: 500, json: { error: 'disk full' } }) : route.fulfill({ json: { traces: [] } }));
     await page.goto('/');
-    await page.locator('details.imp summary').click();
+    await page.getByRole('button', { name: 'New trace', exact: true }).click();
+    await page.locator('#trace-dialog details.imp summary').click();
     const { outputs, key, ...legacy } = trace;
     await page.locator('#importbox').fill('rmap1:' + Buffer.from(JSON.stringify(legacy)).toString('base64'));
     await page.getByRole('button', { name: 'Add trace' }).click();

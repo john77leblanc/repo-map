@@ -1,5 +1,7 @@
 ﻿export const FC_CSS = `.fc{font-family:var(--f-ui);font-size:12.5px}
 .fc .fs{fill:var(--panel);stroke:var(--muted);stroke-width:1.3}
+.fc .execution-lane rect{fill:var(--soft);fill-opacity:.35;stroke:var(--line);stroke-width:1}
+.fc .execution-lane text{fill:var(--ink);font-size:14px;font-weight:600}
 .fc .t-start .fs,.fc .t-end .fs{fill:var(--soft);stroke:var(--ink)}
 .fc .t-action .fs{stroke:var(--sync)}
 .fc .t-decision .fs{stroke:var(--event)}
@@ -18,6 +20,10 @@
 .fc .change-removed>text{text-decoration:line-through;fill:var(--muted)}`;
 export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fn:hover .fs{stroke-width:2.2}
+.diagram-with-lanes .execution-lane text{visibility:hidden}
+.diagram-lane-headings{position:sticky;top:0;z-index:2;min-width:100%;box-sizing:border-box;padding-inline:12px;background:var(--bg);border-bottom:1px solid var(--line)}
+.diagram-lane-heading-row{position:relative;margin:0 auto}
+.diagram-lane-title{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px 6px 0 0;font-weight:600;white-space:nowrap}
 .fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
 .fc .fe.on{stroke:var(--http);stroke-width:2.2}
 .fc.picking .fe:not(.on){opacity:.35}

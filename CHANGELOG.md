@@ -1,7 +1,39 @@
 # Changelog
 
-## Unreleased
+## 0.10.0
 
+- Align flowchart and sitemap controls through a shared toolbar. Add a sitemap Diagram key, Mermaid copy, and standalone SVG downloads for the displayed graph; move Info, Details, and Refresh status into a compact, keyboard-accessible More dropdown.
+
+- Compact the sitemap toolbar, collapse metadata behind Info and refresh under More, add a Details toggle that frees the diagram width, and show journey notes only for the selected step.
+
+- Remove the sitemap panel heading and introductory description to give the diagram more room.
+
+- Avoid Claude's top-level conditional schema rejection; retain full local validation and retry recognized structured-output compatibility failures once using prompt-requested JSON with the same model. Restrict Claude's built-in tools and disable inherited MCP servers.
+
+- Define shared JSON Schema contracts for every AI response, validate nested fields before use, and report field-level errors. Pass schemas to Claude Code's structured output option and read its structured payload. Retry invalid trace responses once with validation feedback, preserving cancellation and usage totals.
+
+- Tighten sidebar divider spacing and move repository identity, map counts, and Git revision into Settings / Repository.
+
+- Add a divider below New trace and show only available trace-output tabs, including during keyboard navigation.
+
+- Accept empty HTTP 204 responses after deleting traces instead of reporting a false deletion failure.
+
+- Show Edit and Delete beneath the read-only trace prompt, removing click-to-edit and the duplicate bottom Delete action.
+
+- Move trace-code import into the New trace modal and keep progress beside the create/refresh buttons on one line, truncating long text.
+
+- Keep traces running when their modal closes and support concurrent trace jobs. Show each run in the sidebar with a spinner and skeleton title, stream an early title from the existing classifier, and reopen its prompt by clicking the running entry. Preserve independent progress, cancellation, failures, and saves without interrupting another draft.
+
+- Open New trace in a modal that preserves drafts on dismissal. Stack trace output choices vertically and move their descriptions into hover/focus tooltips.
+
+- Add Edit and Delete beneath the saved trace prompt, with editing on explicit request, reusing bounded prior findings and replacing the original only after all requested outputs validate. Preserve canceled drafts, support save retries, and clear obsolete implementation plans.
+
+- Add Sitemap as a selectable trace output, with repeatable screen journeys, dimmed neighboring navigation, and immutable New/Modified/Removed proposal overlays. Saved/shared traces retain their sitemap snapshot, support screen-only results, and can add or retry Sitemap independently.
+- Route same-lane flowchart return paths within their own column, reserving space for labels and separating overlapping returns.
+- Give sticky flowchart headings an opaque full-width band so scrolling lane borders and arrows cannot show through gaps or rounded corners.
+- Keep flowchart execution-lane headings visible while scrolling vertically, aligned with their columns through horizontal scrolling and zooming.
+- Add adaptive execution lanes to flowcharts, with an optional compact layout, explicit unassigned ownership, and lane metadata preserved in saved/shared traces and SVG/Mermaid exports.
+- Add an on-demand repository Sitemap view for major screens and code-backed navigation, including multiple applications, route-less workspaces, validated code references, independent persistence/freshness, cancellation, and explicit no-UI/incomplete results.
 - Clear architecture hover highlighting when the cursor leaves a node button or group header, including within the diagram.
 - Keep the implementation-plan modal header and Close button visible while its content scrolls.
 - Document the approved React/TypeScript/MobX MVVM frontend migration, bootstrap/models/features/shared layout, injected plain-class view models, observer views, immutable base map with computed proposals, and view-layer DOM adapters. Shared pure `.mjs` helpers remain browser-safe.

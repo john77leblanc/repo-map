@@ -1,4 +1,4 @@
-export type Workspace = 'architecture' | 'flowchart';
+export type Workspace = 'architecture' | 'flowchart' | 'sitemap';
 export type ChangeStatus = 'new' | 'modified' | 'removed';
 export interface MapNode {
     id: string;
@@ -67,8 +67,10 @@ export interface FlowNode {
     step?: number;
     inferred?: boolean;
     status?: ChangeStatus;
+    lane?: string;
 }
 export interface Flow {
+    lanes?: { id: string; label: string }[];
     nodes: FlowNode[];
     edges: {
         from: string;
@@ -77,6 +79,50 @@ export interface Flow {
         inferred?: boolean;
         status?: ChangeStatus;
     }[];
+}
+export interface SitemapScreen {
+    id: string;
+    app: string;
+    label: string;
+    route: string;
+    detail: string;
+    refs: CodeRef[];
+}
+export interface SitemapNavigation {
+    from: string;
+    to: string;
+    label: string;
+    condition: string;
+    refs: CodeRef[];
+}
+export interface Sitemap {
+    version: number;
+    applicability: 'applicable' | 'none' | 'incomplete';
+    summary: string;
+    applications: { id: string; label: string }[];
+    screens: SitemapScreen[];
+    navigation: SitemapNavigation[];
+    gaps: string[];
+    commit?: string;
+    generatedAt?: string;
+    dirtyAtGeneration?: boolean;
+}
+export interface SitemapResult {
+    sitemap: Sitemap | null;
+    status: { state: string; dirty?: boolean; dirtyAtGeneration?: boolean };
+}
+export interface SitemapTrace {
+    version: number;
+    base: Sitemap;
+    applicability: 'relevant' | 'none';
+    summary: string;
+    gaps: string[];
+    steps: { screen: string; note: string; refs: CodeRef[] }[];
+    navigation: number[];
+    changes: {
+        screens: (SitemapScreen & { status: ChangeStatus; rationale: string })[];
+        navigation: (SitemapNavigation & { index?: number; status: ChangeStatus; rationale: string })[];
+    };
 }
 export interface Trace {
     intent: 'description' | 'proposal';
@@ -87,8 +133,10 @@ export interface Trace {
     steps: { id: string; note: string }[];
     edges: string[][];
     refs: CodeRef[];
-    outputs: { architecture: boolean; flowchart: boolean };
+    outputs: { architecture: boolean; flowchart: boolean; sitemap?: boolean };
     pendingFlow: boolean;
+    pendingSitemap?: boolean;
+    sitemap?: SitemapTrace | null;
     flow?: Flow | null;
     proposal?: Proposal | null;
     plan?: Plan | null;

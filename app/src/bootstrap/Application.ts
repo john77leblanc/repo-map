@@ -6,6 +6,7 @@ import { TraceViewModel } from '../features/traces/TraceViewModel';
 import { ArchitectureViewModel } from '../features/architecture/ArchitectureViewModel';
 import { FlowchartViewModel } from '../features/flowchart/FlowchartViewModel';
 import { PlansViewModel } from '../features/plans/PlansViewModel';
+import { SitemapViewModel } from '../features/sitemap/SitemapViewModel';
 import type { Services } from '../shared/services/contracts';
 import type { Trace, Workspace } from '../models/types';
 
@@ -17,11 +18,16 @@ export class Application {
     readonly architecture: ArchitectureViewModel;
     readonly flowchart: FlowchartViewModel;
     readonly plans: PlansViewModel;
+    readonly sitemap: SitemapViewModel;
     constructor(
         readonly repo: RepositoryModel,
         readonly services: Services
     ) {
-        this.shell = new ShellViewModel({ repo, services });
+        this.sitemap = new SitemapViewModel({ repo, services,
+            getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace) });
+        this.shell = new ShellViewModel({ repo, services, onWorkspaceChange: (workspace) => {
+            if (workspace === 'sitemap') void this.sitemap.load();
+        } });
         this.settings = new SettingsViewModel({ repo, services });
         this.architecture = new ArchitectureViewModel({ repo, services });
         const getPick = () => this.settings.currentPick();
@@ -40,12 +46,14 @@ export class Application {
             getPick,
             getPickLabel: () => this.settings.pickLabel(),
             getWorkspace: () => this.shell.workspace,
+            sitemap: this.sitemap,
             onSelect: (trace, workspace) => this.showTrace(trace, workspace),
             onClear: () => {
                 this.flowchart.setTrace(null);
                 this.architecture.setTrace(null);
+                this.sitemap.setTrace(null);
                 this.architecture.setQuery('');
-                this.shell.showWorkspace('architecture');
+                this.shell.showRepository();
                 this.plans.close();
             },
             onReveal: (id) => this.architecture.inspect(id),
@@ -61,6 +69,7 @@ export class Application {
     private showTrace(trace: Trace, workspace: Workspace) {
         if (this.architecture.trace !== trace) this.architecture.setTrace(trace);
         if (this.flowchart.trace !== trace) this.flowchart.setTrace(trace);
+        this.sitemap.setTrace(trace);
         this.architecture.dismiss();
         this.shell.showWorkspace(workspace);
         this.shell.expandSidebar();
@@ -69,6 +78,7 @@ export class Application {
         await Promise.all([this.settings.init(), this.traces.init()]);
     }
     dispose() {
+        this.sitemap.dispose();
         this.traces.dispose();
         this.plans.dispose();
         this.flowchart.dispose();

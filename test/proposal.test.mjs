@@ -20,8 +20,8 @@ const rawProposal = { rationale: 'Validate coupons before submitting the order.'
     { id: 'checkout', status: 'modified', rationale: 'Accept a coupon code.' },
     { id: 'proposal:coupons', status: 'new', title: 'Coupons', group: 'shop', kind: 'service', rationale: 'Validate the discount.', suggestedPath: 'src/coupons.mjs' },
 ], edges: [{ from: 'checkout', to: 'proposal:coupons', status: 'new', label: 'Check coupon' }, { from: 'checkout', to: 'orders', status: 'modified', label: 'Submit discounted order' }] };
-const plan = { summary: 'Add coupon validation.', tasks: [{ title: 'Validate coupons', detail: 'Add validation and call it before order submission.', files: ['new: src/coupons.mjs'] }], tests: ['Reject expired coupons.'] };
-const flow = { nodes: [{ id: 's', type: 'start', label: 'Begin' }, { id: 'c', label: 'Validate coupon', status: 'new', step: 2 }, { id: 'end', label: 'Submit order', status: 'modified' }], edges: [{ from: 's', to: 'c', status: 'new' }, { from: 'c', to: 'end', status: 'modified' }] };
+const plan = { summary: 'Add coupon validation.', tasks: [{ title: 'Validate coupons', detail: 'Add validation and call it before order submission.', files: ['new: src/coupons.mjs'] }], interfaces: [], tests: ['Reject expired coupons.'], risks: [], questions: [] };
+const flow = { nodes: [{ id: 's', type: 'start', label: 'Begin' }, { id: 'c', type: 'process', label: 'Validate coupon', status: 'new', step: 2 }, { id: 'end', type: 'end', label: 'Submit order', status: 'modified' }], edges: [{ from: 's', to: 'c', status: 'new' }, { from: 'c', to: 'end', status: 'modified' }] };
 const config = withDefaults({}, { env: {} });
 
 test('proposal validation constrains identities, placement, statuses and connections', () => {
@@ -93,8 +93,8 @@ for (const answer of ['proposal', 'description', 'invalid', 'error']) {
         const runner = runTrace({ ...traceArgs, resolve: async (cfg, { pick }) => { picks.push(pick);return selection; },
             run: (sel, opts) => {
                 prompts.push(opts.prompt);
-                if (prompts.length === 1) return { kill() {}, promise: answer === 'error' ? Promise.reject(new Error('Classifier unavailable')) : Promise.resolve({ text: JSON.stringify({ intent: answer }), tokens: 3, cost: 0.01, turns: 1 }) };
-                return { kill() {}, promise: Promise.resolve({ text: JSON.stringify({ intent: 'proposal', steps: [], proposal: rawProposal }), tokens: 7, cost: 0.02, turns: 2 }) };
+                if (prompts.length === 1) return { kill() {}, promise: answer === 'error' ? Promise.reject(new Error('Classifier unavailable')) : Promise.resolve({ text: JSON.stringify({ intent: answer, title: 'Coupons' }), tokens: 3, cost: 0.01, turns: 1 }) };
+                return { kill() {}, promise: Promise.resolve({ text: JSON.stringify({ intent: answer === 'description' ? 'description' : 'proposal', title: 'Coupons', summary: 'Add coupons', steps: [], edges: [], gaps: '', proposal: rawProposal, flow }), tokens: 7, cost: 0.02, turns: 2 }) };
             } });
         const result = await runner.promise;
         assert.equal(prompts.length, 2);
@@ -140,10 +140,10 @@ test('server routes proposals, validates refs, redraws and generates retained pl
             if (req.method === 'GET') return res.end(JSON.stringify({ data: [{ id: 'fake' }, { id: 'small' }] }));
             const body = JSON.parse(buffer), prompt = body.messages.at(-1).content;requests.push(body);
             let out;
-            if (prompt.startsWith('Classify')) out = { intent: 'proposal' };
+            if (prompt.startsWith('Classify')) out = { intent: 'proposal', title: 'Coupons' };
             else if (prompt.startsWith('Create an implementation plan')) out = plan;
             else if (prompt.startsWith('You are drawing')) out = { flow };
-            else out = { title: 'Coupons', summary: 'Add coupons to checkout.', proposal, steps: [
+            else out = { intent: 'proposal', gaps: '', title: 'Coupons', summary: 'Add coupons to checkout.', proposal, steps: [
                 { id: checkout.id, note: 'Accept a code', refs: [{ path: '.env', start: 1, end: 2 }] },
                 { id: 'proposal:coupons', note: 'Validate the code', refs: [{ path: 'missing-file.mjs', start: 1, end: 2 }] },
             ], edges: [[checkout.id, 'proposal:coupons']], flow };
@@ -181,5 +181,13 @@ test('server routes proposals, validates refs, redraws and generates retained pl
     assert.equal((await post('/api/plan', { trace, model: '--bad' })).status, 400);
     assert.equal((await fetch(`${base}/api/plan`, { method: 'POST', body: '{}' })).status, 403);
     assert.equal((await fetch(`${base}/lib/proposal.mjs`)).status, 200);
+    const revised = await result(await post('/api/trace', { prompt: 'Add coupon expiry checks', flow: true,
+        previousTrace: { ...trace, prompt: 'Where would coupons fit?', plan: { tasks: ['old-plan-marker'] } } }));
+    assert.equal(revised.type, 'result');
+    const revisionPrompt = requests.at(-1).messages.at(-1).content;
+    assert.match(revisionPrompt, /PREVIOUS FINDINGS/);
+    assert.match(revisionPrompt, /Where would coupons fit/);
+    assert.doesNotMatch(revisionPrompt, /old-plan-marker/);
+    assert.deepEqual(revised.trace.steps.map((s) => s.refs), [[], []]);
     assert.equal(readFileSync(mapFile, 'utf8'), originalMap);
 });

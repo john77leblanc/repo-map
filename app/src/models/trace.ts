@@ -1,7 +1,8 @@
 ﻿import { normalizeFlow } from '../../../lib/flow.mjs';
 import { normalizePlan, normalizeProposal } from '../../../lib/proposal.mjs';
 import { traceOutputs } from '../../../lib/trace-outputs.mjs';
-import type { CodeRef, Flow, Plan, Proposal, RepoMap, StreamResult, Trace } from './types';
+import { normalizeSitemapTrace } from '../../../lib/sitemap-trace.mjs';
+import type { CodeRef, Flow, Plan, Proposal, RepoMap, StreamResult, Trace, SitemapTrace } from './types';
 
 type PlainTrace = Omit<Trace, 'pairs' | '_doc' | 'key' | 'createdAt'>;
 type TraceStep = Trace['steps'][number];
@@ -60,7 +61,8 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
             seen.add(step.id);
             return true;
         });
-    if (!steps.length) throw new Error('no known services');
+    const sitemap = normalizeSitemapTrace(raw.sitemap, null, intent) as SitemapTrace | null;
+    if (!steps.length && !sitemap && !normalizeFlow(raw.flow)) throw new Error('no known services');
 
     // Saved refs are flat; fresh AI results may nest them under each step.
     const refs: unknown[] = Array.isArray(raw.refs)
@@ -114,6 +116,8 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
         pairs,
         refs: cleanRefs(refs, steps) || [],
         flow,
+        sitemap,
+        pendingSitemap: raw.pendingSitemap === true,
         outputs: traceOutputs(raw),
         pendingFlow: raw.pendingFlow === true,
         used: cleanUsed(raw.used),
@@ -148,6 +152,8 @@ function plain(trace: Trace): PlainTrace {
     if (trace.proposal) result.proposal = trace.proposal;
     if (trace.plan) result.plan = trace.plan;
     if (trace.flow) result.flow = trace.flow;
+    if (trace.sitemap) result.sitemap = trace.sitemap;
+    if (trace.pendingSitemap) result.pendingSitemap = true;
     if (trace.used) result.used = trace.used;
     return result;
 }

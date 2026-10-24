@@ -3,6 +3,8 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
 import type { AgentPick, StreamResult, Trace, Workspace } from '../../models/types';
 import { decodeTrace, encodeTrace, normalizeTrace, plain, spend } from '../../models/trace';
+import { TraceJob } from './TraceJob';
+import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
 export interface TraceDependencies {
     repo: RepositoryModel;
@@ -15,9 +17,18 @@ export interface TraceDependencies {
     onReveal(nodeId: string): void;
     onOpenPlan(trace: Trace): void;
     onRequestFlow(trace: Trace): void | Promise<void>;
+    sitemap?: SitemapViewModel;
 }
 export class TraceViewModel {
     selected: Trace | null = null;
+    editing: Trace | null = null;
+    private editDefaults: { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
+    private editWorkspace: Workspace = 'architecture';
+    savingRevision = false;
+    private editDraft: { id: string; prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
+    jobs: TraceJob[] = [];
+    activeJob: TraceJob | null = null;
+    private jobDefaults: { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
     items: Trace[] = [];
     temp: Trace | null = null;
     ready = false;
@@ -25,9 +36,10 @@ export class TraceViewModel {
     prompt = '';
     architecture = true;
     flowchart = true;
-    status = '';
-    error = false;
-    busy = false;
+    sitemap = false;
+    private message = '';
+    private statusError = false;
+    private revisionBusy = false;
     importCode = '';
     importMessage = '';
     code = '';
@@ -53,6 +65,8 @@ export class TraceViewModel {
             {
                 deps: false,
                 selected: observableRef,
+                editing: observableRef,
+                activeJob: observableRef,
                 temp: observableRef,
                 controllers: false,
                 generation: false,
@@ -70,6 +84,32 @@ export class TraceViewModel {
     get workspace() {
         return this.deps.getWorkspace();
     }
+    get busy() {
+        return this.editing ? this.revisionBusy : !!this.activeJob?.busy;
+    }
+    get status() {
+        return !this.editing && this.activeJob ? this.activeJob.status : this.message;
+    }
+    get error() {
+        return !this.editing && this.activeJob ? this.activeJob.error : this.statusError;
+    }
+    get saving() {
+        return this.savingRevision || this.activeJob?.state === 'saving';
+    }
+    get jobRows() {
+        return this.jobs.filter((job) => !job.result || (job.result !== this.temp &&
+            !this.items.some((item) => !!job.result?._doc && item.key === job.result._doc)));
+    }
+    private outputsFor(trace: Trace): Workspace[] {
+        const outputs: Workspace[] = [];
+        if (trace.outputs.architecture && trace.steps.length) outputs.push('architecture');
+        if (trace.outputs.flowchart && trace.flow) outputs.push('flowchart');
+        if (trace.outputs.sitemap && trace.sitemap) outputs.push('sitemap');
+        return outputs;
+    }
+    get availableOutputs() {
+        return this.selected ? this.outputsFor(this.selected) : [];
+    }
     get rows() {
         return this.temp
             ? [this.temp, ...this.items.filter((t) => t.key !== this.temp?._doc)]
@@ -78,41 +118,112 @@ export class TraceViewModel {
     setPrompt(value: string) {
         this.prompt = value;
     }
-    setOutput(output: 'architecture' | 'flowchart', value: boolean) {
+    setOutput(output: Workspace, value: boolean) {
         this[output] = value;
+        if (this.editing || this.activeJob) return;
         try {
             this.deps.services.storage.setRaw(
-                this.repo.namespace + (output === 'architecture' ? 'witharchitecture' : 'withflow'),
+                this.repo.namespace + (output === 'architecture' ? 'witharchitecture' : output === 'sitemap' ? 'withsitemap' : 'withflow'),
                 value ? '1' : '0'
             );
         } catch {
             /* Preferences are optional when storage is unavailable. */
         }
+        if (output === 'sitemap' && value) void this.deps.sitemap?.load();
     }
     setImportCode(value: string) {
         this.importCode = value;
     }
+    editPrompt(trace: Trace) {
+        if (this.busy || this.editing || this.disposed || !trace._doc) return;
+        this.editDefaults = { prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.editWorkspace = this.workspace;
+        this.clear(); // Disconnect output views and cancel their active jobs.
+        this.editing = trace;
+        this.selected = isObservable(trace) ? trace : observable(trace);
+        this.prompt = trace.prompt;
+        this.architecture = trace.outputs.architecture;
+        this.flowchart = trace.outputs.flowchart || trace.pendingFlow;
+        this.sitemap = !!(trace.outputs.sitemap || trace.pendingSitemap);
+        if (this.editDraft?.id === trace._doc) {
+            this.prompt = this.editDraft.prompt;
+            this.architecture = this.editDraft.architecture;
+            this.flowchart = this.editDraft.flowchart;
+            this.sitemap = this.editDraft.sitemap;
+        }
+        this.message = '';
+        this.statusError = false;
+        this.composerOpen = true;
+    }
+    private finishEdit() {
+        if (this.editDefaults) Object.assign(this, this.editDefaults);
+        this.editDefaults = null;
+        this.editing = null;
+        this.composerOpen = false;
+    }
+    cancelEdit() {
+        if (!this.editing || this.savingRevision) return;
+        const original = this.editing;
+        this.editDraft = { id: original._doc!, prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.stop();
+        this.finishEdit();
+        this.select(original, this.editWorkspace);
+    }
+    closeComposer() {
+        if (this.editing) return;
+        this.releaseJob();
+        this.composerOpen = false;
+    }
     toggleComposer() {
+        if (this.editing) return;
+        if (this.composerOpen) { this.closeComposer(); return; }
         if (this.selected) this.clear();
-        this.composerOpen = !this.composerOpen;
+        this.message = '';
+        this.statusError = false;
+        this.composerOpen = true;
+    }
+    private releaseJob() {
+        if (!this.activeJob) return;
+        this.message = this.activeJob.status;
+        this.statusError = this.activeJob.error;
+        if (this.jobDefaults) Object.assign(this, this.jobDefaults);
+        this.jobDefaults = null;
+        this.activeJob = null;
+    }
+    openJob(job: TraceJob) {
+        if (this.disposed || this.editing) return;
+        if (job.result && !job.busy) {
+            if (job.saveFailed) this.temp = job.result;
+            this.message = job.status;
+            this.statusError = job.error;
+            return this.openSavedOutput(job.result, this.resultWorkspace(job.result, job.workspace));
+        }
+        this.releaseJob();
+        this.jobDefaults = { prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.clear();
+        this.activeJob = job;
+        this.prompt = job.prompt;
+        Object.assign(this, job.outputs, { sitemap: !!job.outputs.sitemap });
+        this.composerOpen = true;
     }
     setStatus(text: string, error = false) {
-        this.status = text;
-        this.error = error;
+        this.message = text;
+        this.statusError = error;
         if (error) this.composerOpen = true;
     }
     init() {
-        for (const output of ['architecture', 'flowchart'] as const) {
+        for (const output of ['architecture', 'flowchart', 'sitemap'] as const) {
             try {
                 const value = this.deps.services.storage.getRaw(
                     this.repo.namespace +
-                        (output === 'architecture' ? 'witharchitecture' : 'withflow')
+                        (output === 'architecture' ? 'witharchitecture' : output === 'sitemap' ? 'withsitemap' : 'withflow')
                 );
                 if (value !== null) this[output] = value === '1';
             } catch {
                 /* Keep defaults. */
             }
         }
+        if (this.sitemap) void this.deps.sitemap?.load();
         return this.loadSaved();
     }
     async loadSaved() {
@@ -141,10 +252,13 @@ export class TraceViewModel {
     select(trace: Trace, workspace: Workspace = this.workspace) {
         if (this.disposed) return;
         this.selectionVersion++;
+        this.releaseJob();
         this.selected = isObservable(trace) ? trace : observable(trace);
+        if (!this.editing) this.composerOpen = false;
         this.deps.onSelect(this.selected, workspace);
     }
     clear() {
+        this.releaseJob();
         this.selectionVersion++;
         this.selected = null;
         this.code = '';
@@ -157,6 +271,7 @@ export class TraceViewModel {
         this.deps.onOpenPlan(trace);
     }
     async openSavedOutput(item: Trace, output: Workspace) {
+        if (this.editing) return;
         let trace: Trace;
         try {
             trace =
@@ -172,12 +287,15 @@ export class TraceViewModel {
         }
         trace = isObservable(trace) ? trace : observable(trace);
         const selectionVersion = ++this.selectionVersion;
-        if (output === 'flowchart') {
+        if (output === 'sitemap') {
+            this.select(trace, output);
+            return;
+        } else if (output === 'flowchart') {
             if (!trace.flow && !trace.pendingFlow) {
                 if (this.repo.aiAvailable) await this.deps.onRequestFlow(trace);
                 return;
             }
-        } else if (!trace.outputs.architecture) {
+        } else if (!trace.outputs.architecture && trace.steps.length) {
             runInAction(() => {
                 trace.outputs.architecture = true;
             });
@@ -189,7 +307,7 @@ export class TraceViewModel {
     openOutput(output: Workspace) {
         if (this.selected) return this.openSavedOutput(this.selected, output);
     }
-    async persist(trace: Trace): Promise<boolean> {
+    async persist(trace: Trace, quiet = false): Promise<boolean> {
         const ctl = new AbortController();
         this.controllers.add(ctl);
         runInAction(() => {
@@ -212,7 +330,7 @@ export class TraceViewModel {
             await this.loadSaved();
             return !this.disposed;
         } catch {
-            if (!this.disposed && !ctl.signal.aborted)
+            if (!quiet && !this.disposed && !ctl.signal.aborted)
                 runInAction(() => {
                     this.temp = trace;
                     this.setStatus(
@@ -226,7 +344,19 @@ export class TraceViewModel {
         }
     }
     async saveExisting(trace: Trace) {
-        await this.persist(trace);
+        const saved = await this.persist(trace);
+        if (saved) runInAction(() => {
+            for (const job of this.jobs) if (job.result === trace) {
+                job.saveFailed = false;
+                job.error = false;
+            }
+        });
+    }
+    private resultWorkspace(trace: Trace, preferred: Workspace): Workspace {
+        const available = this.outputsFor(trace);
+        if (available.length) return available.includes(preferred) ? preferred : available[0];
+        return (trace.outputs.sitemap || trace.pendingSitemap) && (preferred === 'sitemap' || (!trace.outputs.architecture && !trace.outputs.flowchart && !trace.pendingFlow))
+            ? 'sitemap' : (trace.outputs.flowchart || trace.pendingFlow) && (preferred === 'flowchart' || !trace.outputs.architecture) ? 'flowchart' : 'architecture';
     }
     async keepTrace(trace: Trace, preferred: Workspace = this.workspace) {
         const selectionVersion = ++this.selectionVersion;
@@ -235,10 +365,7 @@ export class TraceViewModel {
         if (!this.disposed && selectionVersion === this.selectionVersion)
             this.select(
                 trace,
-                (trace.outputs.flowchart || trace.pendingFlow) &&
-                    (preferred === 'flowchart' || !trace.outputs.architecture)
-                    ? 'flowchart'
-                    : 'architecture'
+                this.resultWorkspace(trace, preferred)
             );
     }
     async importTrace() {
@@ -281,6 +408,7 @@ export class TraceViewModel {
             runInAction(() => {
                 if (this.temp?._doc === trace._doc) this.temp = null;
                 if (this.selected?._doc === trace._doc) this.clear();
+                this.jobs = this.jobs.filter((job) => job.result?._doc !== trace._doc);
             });
             await this.loadSaved();
         } catch {
@@ -290,24 +418,127 @@ export class TraceViewModel {
             this.controllers.delete(ctl);
         }
     }
+    private async runNewTrace(prompt: string) {
+        const outputs = { architecture: this.architecture, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) };
+        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap) {
+            this.setStatus('Select Code architecture, Flowchart, or Sitemap.', true);
+            return;
+        }
+        if (!this.activeJob) this.jobDefaults = { prompt: '', architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        else this.jobs = this.jobs.filter((job) => job !== this.activeJob);
+        const job = new TraceJob(prompt, outputs, { ...this.deps.getPick() }, this.deps.getPickLabel(), this.workspace);
+        this.jobs.unshift(job);
+        this.activeJob = job;
+        const signal = job.controller.signal;
+        this.controllers.add(job.controller);
+        const current = () => !this.disposed && !signal.aborted;
+        let last = 'Starting ' + job.agentLabel + '...';
+        const tick = () => {
+            if (current() && job.state === 'running') runInAction(() => {
+                job.status = last + ' - ' + Math.round((Date.now() - job.createdAt) / 1000) + 's';
+            });
+        };
+        tick();
+        job.ticker = setInterval(tick, 1000);
+        try {
+            if (outputs.sitemap && !this.deps.sitemap?.sitemap) {
+                await this.deps.sitemap?.load();
+                if (!current()) return;
+                if (!this.deps.sitemap?.sitemap) throw new Error('Generate the repository sitemap before tracing screens. Your question has been kept.');
+            }
+            const result = await this.deps.services.api.stream<StreamResult>('/api/trace',
+                { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...job.pick },
+                signal, (text) => { last = text; tick(); },
+                (title) => { if (current() && job.state === 'running') runInAction(() => { job.title = title.trim().slice(0, 80); }); });
+            if (!current()) return;
+            job.clearTicker();
+            if (!result) throw new Error(job.agentLabel + ' ended without an answer. Run repo-map doctor to check your setup.');
+            const trace = observable(normalizeTrace({ ...(result.trace as object), outputs, used: result.used }, this.repo.map, prompt));
+            trace.createdAt = job.createdAt;
+            trace.outputs = {
+                architecture: outputs.architecture && trace.steps.length > 0,
+                flowchart: outputs.flowchart && !!trace.flow,
+                ...(outputs.sitemap ? { sitemap: !!trace.sitemap } : {}),
+            };
+            trace.pendingFlow = outputs.flowchart && !trace.flow;
+            trace.pendingSitemap = !!outputs.sitemap && !trace.sitemap;
+            runInAction(() => {
+                job.result = trace;
+                job.title = trace.title;
+                job.state = 'saving';
+                job.status = 'Done in ' + Math.round((Date.now() - job.createdAt) / 1000) + 's' + spend(result);
+            });
+            const saved = await this.persist(trace, true);
+            if (this.disposed) return;
+            runInAction(() => {
+                job.state = 'completed';
+                job.saveFailed = !saved;
+                if (!saved) {
+                    job.status = 'Changes could not be saved. Open the trace to retry saving before reloading.';
+                    job.error = true;
+                } else if (trace.pendingFlow || trace.pendingSitemap) {
+                    job.status = trace.pendingSitemap
+                        ? 'Other outputs were kept, but Sitemap was missing. Use Edit to select Sitemap and regenerate.'
+                        : 'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.';
+                    job.error = true;
+                }
+                if (this.activeJob === job) {
+                    if (!saved) this.temp = trace;
+                    this.select(trace, this.resultWorkspace(trace, job.workspace));
+                }
+            });
+        } catch (error) {
+            if (!this.disposed) runInAction(() => {
+                job.state = signal.aborted ? 'stopped' : 'failed';
+                job.status = signal.aborted ? 'Stopped.' : error instanceof Error && error.message !== 'no known services'
+                    ? error.message : 'The AI returned no usable trace outputs. Your question was kept; try again.';
+                job.error = !signal.aborted;
+                job.title ||= signal.aborted ? 'Stopped trace' : 'Trace failed';
+            });
+        } finally {
+            job.clearTicker();
+            this.controllers.delete(job.controller);
+        }
+    }
     stop() {
+        if (this.saving) return;
+        if (this.activeJob) {
+            const job = this.activeJob;
+            job.controller.abort();
+            job.clearTicker();
+            job.state = 'stopped';
+            job.status = 'Stopped.';
+            job.title ||= 'Stopped trace';
+            return;
+        }
+        if (this.savingRevision) return;
         this.generation?.abort();
         if (this.ticker !== null) clearInterval(this.ticker);
         this.ticker = null;
     }
     async runTrace() {
         const prompt = this.prompt.trim();
+        const original = this.editing;
         if (!prompt || this.busy || !this.repo.aiAvailable || this.disposed) return;
-        const outputs = { architecture: this.architecture, flowchart: this.flowchart },
-            origin = this.workspace;
-        if (!outputs.architecture && !outputs.flowchart) {
-            this.setStatus('Select Code architecture, Flowchart, or both.', true);
+        if (!original) return this.runNewTrace(prompt);
+        const outputs = { architecture: this.architecture, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) },
+            origin = original ? this.editWorkspace : this.workspace;
+        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap) {
+            this.setStatus('Select Code architecture, Flowchart, or Sitemap.', true);
             return;
+        }
+        if (outputs.sitemap && !this.deps.sitemap?.sitemap) {
+            await this.deps.sitemap?.load();
+            if (!this.deps.sitemap?.sitemap) {
+                this.setStatus('Generate the repository sitemap before tracing screens. Your question has been kept.', true);
+                return;
+            }
+            if (this.disposed || this.busy || this.editing !== original) return;
         }
         const ctl = new AbortController();
         this.generation = ctl;
         this.controllers.add(ctl);
-        this.busy = true;
+        this.revisionBusy = true;
         let answered = false;
         const start = Date.now();
         let last = 'Starting ' + this.deps.getPickLabel() + '…';
@@ -323,7 +554,7 @@ export class TraceViewModel {
         try {
             const result = await this.deps.services.api.stream<StreamResult>(
                 '/api/trace',
-                { prompt, flow: outputs.flowchart, ...this.deps.getPick() },
+                { prompt, ...(original ? { previousTrace: plain(original), architecture: outputs.architecture } : {}), flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.deps.getPick() },
                 ctl.signal,
                 (text) => {
                     last = text;
@@ -344,25 +575,42 @@ export class TraceViewModel {
                 this.repo.map,
                 prompt
             );
+            if (original) {
+                if ((outputs.architecture && !trace.steps.length) || (outputs.flowchart && !trace.flow) || (outputs.sitemap && !trace.sitemap)) {
+                    throw new Error('Not all requested outputs were returned. The original trace and edited question were kept. Try again.');
+                }
+                trace._doc = original._doc;
+                trace.createdAt = original.createdAt;
+                trace.plan = null;
+                if (!outputs.flowchart) trace.flow = null;
+                if (!outputs.sitemap) trace.sitemap = null;
+            }
             trace.outputs = {
-                architecture: outputs.architecture,
+                architecture: outputs.architecture && trace.steps.length > 0,
                 flowchart: outputs.flowchart && !!trace.flow,
+                ...(outputs.sitemap ? { sitemap: !!trace.sitemap } : {}),
             };
             trace.pendingFlow = outputs.flowchart && !trace.flow;
+            trace.pendingSitemap = !!outputs.sitemap && !trace.sitemap;
             runInAction(() =>
                 this.setStatus(
                     'Done in ' + Math.round((Date.now() - start) / 1000) + 's' + spend(result)
                 )
             );
+            if (original) {
+                runInAction(() => { this.savingRevision = true; });
+            }
             await this.keepTrace(trace, origin);
             if (!this.disposed && !ctl.signal.aborted)
                 runInAction(() => {
+                    if (original) { this.editDraft = null; this.finishEdit(); }
                     this.prompt = '';
                     if (trace.pendingFlow)
                         this.setStatus(
-                            'The walkthrough was kept, but the flowchart was missing. Open the flowchart output to retry.',
+                            'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.',
                             true
                         );
+                    if (trace.pendingSitemap) this.setStatus('Other outputs were kept, but Sitemap was missing. Use Edit to select Sitemap and regenerate.', true);
                 });
         } catch (error) {
             if (!this.disposed)
@@ -372,7 +620,7 @@ export class TraceViewModel {
                             ? 'Stopped.'
                             : error instanceof Error && error.message !== 'no known services'
                               ? error.message
-                              : "The answer didn't name any services on this map. Try rephrasing.",
+                              : outputs.sitemap ? 'The AI returned no usable trace outputs. Your question was kept; try again.' : "The answer didn't name any services on this map. Try rephrasing.",
                         !ctl.signal.aborted
                     )
                 );
@@ -382,7 +630,8 @@ export class TraceViewModel {
             this.controllers.delete(ctl);
             if (!this.disposed)
                 runInAction(() => {
-                    this.busy = false;
+                    this.revisionBusy = false;
+                    this.savingRevision = false;
                     this.generation = null;
                     if (ctl.signal.aborted) this.setStatus('Stopped.');
                 });
@@ -390,6 +639,7 @@ export class TraceViewModel {
     }
     dispose() {
         this.disposed = true;
+        for (const job of this.jobs) { job.controller.abort(); job.clearTicker(); }
         this.stop();
         this.controllers.forEach((ctl) => ctl.abort());
         this.controllers.clear();

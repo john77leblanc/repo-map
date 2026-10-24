@@ -74,8 +74,110 @@ test('placeRow keeps order and gaps while staying close to targets', () => {
     assert.deepEqual(placeRow([0, 100], [0, 10]), [0, 100]);
 });
 
+test('lane metadata is optional, bounded, and preserves independent proposal and inference flags', () => {
+    const flow = normalizeFlow({ ...CHECKOUT,
+        lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }, { id: 'api', label: 'Duplicate' }, { id: 'unused', label: 'Unused' }, { id: '<bad>', label: 'Invalid' }],
+        nodes: CHECKOUT.nodes.map((node, i) => ({ ...node, lane: i === 0 ? 'missing' : i % 2 ? 'web' : 'api', status: 'modified', inferred: true })),
+    });
+    assert.deepEqual(flow.lanes.map((lane) => lane.id), ['web', 'api']);
+    assert.equal(flow.nodes[0].lane, undefined);
+    assert.equal(flow.nodes[1].lane, 'web');
+    assert.equal(flow.nodes[1].status, 'modified');
+    assert.equal(flow.nodes[1].inferred, true);
+    assert.deepEqual(normalizeFlow(JSON.parse(JSON.stringify(flow))), flow);
+    const source = flowToMermaid(flow);
+    assert.match(source, /subgraph lane1\["Frontend"\]/);
+    assert.match(source, /subgraph lane3\["Unassigned"\]/);
+    assert.equal((source.match(/n\d+\(\[|n\d+\[|n\d+\{/g) || []).length, flow.nodes.length);
+});
+
+test('execution lanes contain branches and long labels, preserve loops, and allow compact layout', () => {
+    const flow = normalizeFlow({ ...CHECKOUT,
+        lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }, { id: 'worker', label: 'Payment processing worker' }],
+        nodes: CHECKOUT.nodes.map((node, i) => ({ ...node, lane: ['web', 'api', 'api', 'worker', 'worker', undefined, 'web'][i] })),
+    });
+    const layout = layoutFlow(flow);
+    assert.equal(layout.lanes.length, 4);
+    for (const node of layout.nodes) {
+        const lane = layout.lanes.find((item) => item.id === (node.lane || ''));
+        assert.ok(node.x >= lane.x && node.x + node.w <= lane.x + lane.w, node.id);
+        assert.ok(node.y > 48);
+        assert.ok(Number.isFinite(node.cx) && Number.isFinite(node.cy));
+        for (const other of layout.nodes.filter((item) => item.id !== node.id)) {
+            assert.ok(node.x + node.w <= other.x || other.x + other.w <= node.x || node.y + node.h <= other.y || other.y + other.h <= node.y);
+        }
+    }
+    assert.equal(layout.edges.filter((edge) => edge.back).length, 1);
+    assert.ok(layout.edges.every((edge) => !/NaN|Infinity/.test(edge.d)));
+    assert.match(renderFlowSvg(layout), /execution-lane/);
+    assert.match(renderFlowSvg(layout), /Unassigned/);
+    assert.equal(layoutFlow(flow, { lanes: false }).lanes.length, 0);
+    assert.equal(layoutFlow(normalizeFlow(CHECKOUT)).lanes.length, 0);
+    const single = normalizeFlow({ ...CHECKOUT, lanes: [{ id: 'web', label: 'Frontend' }], nodes: CHECKOUT.nodes.map((node) => ({ ...node, lane: 'web' })) });
+    assert.equal(layoutFlow(single).lanes.length, 0);
+});
+
+test('lane decision labels stay distinct when both branches cross to the right', () => {
+    const flow = normalizeFlow({
+        lanes: [{ id: 'api', label: 'Backend' }, { id: 'worker', label: 'Worker' }, { id: 'web', label: 'Frontend' }],
+        nodes: [{ id: 'decision', type: 'decision', label: 'Valid?', lane: 'api' },
+            { id: 'yes', label: 'Process', lane: 'worker' }, { id: 'no', label: 'Show error', lane: 'web' }],
+        edges: [{ from: 'decision', to: 'yes', label: 'yes' }, { from: 'decision', to: 'no', label: 'no' }],
+    });
+    const layout = layoutFlow(flow);
+    const [yes, no] = layout.edges;
+    assert.ok(Math.abs(yes.labelAt[0] - no.labelAt[0]) > 40, 'branch labels must not overlap');
+});
+
 test('wrap breaks labels on words', () => {
     assert.deepEqual(wrap('Charge the card through the payments API', 16), ['Charge the card', 'through the', 'payments API']);
+});
+
+test('same-lane returns and captions stay in clear, separate corridors inside their lane', () => {
+    const flow = normalizeFlow({
+        lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Orders API' }],
+        nodes: ['a', 'b', 'c', 'd', 'api'].map((id) => ({ id, label: id, lane: id === 'api' ? 'api' : 'web', type: id === 'a' ? 'start' : 'decision' })),
+        edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'd' }, { from: 'd', to: 'api' },
+            { from: 'c', to: 'a', label: 'no' }, { from: 'd', to: 'b', label: 'Edit email and retry', status: 'modified' },
+            { from: 'api', to: 'a', label: 'server declined' }],
+    });
+    const layout = layoutFlow(flow);
+    const web = layout.lanes[0];
+    const returns = layout.edges.filter((edge) => edge.back && edge.from !== 'api');
+    assert.equal(returns.length, 2);
+    assert.notEqual(returns[0].labelAt[0], returns[1].labelAt[0], 'overlapping returns have separate corridors');
+    for (const edge of returns) {
+        const points = [...edge.d.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map((match) => [Number(match[1]), Number(match[2])]);
+        assert.equal(points.length, 6);
+        assert.ok(points.every(([x]) => x >= web.x && x <= web.x + web.w));
+        const caption = (edge.status ? 'Modified: ' : '') + edge.label;
+        assert.ok(edge.labelAt[0] + caption.length * 6.1 + 10 <= web.x + web.w, 'caption fits inside lane');
+        for (let index = 1; index < points.length; index++) {
+            const [a, b] = [points[index - 1], points[index]];
+            for (const node of layout.nodes) {
+                const crosses = a[0] === b[0]
+                    ? a[0] > node.x && a[0] < node.x + node.w && Math.min(a[1], b[1]) < node.y + node.h && Math.max(a[1], b[1]) > node.y
+                    : a[1] > node.y && a[1] < node.y + node.h && Math.min(a[0], b[0]) < node.x + node.w && Math.max(a[0], b[0]) > node.x;
+                assert.equal(crosses, false, `${edge.from} -> ${edge.to} avoids ${node.id}`);
+            }
+        }
+    }
+    const crossLane = layout.edges.find((edge) => edge.from === 'api');
+    assert.ok(crossLane.labelAt[0] > layout.lanes.at(-1).x + layout.lanes.at(-1).w);
+    assert.match(renderFlowSvg(layout), /Modified: Edit email and retry/);
+    assert.equal(layoutFlow(flow, { lanes: false }).lanes.length, 0);
+});
+
+test('vertically separate same-lane returns reuse a corridor', () => {
+    const layout = layoutFlow(normalizeFlow({
+        lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }],
+        nodes: ['a', 'b', 'c', 'd', 'api'].map((id) => ({ id, label: id, lane: id === 'api' ? 'api' : 'web' })),
+        edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'd' }, { from: 'd', to: 'api' },
+            { from: 'b', to: 'a', label: 'retry' }, { from: 'd', to: 'c', label: 'no' }],
+    }));
+    const returns = layout.edges.filter((edge) => edge.back);
+    assert.equal(returns.length, 2);
+    assert.equal(returns[0].labelAt[0], returns[1].labelAt[0]);
 });
 
 test('layoutFlow ranks top to bottom, draws loops as return arrows, and never overlaps boxes', () => {
@@ -134,10 +236,11 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
                 res.end(JSON.stringify({ data: [{ id: 'fake' }] })); // GET /models
                 return;
             }
-            const prompt = JSON.parse(b).messages.map((m) => m.content).join('\n');
-            const out = prompt.startsWith('You are drawing a flowchart')
+            const prompt = JSON.parse(b).messages.at(-1).content;
+            const out = prompt.startsWith('Classify') ? { intent: 'description', title: 'Order' }
+                : prompt.startsWith('You are drawing a flowchart')
                 ? { flow: CHECKOUT }
-                : { title: 'Order', summary: 's', steps: [{ id: 'shopper', note: 'n' }, { id: 'checkout-page', note: 'n' }, { id: 'orders-client', note: 'n' }], edges: [], gaps: '', flow: CHECKOUT };
+                : { intent: 'description', title: 'Order', summary: 's', steps: [{ id: 'shopper', note: 'n', refs: [] }, { id: 'checkout-page', note: 'n', refs: [] }, { id: 'orders-client', note: 'n', refs: [] }], edges: [], gaps: '', flow: CHECKOUT };
             res.writeHead(200, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(out) }, finish_reason: 'stop' }] }));
         });

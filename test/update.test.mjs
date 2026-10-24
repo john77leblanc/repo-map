@@ -148,7 +148,7 @@ test('updateMap relinks docs only when documents changed, and drops links to rem
             const prompt = JSON.parse(body).messages.find((m) => m.role === 'user').content;
             prompts.push(prompt);
             const reply = /connecting the documentation/.test(prompt)
-                ? { links: [{ node: 'api', path: 'docs/api.md', start: 1, end: 3, title: 'API', why: 'w' }] }
+                ? { links: [{ node: 'api', path: 'docs/api.md', start: 1, end: 3, title: 'API', why: 'w', kind: 'doc' }] }
                 : { summary: 'Removed the web pages.', nodes: { remove: ['web'], update: [{ id: 'api', desc: 'Changed.' }] } };
             res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(reply) } }] }));
         });

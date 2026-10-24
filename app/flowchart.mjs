@@ -5,13 +5,14 @@
  *   layoutFlow(flow)        -> { width, height, nodes, edges }
  *   renderFlowSvg(layout)   -> SVG markup (styled by classes; see app/index.html)
  *
- * Layered layout: break cycles (loops are drawn as return arrows on the right),
+ * Layered layout: break cycles (loops use lane-local or outer return corridors),
  * rank by longest path, add bend points for edges that skip ranks, order each
  * rank to reduce crossings, then place boxes as close to their neighbours as
  * the spacing allows (isotonic regression keeps order and gaps exact).
  */
 
 import { CHANGE_LABELS } from '../lib/proposal.mjs';
+import { flowLanes } from '../lib/flow.mjs';
 
 const FONT_W = 6.7;          // average glyph width at 12.5px
 const LINE_H = 16;
@@ -85,7 +86,10 @@ function placeRow(want, sep) {
     return out;
 }
 
-function layoutFlow(flow) {
+function layoutFlow(flow, { lanes = true } = {}) {
+    if (!flow.nodes.length) return { width: 0, height: 0, nodes: [], edges: [], lanes: [] };
+    const participants = flowLanes(flow);
+    const useLanes = lanes && participants.filter((lane) => lane.id).length >= 2;
     const nodes = flow.nodes.map((n, i) => ({ ...n, ...sizeNode(n), idx: i }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const edges = flow.edges.filter((e) => byId.has(e.from) && byId.has(e.to)).map((e, i) => ({ ...e, idx: i }));
@@ -257,16 +261,63 @@ function layoutFlow(flow) {
         }
     }
 
+    // Constrain rows to execution columns. Dummy segments stay in their source
+    // lane, reserving space so long connections cannot pass through boxes.
+    const laneBounds = [];
+    const localReturnX = new Map();
+    if (useLanes) {
+        const owner = new Map(nodes.map((n) => [n.id, n.lane || '']));
+        fwd.forEach((e) => e.chain.slice(1, -1).forEach((id) => owner.set(id, owner.get(e.from))));
+        let left = 0;
+        for (const participant of participants) {
+            const rows = layers.map((row) => row.filter((it) => owner.get(it.id) === participant.id));
+            const widths = rows.map((row) => row.reduce((sum, it) => sum + it.w + GAP_X, 0));
+            const contentWidth = Math.max(220, participant.label.length * 8 + 48, ...widths.map((width) => width + GAP_X));
+            // Reserve clear corridors beside nodes and dummy segments. Separate
+            // overlapping returns (including their captions); reuse a corridor
+            // for returns whose vertical spans do not overlap.
+            const tracks = [];
+            for (const edge of edges.filter((e) => e.back && owner.get(e.from) === participant.id && owner.get(e.to) === participant.id)) {
+                const top = Math.min(rank.get(edge.from), rank.get(edge.to));
+                const bottom = Math.max(rank.get(edge.from), rank.get(edge.to));
+                let track = tracks.find((item) => item.spans.every((span) => bottom < span.top || top > span.bottom));
+                if (!track) {
+                    track = { spans: [], edges: [], width: 40 };
+                    tracks.push(track);
+                }
+                const caption = [CHANGE_LABELS[edge.status], edge.label].filter(Boolean).join(': ');
+                track.width = Math.max(track.width, caption.length * 6.1 + 36);
+                track.spans.push({ top, bottom });
+                track.edges.push(edge.idx);
+            }
+            let corridor = left + MARGIN + contentWidth;
+            for (const track of tracks) {
+                track.edges.forEach((idx) => localReturnX.set(idx, corridor + 12));
+                corridor += track.width;
+            }
+            const w = contentWidth + tracks.reduce((sum, track) => sum + track.width, 0);
+            rows.forEach((row, r) => {
+                let cur = left + (contentWidth - widths[r] + GAP_X) / 2;
+                row.forEach((it) => {
+                    x.set(it.id, cur + it.w / 2);
+                    cur += it.w + GAP_X;
+                });
+            });
+            laneBounds.push({ ...participant, x: left + MARGIN, w });
+            left += w;
+        }
+    }
+
     // 6. y per rank.
     const labelled = new Set(fwd.filter((e) => e.label || CHANGE_LABELS[e.status]).map((e) => rank.get(e.from)));
     const rowH = layers.map((L) => Math.max(0, ...L.map((it) => it.h)));
     const rowY = [];
-    let y = MARGIN;
+    let y = MARGIN + (useLanes ? 48 : 0);
     rowH.forEach((h, r) => {
         rowY.push(y);
         y += Math.max(h, 8) + GAP_Y + (labelled.has(r) ? 10 : 0);
     });
-    const minX = Math.min(...[...items.values()].map((it) => x.get(it.id) - it.w / 2));
+    const minX = useLanes ? 0 : Math.min(...[...items.values()].map((it) => x.get(it.id) - it.w / 2));
     const X = (id) => x.get(id) - minX + MARGIN;
     const cy = (it) => rowY[it.rank] + rowH[it.rank] / 2;
     nodes.forEach((n) => {
@@ -277,6 +328,7 @@ function layoutFlow(flow) {
         n.cy = cy(it);
     });
     let width = Math.max(...nodes.map((n) => n.x + n.w)) + MARGIN;
+    if (useLanes) width = Math.max(width, ...laneBounds.map((lane) => lane.x + lane.w + MARGIN));
     const height = y - GAP_Y + MARGIN;
 
     // 7. Route edges.
@@ -315,10 +367,10 @@ function layoutFlow(flow) {
         const k = outCount.get(e.from);
         let p0;
         let side = 0;
-        if (s.type === 'decision' && k > 1 && nextX < s.cx - s.w / 4) {
+        if (!useLanes && s.type === 'decision' && k > 1 && nextX < s.cx - s.w / 4) {
             p0 = [s.x, s.cy];
             side = -1;
-        } else if (s.type === 'decision' && k > 1 && nextX > s.cx + s.w / 4) {
+        } else if (!useLanes && s.type === 'decision' && k > 1 && nextX > s.cx + s.w / 4) {
             p0 = [s.x + s.w, s.cy];
             side = 1;
         } else {
@@ -358,7 +410,8 @@ function layoutFlow(flow) {
         routed.push({ ...e, d, label: e.label || '', labelAt: label });
     });
 
-    // Loops: return arrows down the right-hand side.
+    // Same-lane loops stay in their reserved corridor. Cross-lane loops and
+    // compact diagrams retain the outer route, with horizontal legs in row gaps.
     let lane = 0;
     edges.filter((e) => e.back).forEach((e) => {
         const s = byId.get(e.from);
@@ -366,14 +419,18 @@ function layoutFlow(flow) {
         const top = Math.min(s.y, t.y);
         const bottom = Math.max(s.y + s.h, t.y + t.h);
         const rightmost = Math.max(...nodes.filter((n) => n.y + n.h >= top && n.y <= bottom).map((n) => n.x + n.w));
-        const xr = rightmost + 26 + lane * 14;
-        lane++;
+        const local = localReturnX.has(e.idx);
+        const xr = local ? localReturnX.get(e.idx)
+            : (useLanes ? Math.max(...laneBounds.map((item) => item.x + item.w)) : rightmost) + 26 + lane * 14;
+        if (!local) lane++;
         const sx = s.x + s.w;
         const tx = t.x + t.w + 2;
         const R = 8;
-        const d = `M${r1(sx)},${r1(s.cy)} L${r1(xr - R)},${r1(s.cy)} Q${r1(xr)},${r1(s.cy)} ${r1(xr)},${r1(s.cy - R)} L${r1(xr)},${r1(t.cy + R)} Q${r1(xr)},${r1(t.cy)} ${r1(xr - R)},${r1(t.cy)} L${r1(tx)},${r1(t.cy)}`;
+        const d = useLanes
+            ? `M${r1(s.cx)},${r1(s.y + s.h)} L${r1(s.cx)},${r1(rowY[rank.get(s.id)] + rowH[rank.get(s.id)] + 18)} L${r1(xr)},${r1(rowY[rank.get(s.id)] + rowH[rank.get(s.id)] + 18)} L${r1(xr)},${r1(rowY[rank.get(t.id)] - 18)} L${r1(t.cx)},${r1(rowY[rank.get(t.id)] - 18)} L${r1(t.cx)},${r1(t.y)}`
+            : `M${r1(sx)},${r1(s.cy)} L${r1(xr - R)},${r1(s.cy)} Q${r1(xr)},${r1(s.cy)} ${r1(xr)},${r1(s.cy - R)} L${r1(xr)},${r1(t.cy + R)} Q${r1(xr)},${r1(t.cy)} ${r1(xr - R)},${r1(t.cy)} L${r1(tx)},${r1(t.cy)}`;
         const caption = [CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': ');
-        width = Math.max(width, xr + MARGIN + (caption ? caption.length * 6.1 + 16 : 0));
+        if (!local) width = Math.max(width, xr + MARGIN + (caption ? caption.length * 6.1 + 16 : 0));
         routed.push({ ...e, d, label: e.label || '', labelAt: [xr + 6, (s.cy + t.cy) / 2, 'start'] });
     });
 
@@ -382,6 +439,7 @@ function layoutFlow(flow) {
         height: Math.ceil(height),
         nodes: nodes.map(({ idx, ...n }) => n),
         edges: routed.sort((a, b) => a.idx - b.idx).map(({ chain, idx, ...e }) => e),
+        lanes: laneBounds,
     };
 }
 
@@ -410,8 +468,11 @@ function renderFlowSvg(layout, { title = '' } = {}) {
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" class="fc" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" role="img" aria-label="${escXml(title || 'Flowchart')}">`);
     parts.push('<defs><marker id="fc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa" d="M0 0.5L7.5 4L0 7.5z"/></marker></defs>');
     parts.push('<g class="fe-all">');
+    for (const lane of layout.lanes || []) {
+        parts.push(`<g class="execution-lane"><rect x="${r1(lane.x)}" y="8" width="${r1(lane.w)}" height="${r1(layout.height - 16)}" rx="6"/><text x="${r1(lane.x + lane.w / 2)}" y="36" text-anchor="middle">${escXml(lane.label)}</text></g>`);
+    }
     layout.edges.forEach((e, i) => {
-        parts.push(`<path class="fe${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
+        parts.push(`<path class="fe${e.context ? ' context' : ''}${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
     });
     parts.push('</g><g class="fl-all">');
     layout.edges.forEach((e) => {
@@ -422,12 +483,12 @@ function renderFlowSvg(layout, { title = '' } = {}) {
         const [lx, ly, anchor] = e.labelAt;
         const w = caption.length * 6.1 + 10;
         const x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-        parts.push(`<g class="fl"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
+        parts.push(`<g class="fl${e.context ? ' context' : ''}"><rect x="${r1(x0)}" y="${r1(ly - 9)}" width="${r1(w)}" height="17" rx="3"/><text x="${r1(x0 + w / 2)}" y="${r1(ly + 3.5)}" text-anchor="middle">${escXml(caption)}</text></g>`);
     });
     parts.push('</g>');
     layout.nodes.forEach((n) => {
         const label = `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
-        parts.push(`<g class="fn t-${n.type}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
+        parts.push(`<g class="fn t-${n.type}${n.context ? ' context' : ''}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
         parts.push(shapeOf(n));
         const top = n.cy - ((n.lines.length - 1) * LINE_H) / 2 + 4.5;
         parts.push(`<text x="${r1(n.cx)}" y="${r1(top)}" text-anchor="middle">${n.lines.map((l, i) => `<tspan x="${r1(n.cx)}"${i ? ` dy="${LINE_H}"` : ''}>${escXml(l)}</tspan>`).join('')}</text>`);

@@ -46,13 +46,15 @@ Add a script so teammates only need `npm install` and `npm run map`:
 
 Commit the `.repo-map/` folder it creates (`config.json`, `map.json`, `.gitignore`). Saved traces and personal AI settings stay out of git.
 
-**Explore:** the sidebar starts with the repository title and details, followed by **New trace** and **Saved traces**. Select a trace to see its title, original prompt, **Architecture** / **Flowchart** tabs, and expanded walkthrough and actions. Flowchart controls sit above its diagram key, while step details appear in the sidebar when you click a box. The flowchart canvas fills the available height. Both outputs use the main canvas. A missing output can be added using its tab; drawing a flowchart requires an AI tool. **Back to all traces** returns to the library and whole map without deleting anything. The map stays in place as trace information changes. Older saved traces and import codes continue to work.
+**Explore:** the sidebar starts with the map title, followed by **New trace** and **Saved traces**. Repository details, component counts, and the current Git revision are in **Settings / Repository**. **New trace** opens a modal with vertically stacked output choices; hover or focus each help icon for its description. Expand **Import a trace code** inside this modal to open a shared trace. Closing the modal keeps an unsubmitted draft and lets submitted traces continue in the background. Running traces appear in the sidebar with a spinner and a skeleton title, replaced by an early title while the agent continues. Click a running entry to reopen its prompt, or choose **New trace** to start another. Background completions never replace another draft or selection. Select a trace to see its title, original prompt, **Architecture** / **Flowchart** / **Sitemap** tabs, and expanded walkthrough and actions. Flowchart controls sit above its diagram key, while step details appear in the sidebar when you click a box. The flowchart canvas fills the available height. All outputs use the main canvas. Only available outputs have tabs. Use **Edit** to select and regenerate missing outputs; generation requires an AI tool. **Back to all traces** returns to the library and whole map without deleting anything. The map stays in place as trace information changes. Older saved traces and import codes continue to work.
 
 Each diagram has a **Diagram key** accordion beside its controls, collapsed by default. Expand it to show the key below the controls. Clicking an architecture card opens a centered details overlay confined to the diagram, leaving the sidebar interactive. Close it with **Close details**, Escape, or a click on its backdrop. Flowcharts show their own process details and code references without architecture step numbers or the architecture walkthrough. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
 
 Hovering an architecture node button or group header highlights its connections. Moving off that item clears the hover highlight, including in empty diagram space; any selected card or active trace resumes its highlighting.
 
 Both diagrams fill the available workspace height and scroll inside their canvas. The architecture diagram's horizontal scrollbar stays at the bottom of the screen even when the diagram's content is short.
+
+All AI responses use shared JSON Schema contracts and are validated before use. Claude receives a simplified native schema; if structured output is rejected, repo-map retries once with JSON requested in the prompt, keeping the same model. If a trace violates its contract, the app makes one automatic formatting retry with the same agent and model, including the validation errors. These additional AI requests may add time and cost.
 
 **Keeping it current:** the map remembers the commit it was drawn from. Map and documentation issues show a notification icon on **Settings**, which shows what needs attention and offers **Update map**, **Redraw map**, **Relink docs**, and the tool, model and effort the map uses. Settings also holds the trace AI preference used for new traces and flowchart redraws. Use **Dismiss notification** in Settings to hide the icon for the current issue; dismissal is remembered in this browser, and new issues notify again. From a terminal, use `repo-map update`. Commit the updated `map.json` and `docs.json` like any other change.
 
@@ -150,9 +152,25 @@ If the repo has `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instruct
 
 ### Flowcharts
 
-With **Include a flowchart** ticked (the default), the AI tool also returns a flowchart with each trace. Traces saved without one have a **Draw flowchart** button, which asks the AI tool to draw it from the trace's steps and code. The chart opens in a window over the map: click a box for its detail, the trace step behind it and that step's code, or **Show on map** to jump there.
+With **Flowchart** selected (the default), the AI tool also returns a flowchart with each trace. Traces saved without one have a **Draw flowchart** action, which asks the AI tool to draw it from the trace's steps and code. Open the trace's **Flowchart** tab and select a box for its explanation and code references in the sidebar.
+
+New flowcharts identify where steps execute. When two or more participants are known, vertical **Execution lanes** group steps into Frontend, Backend, workers, databases, or named external services as relevant. Arrows crossing columns show handoffs. Return paths between steps in the same lane stay inside that lane, with space reserved for arrows and labels. Cross-lane returns use the outside route. Lane headings stay visible on an opaque header band while scrolling down the chart, covering the diagram beneath them and remaining aligned during horizontal scrolling and zooming. Ownership follows execution, not source folders; uncertain steps appear as **Unassigned**. Use the **Layout** selector to switch to **Compact**; this preference is remembered per repository in your browser. Single-participant and older flowcharts retain the compact layout. **Redraw** adds lane metadata to an older flowchart; opening it never starts an AI run.
 
 Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (using shared pure layout helpers), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
+
+Optional flow metadata is `lanes: [{ id, label }]` and `nodes[].lane`. It survives saving and sharing independently of proposal status and inferred behavior. SVG export follows the displayed layout. Mermaid preserves participant groups as subgraphs; other renderers may position them differently.
+
+### Sitemap
+
+At repository home, choose **Architecture / Sitemap** to explore components or major screens. Select **Generate sitemap** to analyze pages, substantial workspaces, and navigation from repository code using the map-generation AI settings. This is a whole-application view; a selected trace has **Architecture / Flowchart / Sitemap** tabs. **Back to all traces** restores your last repository view.
+
+Screens can have URL patterns such as `/products/:id` or no URL at all. Ordinary tabs and dialogs are described in screen details. Arrows require navigation evidence, not merely nested route names. Select a screen for its route, code references, and navigation conditions. Separate applications have an application selector; cross-application destinations are labeled. Incomplete analysis and repositories without user-facing screens have explicit results.
+
+The independent `.repo-map/sitemap.json` is suitable for committing. Version 1 contains `applicability` (`applicable`, `none`, or `incomplete`), `summary`, `applications: [{ id, label }]`, `screens: [{ id, app, label, route, detail, refs }]`, `navigation: [{ from, to, label, condition, refs }]`, `gaps`, and generation metadata (`generatedAt`, `commit`, `dirtyAtGeneration`). References use `{ path, start, end, why }` and are checked against accessible code. Limits are 20 applications, 200 screens, 400 navigation arrows, and three references per item; omissions are disclosed as gaps.
+
+Flowcharts and sitemaps share the same zoom, **Fit**, **Diagram key**, export, and generation toolbar. Sitemap's key explains screens, navigation, journey numbers, surrounding context, and proposed changes. **Copy Mermaid** and **Download SVG** export the displayed application/journey, including filters and proposed changes; SVG preserves theme colors and dimmed context.
+
+Use **More > Show info** for sitemap freshness, snapshot details, and analysis notes, or **More > Hide details** to give the diagram the full width; selecting a screen reopens its details. Journey notes expand for the selected step. **More > Refresh status** reloads the saved result without AI; **Regenerate** explicitly refreshes the analysis. Failed or stopped generation keeps the previous result. Generation shares the map/docs job lock and does not run automatically with architecture generation. Sitemap generation reads code only; it does not crawl a running site.
 
 ## Safety
 
@@ -186,3 +204,11 @@ npm run test:e2e                # Playwright
 ## License
 
 MIT
+
+Select **Sitemap** in the new-trace output choices to follow a question through screens and navigation; it can be selected alone or with Architecture and Flowchart. Generate the repository sitemap first if prompted?your question is kept. The journey numbers screens, supports repeated visits, and dims directly connected context; **Whole application** expands the view. Proposals mark screens and links **New**, **Modified**, or **Removed**, with original values in details. The base sitemap stays unchanged. Saved traces and share codes include a snapshot, so later regeneration does not rewrite old journeys. Use **Edit** on a saved trace to select Sitemap and regenerate that output. Questions with no relevant screens show an explanation rather than an invented journey.
+
+### Editing a saved trace
+
+Open a saved trace and choose **Edit** beneath its prompt to revise its complete question and output selections. **Regenerate** replaces the original only when every requested output is usable; its ID and creation date stay the same, and its old implementation plan is cleared. Failures keep the original and your question. Cancel keeps the draft in memory for reopening; reloading discards that draft. Output choices made while editing do not change defaults for new traces.
+
+Revisions reuse up to 12,000 characters of prior findings and code references to focus exploration. They still use the current map, repository guidance, and read-only code tools. No conversation history accumulates, and lower token usage is not guaranteed.

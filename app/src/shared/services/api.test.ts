@@ -3,6 +3,29 @@ import { createApiClient } from './api';
 import { createStorage } from './browser';
 
 describe('API and browser boundaries', () => {
+    it('accepts a successful delete with no response body and still rejects server errors', async () => {
+        const api = createApiClient(vi.fn(async () => new Response(null, { status: 204 })) as typeof fetch);
+        await expect(api.request<void>('/api/traces/saved-trace', { method: 'DELETE' })).resolves.toBeUndefined();
+        const failed = createApiClient(vi.fn(async () => new Response('{"error":"Permission denied"}', { status: 500 })) as typeof fetch);
+        await expect(failed.request('/api/traces/saved-trace', { method: 'DELETE' })).rejects.toThrow('Permission denied');
+    });
+    it('delivers an early title while the response is still running', async () => {
+        let stream!: ReadableStreamDefaultController<Uint8Array>;
+        const api = createApiClient(vi.fn(async () => new Response(new ReadableStream({
+            start(controller) { stream = controller; },
+        }))) as typeof fetch);
+        const title = vi.fn();
+        let finished = false;
+        const result = api.stream('/api/trace', {}, new AbortController().signal, vi.fn(), title)
+            .then(value => { finished = true; return value; });
+        await vi.waitFor(() => expect(stream).toBeDefined());
+        stream.enqueue(new TextEncoder().encode('{"type":"title","title":"Checkout failures"}\n'));
+        await vi.waitFor(() => expect(title).toHaveBeenCalledWith('Checkout failures'));
+        expect(finished).toBe(false);
+        stream.enqueue(new TextEncoder().encode('{"type":"result","trace":{"title":"Final title"}}\n'));
+        stream.close();
+        await expect(result).resolves.toMatchObject({ trace: { title: 'Final title' } });
+    });
     it('sends the API guard and handles split unicode and an unterminated final event', async () => {
         const bytes = new TextEncoder().encode(
             '{"type":"progress","text":"Préparing"}\n{"type":"result","value":3}'

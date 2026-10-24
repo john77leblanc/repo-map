@@ -2,7 +2,37 @@
 import type { StreamResult } from '../../models/types';
 import { autorun, runInAction } from 'mobx';
 import { fixture } from './testFixture';
+import { decodeTrace, encodeTrace } from '../../models/trace';
+import { FlowchartViewModel } from './FlowchartViewModel';
 describe('FlowchartViewModel', () => {
+    it('preserves lane metadata through sharing and remembers compact layout without changing the flow', () => {
+        const { vm, trace, services } = fixture();
+        trace.flow!.lanes = [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }];
+        trace.flow!.nodes[0].lane = 'web';
+        trace.flow!.nodes[1].lane = 'api';
+        const restored = decodeTrace(encodeTrace(trace), { nodes: [{ id: 'checkout', group: 'app', kind: 'service' }], groups: [], edges: [] });
+        expect(restored.flow).toEqual(trace.flow);
+        vm.setTrace(restored);
+        expect(vm.hasLanes).toBe(true);
+        expect(vm.layout?.lanes).toHaveLength(2);
+        vm.setCompact(true);
+        expect(vm.layout?.lanes).toHaveLength(0);
+        expect(vm.trace?.flow?.lanes).toHaveLength(2);
+        expect(services.storage.set).toHaveBeenCalledWith(vm.repo.namespace + 'flow-compact', true);
+        vi.mocked(services.storage.get).mockReturnValue(true);
+        const next = new FlowchartViewModel(vm.deps);
+        next.setTrace(restored);
+        expect(next.compact).toBe(true);
+        vm.select('a');
+        expect(vm.selectedLane).toBe('Frontend');
+        vm.downloadSvg(() => '#fff');
+        expect(vi.mocked(services.browser.download).mock.calls[0][1]).not.toContain('class="execution-lane"');
+        vm.setCompact(false);
+        vm.downloadSvg(() => '#fff');
+        expect(vi.mocked(services.browser.download).mock.calls[1][1]).toContain('class="execution-lane"');
+        vm.dispose();
+        next.dispose();
+    });
     it('invalidates computed SVG after nested edits and save metadata changes', async () => {
         const { vm, trace, saveTrace } = fixture();
         vm.setTrace(trace);
