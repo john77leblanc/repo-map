@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { anchorBranchCaptions, fitCaptions, layoutFlow, placeRow, renderFlowSvg, wrap } from '../app/flowchart.mjs';
 import { withDefaults } from '../lib/config.mjs';
-import { flowToMermaid, normalizeFlow } from '../lib/flow.mjs';
+import { countInferred, flowToMermaid, normalizeFlow } from '../lib/flow.mjs';
 import { flowPrompt, tracePrompt } from '../lib/prompts.mjs';
 import { startServer } from '../lib/server.mjs';
 
@@ -327,4 +327,12 @@ test('caption helpers keep captions on their paths and widen the canvas to fit',
     }
     const svg = renderFlowSvg(layout);
     assert.ok(svg.lastIndexOf('class="fn') < svg.indexOf('class="fl-all"'), 'captions render above boxes');
+});
+
+test('countInferred counts inferred nodes and edges', () => {
+    assert.equal(countInferred(null), 0);
+    assert.equal(countInferred({
+        nodes: [{ id: 'a', inferred: true }, { id: 'b' }],
+        edges: [{ from: 'a', to: 'b', inferred: true }, { from: 'b', to: 'a' }],
+    }), 2);
 });

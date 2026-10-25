@@ -30,7 +30,10 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc.hovering .fn:not(.hl),.fc.hovering .fe:not(.hl){opacity:.2}
 .fc.hovering .fl:not(.hl){opacity:.08}
 .fc .fn.hl,.fc .fe.hl,.fc .fl.hl{opacity:1!important}
-.fc .fn.hl .fs{stroke:var(--http);stroke-width:2.6}
+.fc .fs-ring,.fc .fs-gap{display:none;fill:none;stroke-linejoin:round;pointer-events:none}
+.fc .fn.hl-main .fs{stroke:var(--http);stroke-width:2.6}
+.fc .fn.hl-main .fs-ring{display:inline;stroke:var(--http);stroke-width:11}
+.fc .fn.hl-main .fs-gap{display:inline;stroke:var(--bg);stroke-width:7}
 .fc .fe.hl{stroke:var(--http);stroke-width:2.6}
 .fc .fl.hl text{fill:var(--ink)}
 .flegend .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
 import { SettingsViewModel } from '../settings/SettingsViewModel';
@@ -15,6 +15,7 @@ const catalog: Catalog = {
     generateSet: false,
 };
 const node = { id: 'app', group: 'g', kind: 'service', path: 'src' };
+const setupInfo = { name: 'shop map', codeRoots: ['src/'], context: '', dirs: [{ path: 'scripts/', suggested: false }, { path: 'src/', suggested: true }] };
 
 type Pending = { url: string; signal: AbortSignal; progress: (text: string) => void; resolve: (value: unknown) => void; reject: (e: unknown) => void };
 
@@ -51,6 +52,8 @@ function setup() {
     vi.mocked(f.services.api.get).mockImplementation(async (url: string) => {
         if (url === '/api/config') return f.repo.bootstrap;
         if (url === '/api/map') return { groups: [], edges: [], nodes: [node] };
+        if (url === '/api/setup') return setupInfo;
+        if (url.startsWith('/api/agents')) return settings.data;
         return {};
     });
     const vm = new StartViewModel({ repo: f.repo, services: f.services, settings, sitemap });
@@ -82,6 +85,8 @@ describe('StartViewModel', () => {
         streams[0].progress('Reading the map');
         streams[1].progress('Reading screens');
         expect(vm.mapMessage).toBe('Reading the map');
+        expect(vm.mapLog.entries.map((e) => e.text)).toEqual(['Starting…', 'Reading the map']);
+        expect(vm.sitemapLog.entries.map((e) => e.text)).toEqual(['Starting sitemap analysis…', 'Reading screens']);
         expect(vm.sitemapMessage).toBe('Reading screens');
         // the map finishes first: the screen stays while the sitemap runs
         streams[0].resolve({ check: { counts: { nodes: 1, edges: 0 } } });
@@ -135,11 +140,106 @@ describe('StartViewModel', () => {
     });
 });
 
+describe('onboarding steps', () => {
+    it('loads the project details and saves them before the AI step', async () => {
+        const { vm, services } = setup();
+        expect(vm.step).toBe('project');
+        await vm.loadSetup();
+        expect(vm.name).toBe('shop map');
+        expect(vm.roots).toEqual(['src/']);
+        expect(vm.folderOptions).toEqual(['scripts/', 'src/']);
+        vm.toggleRoot('scripts/', true);
+        vm.setCustomFolder(' ./packages/api ');
+        vm.addFolder();
+        vm.setContext('A shop.');
+        await vm.saveProject();
+        expect(services.api.request).toHaveBeenCalledWith('/api/setup', {
+            method: 'PUT',
+            body: JSON.stringify({ name: 'shop map', codeRoots: ['src/', 'scripts/', 'packages/api/'], context: 'A shop.' }),
+        });
+        expect(vm.step).toBe('ai');
+    });
+
+    it('needs a name and a folder', async () => {
+        const { vm } = setup();
+        await vm.loadSetup();
+        vm.toggleRoot('src/', false);
+        expect(vm.canSaveProject).toBe(false);
+        vm.toggleRoot('src/', true);
+        vm.setName('  ');
+        expect(vm.canSaveProject).toBe(false);
+    });
+
+    it('stays on the step and shows the server error when saving fails', async () => {
+        const { vm, services } = setup();
+        await vm.loadSetup();
+        vi.mocked(services.api.request).mockRejectedValueOnce(new Error('There is no folder'));
+        await vm.saveProject();
+        expect(vm.step).toBe('project');
+        expect(vm.stepError).toBe('There is no folder');
+    });
+
+    it('saves the trace tool as the default, then moves to Build', async () => {
+        const { vm, services, settings } = setup();
+        vm.step = 'ai';
+        settings.setTracePick({ agent: 'codex', effort: 'low' });
+        await vm.saveAi();
+        expect(services.api.request).toHaveBeenCalledWith('/api/settings/trace', {
+            method: 'PUT',
+            body: JSON.stringify({ agent: 'codex', effort: 'low' }),
+        });
+        expect(vm.step).toBe('build');
+        vm.back();
+        expect(vm.step).toBe('ai');
+    });
+
+    it('can give the map its own tool', () => {
+        const { vm, settings, services } = setup();
+        settings.setTracePick({ agent: 'codex' });
+        expect(vm.sameForMap).toBe(true);
+        vm.setSameForMap(false);
+        expect(vm.sameForMap).toBe(false);
+        expect(services.api.request).toHaveBeenCalledWith('/api/settings/generate', expect.objectContaining({ method: 'PUT', body: expect.stringContaining('"agent":"codex"') }));
+        vm.setSameForMap(true);
+        expect(vm.sameForMap).toBe(true);
+    });
+
+    it('goes on without AI when no tool is found', async () => {
+        const { vm, settings, services } = setup();
+        vm.step = 'ai';
+        settings.data = { agents: [], generate: null, generateReason: 'No AI tool found.' } as Catalog;
+        await vm.saveAi();
+        expect(vm.step).toBe('build');
+        expect(services.api.request).not.toHaveBeenCalled();
+        expect(vm.canBuild).toBe(false);
+    });
+});
+
 describe('StartView', () => {
-    it('renders the picker, an unchecked sitemap box and Build', () => {
+    it('starts on the project step with the detected folders', async () => {
         const { vm } = setup();
         render(<StartView vm={vm} />);
-        expect(screen.getByRole('combobox', { name: 'AI tool and model for the map' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Set up repo-map' })).toBeInTheDocument();
+        await screen.findByDisplayValue('shop map');
+        expect(screen.getByRole('checkbox', { name: /^src\// })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /^scripts\// })).not.toBeChecked();
+        expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    });
+
+    it('shows install help on the AI step when no tool is found', () => {
+        const { vm, settings } = setup();
+        settings.data = { agents: [], generate: null, generateReason: 'No AI tool found.' } as Catalog;
+        vm.step = 'ai';
+        render(<StartView vm={vm} />);
+        expect(screen.getByText(/No AI tool found on this machine/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Continue without AI' }));
+        expect(screen.getByRole('button', { name: 'Build' })).toBeDisabled();
+    });
+
+    it('renders an unchecked sitemap box and Build on the last step', () => {
+        const { vm } = setup();
+        vm.step = 'build';
+        render(<StartView vm={vm} />);
         expect(screen.getByRole('checkbox', { name: /Also build the sitemap/ })).not.toBeChecked();
         expect(screen.getByRole('button', { name: 'Build' })).toBeEnabled();
     });

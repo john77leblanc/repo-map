@@ -36,7 +36,10 @@ test('saved trace switches outputs, selects flow details, exports and restores t
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     await expect(page.locator('#fl-svgbox svg')).toBeVisible();
     await page.locator('#fl-svgbox .fn').first().click();
-    await expect(page.locator('#fl-side h3')).toHaveText('Begin checkout');
+    await expect(page.locator('#flowdlg #fl-side h3')).toHaveText('Begin checkout');
+    await expect(page.locator('#sidebar-trace #fl-side')).toHaveCount(0);
+    await page.locator('#fl-side-close').click();
+    await expect(page.locator('#fl-side')).toHaveCount(0);
     await expect(page.locator('#trace-walkthrough .steps')).toHaveCount(0);
     const initial = await page.locator('#fl-svgbox svg').getAttribute('width');
     await page.getByRole('button', { name: 'Fit', exact: true }).click();

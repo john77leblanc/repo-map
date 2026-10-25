@@ -1,4 +1,5 @@
 import { makeAutoObservable, observableRef, runInAction } from 'mobx';
+import { ProgressLog } from '../../models/ProgressLog';
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Sitemap, SitemapNavigation, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
 import { plain } from '../../models/trace';
@@ -31,11 +32,13 @@ class SitemapViewModel {
     appId = '';
     selectedId: string | null = null;
     connectionTab: ConnectionTab = 'to';
-    highlightIds: { nodes: string[]; navs: number[] } | null = null;
+    highlightIds: { nodes: string[]; navs: number[]; primary: string[] } | null = null;
     scale = 1;
     loading = false;
     busy = false;
     message = '';
+    /** Progress of the last sitemap generation, for the one-line status and its history. */
+    readonly log = new ProgressLog();
     error = false;
     readonly focus = new DiagramFocusModel({
         layout: () => this.layout,
@@ -93,15 +96,15 @@ class SitemapViewModel {
     setScope(scope: SitemapScope) { this.resetCopy(); this.scope = scope; this.highlightIds = null; this.focus.reset(); }
     setConnectionTab(tab: ConnectionTab) { this.connectionTab = tab; }
     hoverConnection(connection: Connection | null) {
-        this.highlightIds = connection ? { nodes: [connection.edge.from, connection.edge.to], navs: [connection.nav] } : null;
+        this.highlightIds = connection ? { nodes: [connection.edge.from, connection.edge.to], navs: [connection.nav], primary: [connection.other] } : null;
     }
-    hoverScreen(id: string | null) { this.highlightIds = id ? { nodes: [id], navs: [] } : null; }
+    hoverScreen(id: string | null) { this.highlightIds = id ? { nodes: [id], navs: [], primary: [id] } : null; }
     /** Side-panel hover as layout indices; hidden screens and links are skipped. */
     get panelHighlight() {
         if (!this.highlightIds || !this.layout) return null;
         const navs = new Set(this.highlightIds.navs);
         const edges = this.layout.edges.flatMap((edge: { nav?: number }, i: number) => navs.has(edge.nav ?? -1) ? [i] : []);
-        return { nodes: this.highlightIds.nodes, edges };
+        return { nodes: this.highlightIds.nodes, edges, primary: this.highlightIds.primary };
     }
     /** What DiagramSvg keeps bright: side-panel hover, then diagram hover, then the selected screen. */
     get highlight() { return this.focus.highlight; }
@@ -300,20 +303,24 @@ class SitemapViewModel {
         this.busy = true;
         this.error = false;
         this.message = 'Starting sitemap analysis…';
+        this.log.start(this.message);
         try {
             const result = await this.deps.services.api.stream<SitemapResult>('/api/sitemap/generate', {}, controller.signal, (message) => {
-                if (!controller.signal.aborted && !this.disposed) runInAction(() => { this.message = message; });
+                if (!controller.signal.aborted && !this.disposed) runInAction(() => { this.message = message; this.log.push(message); });
             });
             if (!result?.sitemap) throw new Error('The AI tool ended without a sitemap result.');
             if (!controller.signal.aborted && !this.disposed) runInAction(() => {
                 this.accept(result);
                 this.message = 'Sitemap saved.';
+                this.log.push(this.message);
             });
         } catch (error) {
             if (!controller.signal.aborted && !this.disposed) runInAction(() => {
                 this.error = true;
                 this.message = error instanceof Error ? error.message : 'Sitemap generation failed.';
+                this.log.push(this.message);
             });
+            else if (controller.signal.aborted) this.log.push('Stopped.');
         } finally {
             if (this.controller === controller) runInAction(() => { this.busy = false; this.controller = null; });
         }

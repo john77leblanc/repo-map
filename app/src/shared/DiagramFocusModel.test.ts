@@ -20,7 +20,7 @@ describe('neighborhood', () => {
 
 describe('DiagramFocusModel', () => {
     const setup = () => {
-        const state = observable({ layout: { edges } as { edges: typeof edges } | null, selected: null as string | null, override: null as { nodes: string[]; edges: number[] } | null });
+        const state = observable({ layout: { edges } as { edges: typeof edges } | null, selected: null as string | null, override: null as { nodes: string[]; edges: number[]; primary?: string[] } | null });
         const focus = new DiagramFocusModel({ layout: () => state.layout, selected: () => state.selected, override: () => state.override });
         return { state, focus };
     };
@@ -28,11 +28,11 @@ describe('DiagramFocusModel', () => {
         const { state, focus } = setup();
         expect(focus.highlight).toBeNull();
         state.selected = 'd';
-        expect(focus.highlight).toEqual({ nodes: ['d', 'c'], edges: [2] });
+        expect(focus.highlight).toEqual({ nodes: ['d', 'c'], edges: [2], primary: ['d'] });
         focus.hover('a');
-        expect(focus.highlight).toEqual({ nodes: ['a', 'b'], edges: [0] });
-        state.override = { nodes: ['x'], edges: [] };
-        expect(focus.highlight).toEqual({ nodes: ['x'], edges: [] });
+        expect(focus.highlight).toEqual({ nodes: ['a', 'b'], edges: [0], primary: ['a'] });
+        state.override = { nodes: ['x', 'y'], edges: [], primary: ['y'] };
+        expect(focus.highlight).toEqual({ nodes: ['x', 'y'], edges: [], primary: ['y'] });
         state.override = null;
         focus.hover(null);
         expect(focus.highlight?.nodes[0]).toBe('d');
@@ -43,7 +43,12 @@ describe('DiagramFocusModel', () => {
         focus.hover('d');
         focus.hoverEdge(1);
         expect(focus.hoverId).toBeNull();
-        expect(focus.highlight).toEqual({ nodes: ['b', 'c'], edges: [1] });
+        expect(focus.highlight).toEqual({ nodes: ['b', 'c'], edges: [1], primary: [] });
+        focus.hoverEdge(1, 'c');
+        expect(focus.highlight?.primary).toEqual(['c']);
+        focus.hoverEdge(null, 'c');
+        expect(focus.hoverPrimary).toBeNull();
+        focus.hoverEdge(1);
         focus.hover(null);
         expect(focus.hoverEdgeIndex).toBeNull();
         expect(focus.highlight?.nodes[0]).toBe('a');

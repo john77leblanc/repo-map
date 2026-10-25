@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- Open architecture card details in a panel on the right of the map instead of a centred overlay, matching the flowchart and sitemap. The selected card and its wires stay visible, there is no shade, and hovering a **From** / **To** connection highlights that card. Close with **Close** or Escape.
+
+- Give the main highlighted node in flowcharts and sitemaps a second accent ring outside its outline, separated by a small gap. Neighbours stay bright with a plain outline. Hovering a sidebar row (journey step, **From** / **To** connection) makes the node it names the main one, so it is easy to find; the selected node keeps its accent ring. Hovering a connector in the diagram highlights both ends equally.
+
+- Open flowchart step details in a panel on the right of the diagram instead of the trace sidebar. The panel appears when you click a box and shows its kind, lane, description, inferred and proposal notes, code references, and **From** / **To** tabs (shared `DirectionTabs`) that move the selection and highlight the connector. Close it with **Close** or Escape. The trace sidebar now only describes the trace; the inferred-parts warning moved there (`countInferred` in `lib/flow.mjs`). Selecting a node off-screen scrolls it into view (flowchart and sitemap).
+
+- Move first-run setup out of the terminal into a three-step browser onboarding: **Project** (map name, code folders from a checklist of top-level folders, description), **AI tools** (trace tool saved as your default in `~/.config/repo-map/ai.json`; optionally a separate map tool in `.repo-map/local.json`; setup help and **Recheck** when no tool is found), then **Build**. `repo-map` no longer asks anything: it writes a default config if missing, serves and opens the browser. The stale-map update prompt is gone (use the browser banner or `repo-map update`), as is pasting an OpenAI key at startup (set `REPO_MAP_API_KEY`). `--yes` now only skips opening the browser. The startup spinner (`lib/spinner.mjs`) is removed with the prompts.
+
+- Show job progress (onboarding map and sitemap builds, Settings **Update map** / **Redraw map** / **Relink docs**, sitemap **Regenerate**) as one truncated line. Click it to see every progress message with the seconds elapsed (`shared/ui/ProgressLine.tsx`, `models/ProgressLog.ts`).
+
+- Split architecture card connections into **From** and **To** tabs, like the sitemap's navigation. Both now use the shared `shared/ui/DirectionTabs.tsx`.
+
+- Give every modal the same header row, the title and a **Close** button (`shared/ui/ModalHeader.tsx`). The header stays put and only the content below it scrolls (`.modal-body`), including in Settings.
+
+- Add `GET`/`PUT /api/setup` (project details; folders must exist inside the repo and never be `.repo-map` or `.env*`) and `PUT /api/settings/trace` (default trace tool, validated like map picks).
+
 ## 0.12.0
 
 - **Breaking:** remove the `repo-map generate` command and the terminal "Draft the map now?" prompt. Scripts using `repo-map generate --if-missing` need updating. The first map is now built in the browser. Use **Redraw map** in Settings to redraw the whole map.

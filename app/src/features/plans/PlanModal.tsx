@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
+import { ModalHeader } from '../../shared/ui/ModalHeader';
 import type { PlansViewModel } from './PlansViewModel';
 export const PlanModal = observer(function PlanModal({ vm }: { vm: PlansViewModel }) {
     const dialog = useRef<HTMLDialogElement>(null);
@@ -12,17 +13,13 @@ export const PlanModal = observer(function PlanModal({ vm }: { vm: PlansViewMode
         <dialog
             ref={dialog}
             id="plan-dialog"
+            className="modal"
             aria-labelledby="plan-title"
             onClose={vm.close}
             onCancel={vm.close}
         >
-            <div className="fhead">
-                <h2 id="plan-title">Implementation plan</h2>
-                <button className="btn" id="plan-close" type="button" onClick={vm.close}>
-                    Close
-                </button>
-            </div>
-            <div className="plan-content">
+            <ModalHeader titleId="plan-title" title="Implementation plan" closeId="plan-close" onClose={vm.close} />
+            <div className="modal-body plan-content">
                 <p
                     id="plan-status"
                     className={'status' + (vm.busy ? ' busy' : '') + (vm.error ? ' err' : '')}

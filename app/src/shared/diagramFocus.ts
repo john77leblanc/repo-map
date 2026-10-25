@@ -1,7 +1,7 @@
 /** Edge endpoints; any diagram edge shape with `from` and `to` works. */
 interface FocusEdge { from: string; to: string }
-/** What a diagram keeps bright while the rest dims: node ids and edge indices. */
-interface Highlight { nodes: string[]; edges: number[] }
+/** What a diagram keeps bright while the rest dims: node ids and edge indices. `primary` nodes get the strongest emphasis. */
+interface Highlight { nodes: string[]; edges: number[]; primary?: string[] }
 
 /** The focused ids, the far end of every edge touching them, and those edges' indices. */
 function neighborhood(edges: readonly FocusEdge[], focus: ReadonlySet<string>) {

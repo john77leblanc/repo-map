@@ -25,7 +25,7 @@ No linter configured. Style: backend/shared helpers use ESM `.mjs`; frontend use
 
 CLI tool that serves an interactive architecture map of a target repo, plus AI-driven "traces" (plain-language walkthrough of a process, with optional flowchart). Each target repo stores state in `.repo-map/` (`config.json`, `map.json`, git-ignored `traces/`, `local.json`, drafts).
 
-- `bin/repo-map.mjs` — arg parsing + command dispatch. No-arg / `start` → `lib/start.mjs` (interactive setup: config → AI tool → offer update of a stale map → serve; non-TTY never prompts). There is no `generate` command: the first map is built in the browser's starter screen (`app/src/features/start/`), which picks the map agent, optionally builds the sitemap in parallel, or falls back to the folder starter map (`POST /api/map/starter`).
+- `bin/repo-map.mjs` — arg parsing + command dispatch. No-arg / `start` → `lib/start.mjs` (never prompts: writes a default config if missing, serves, opens the browser). There is no `generate` command: first-run setup is the browser onboarding (`app/src/features/start/`): **Project** (`GET/PUT /api/setup`, `lib/setup.mjs`) → **AI tools** (trace default via `PUT /api/settings/trace` → global `ai.json`; map pick via `PUT /api/settings/generate`) → **Build** (map, optional parallel sitemap, or folder starter map via `POST /api/map/starter`).
 - `lib/server.mjs` ? localhost-only Node built-in HTTP server serving built `dist/` assets and `/api/*` routes. API requires `x-map: 1` (CSRF guard) and rejects non-localhost Host headers. Map update/generate/docs jobs share one server-side lock; sitemap generation has its own, so it can run beside a map job (409 when the relevant lock is busy).
 - `app/index.html` ? Vite HTML entry, replacing the inline UI. Agent choices come from `/api/agents`; trace preferences are browser-local, and map preferences use `PUT /api/settings/generate` (? `.repo-map/local.json` `ai.generate`). Services handle streams and persistence.
 
@@ -37,6 +37,8 @@ The React/TypeScript/MobX frontend follows MVVM under `app/src/`:
 - `shared/`: services, ui, styles and types.
 
 View models are plain MobX classes with injected services and callbacks, owning observable state, actions and computed values. React views use `observer`, render state and invoke view-model actions; views make no direct network or storage calls. Services own HTTP/NDJSON streaming and persistence. Keep the base map immutable and derive proposal diagrams as computed, disposable compositions. DOM adapters for diagram mounting, measurement, focus, scrolling and SVG integration stay in views, outside models and view models.
+
+Shared UI standards (`app/src/shared/ui/`): every modal or overlay starts with `ModalHeader` (one row: title, then **Close**) followed by one `.modal-body` element, which is the only part that scrolls; diagram detail panels (architecture card, flowchart step, sitemap screen) are right-side `.fside` panels inside the diagram with **Close** and Escape, not modals; direction tabs (From/To) use `DirectionTabs`; job progress uses a `ProgressLog` (in the view model) rendered by `ProgressLine` (one truncated line, expandable history).
 
 Existing shared pure `.mjs` helpers, including `app/flowchart.mjs`, `lib/flow.mjs`, `lib/proposal.mjs` and `lib/trace-outputs.mjs`, remain dependency-free and browser-safe, without `node:` imports. Vite bundles frontend imports; source modules need no individual server module-whitelist entries.
 

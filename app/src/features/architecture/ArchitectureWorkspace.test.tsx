@@ -1,22 +1,9 @@
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, cleanup, act } from '@testing-library/react';
+import { runInAction } from 'mobx';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ArchitectureWorkspace } from './ArchitectureWorkspace';
 import { fixture } from './testFixture';
 
-beforeEach(() => {
-    Object.defineProperty(HTMLDialogElement.prototype, 'show', {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-            this.open = true;
-        },
-    });
-    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-            this.open = false;
-        },
-    });
-});
 afterEach(cleanup);
 describe('ArchitectureWorkspace', () => {
     it.each(['node', 'group'])('clears %s hover in empty diagram space', (item) => {
@@ -84,15 +71,44 @@ describe('ArchitectureWorkspace', () => {
         expect(vm.active).toBe(null);
         expect([...vm.relevant!]).toEqual(['two']);
     });
-    it('opens the scoped inspector and navigates connections', () => {
+    it('opens a side panel only on selection and navigates connections', () => {
         const { vm } = fixture();
-        render(<ArchitectureWorkspace vm={vm} />);
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
+        expect(container.querySelector('#arch-details')).toBe(null);
+        expect(container.querySelector('.arch-stage.details-open')).toBe(null);
         fireEvent.click(screen.getByRole('button', { name: 'One' }));
+        const panel = container.querySelector('.arch-stage.details-open > aside#arch-details')!;
+        expect(panel).toBeTruthy();
+        expect(container.querySelector('dialog, .arch-details-shade')).toBe(null);
+        // Hovering a connection makes its card the main (filled) highlight.
+        const two = screen.getByRole('button', { name: /Two\s*HTTP/ });
+        fireEvent.mouseEnter(two);
+        expect(vm.hover).toBe('two');
+        expect(container.querySelector('.node.act')?.getAttribute('data-id')).toBe('two');
+        fireEvent.mouseLeave(two);
+        expect(vm.hover).toBe(null);
         expect(screen.getByRole('heading', { name: 'One' })).toBeTruthy();
+        // One only sends: From is empty, so To is shown
+        expect(screen.getByRole('tab', { name: 'From (0)' })).toBeDisabled();
+        expect(screen.getByRole('tab', { name: 'To (1)' })).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByRole('button', { name: /Two\s*HTTP/ }));
         expect(vm.selected).toBe('two');
-        fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+        expect(screen.getByRole('tab', { name: 'From (1)' })).toHaveAttribute('aria-selected', 'true');
+        expect(vm.connectionsFor('two').from.map((c) => c.other)).toEqual(['one']);
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         expect(vm.selected).toBe(null);
+        expect(container.querySelector('#arch-details')).toBe(null);
+        fireEvent.click(screen.getByRole('button', { name: 'One' }));
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(vm.selected).toBe(null);
+    });
+    it.each([['new', 'New'], ['modified', 'Modified']] as const)('shows a %s proposal badge beside the details title', (status, label) => {
+        const { vm } = fixture();
+        runInAction(() => { vm.repo.map.nodes.find((n) => n.id === 'one')!.status = status; });
+        render(<ArchitectureWorkspace vm={vm} />);
+        act(() => vm.inspect('one'));
+        const title = screen.getByRole('heading', { name: 'One ' + label });
+        expect(title.querySelector('.proposal-badge')).toHaveClass(status);
     });
     it('exposes search, connection filters and diagram key accessibly', () => {
         const { vm } = fixture();

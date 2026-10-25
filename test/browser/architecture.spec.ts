@@ -36,33 +36,34 @@ test('desktop architecture keeps its header inset beneath the repository tabs', 
     expect(search!.y - main!.y).toBeCloseTo(24, 0);
 });
 
-test('node inspector closes with its button, Escape and the scoped backdrop', async ({ page }) => {
+test('node details open in a side panel beside the map and close with the button or Escape', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await openMap(page);
     const node = page.locator('.node[data-id="shopper"] .nh');
-    const inspector = page.locator('#arch-details');
-    const shade = page.locator('.arch-details-shade');
-    for (const close of ['button', 'escape', 'backdrop'] as const) {
+    const panel = page.locator('#arch-details');
+    await expect(panel).toHaveCount(0);
+    for (const close of ['button', 'escape'] as const) {
         await node.click();
-        await expect(inspector).toBeVisible();
-        await expect(inspector).toHaveAttribute('open', '');
-        await expect(inspector).toHaveAttribute('aria-modal', 'false');
+        await expect(panel).toBeVisible();
+        await expect(page.locator('dialog#arch-details, .arch-details-shade')).toHaveCount(0);
         await expect(node).toHaveAttribute('aria-expanded', 'true');
-        await expect(inspector.getByRole('heading', { name: 'Shopper', exact: true })).toBeVisible();
-        await expect(inspector.getByRole('button', { name: 'Close details' })).toBeFocused();
-        await expect(shade).toBeVisible();
-        if (close === 'button') await inspector.getByRole('button', { name: 'Close details' }).click();
-        else if (close === 'escape') await page.keyboard.press('Escape');
-        else await shade.click({ position: { x: 4, y: 4 } });
-        await expect(inspector).toBeHidden();
-        await expect(inspector).not.toHaveAttribute('open');
+        await expect(panel.getByRole('heading', { name: 'Shopper', exact: true })).toBeVisible();
+        // The panel sits to the right of the map and never covers the selected card.
+        const card = await node.boundingBox();
+        const side = await panel.boundingBox();
+        const map = await page.locator('#scroller').boundingBox();
+        expect(side!.x).toBeGreaterThanOrEqual(map!.x + map!.width - 1);
+        expect(card!.x + card!.width).toBeLessThanOrEqual(side!.x);
+        if (close === 'button') await panel.getByRole('button', { name: 'Close' }).click();
+        else await page.keyboard.press('Escape');
+        await expect(panel).toHaveCount(0);
         await expect(node).toHaveAttribute('aria-expanded', 'false');
-        await expect(shade).toBeHidden();
     }
-    // The overlay stays inside architecture and leaves library controls usable.
+    // Library controls stay usable while the panel is open.
     await node.click();
     await page.getByRole('button', { name: 'Collapse panel', exact: true }).click();
     await expect(page.locator('.app')).toHaveClass(/collapsed/);
-    await expect(inspector).toBeVisible();
+    await expect(panel).toBeVisible();
 });
 
 test('diagram key controls each connection type and remains independent of the inspector', async ({ page }) => {
@@ -214,4 +215,23 @@ test('proposal labels target unique base wire IDs while focus overlays have no I
         });
         expect(invalid).toEqual({ duplicates: [], brokenLabels: 0 });
     }
+});
+
+test('node details panel stays on screen and scrolls on a short viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 420 });
+    await openMap(page);
+    await page.locator('.node[data-id="shopper"] .nh').click();
+    const panel = page.locator('#arch-details');
+    await expect(panel).toBeVisible();
+    // pad the content so it must scroll
+    await panel.locator('.arch-details-body').evaluate((body) => {
+        const filler = document.createElement('div');
+        filler.style.height = '2000px';
+        body.append(filler);
+    });
+    const box = await panel.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(420);
+    const scrolled = await panel.evaluate((aside) => { aside.scrollTop = 500; return aside.scrollTop; });
+    expect(scrolled).toBe(500);
 });

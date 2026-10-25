@@ -4,7 +4,7 @@ import type { Application } from './Application';
 import { ShellView } from '../features/shell/ShellView';
 import { SettingsView } from '../features/settings/SettingsView';
 import { ArchitectureWorkspace } from '../features/architecture/ArchitectureWorkspace';
-import { FlowchartWorkspace, FlowchartDetails } from '../features/flowchart/FlowchartWorkspace';
+import { FlowchartWorkspace } from '../features/flowchart/FlowchartWorkspace';
 import { TraceHome, SelectedTraceSidebar } from '../features/traces/TraceViews';
 import { PlanModal } from '../features/plans/PlanModal';
 import { CodeReference } from '../shared/ui/CodeReference';
@@ -45,15 +45,7 @@ export const App = observer(function App() {
                                 void app.settings.loadCatalog(true);
                             }}
                         />
-                        <SelectedTraceSidebar
-                            vm={app.traces}
-                            flowDetails={
-                                <FlowchartDetails
-                                    vm={app.flowchart}
-                                    CodeReference={CodeReference}
-                                />
-                            }
-                        />
+                        <SelectedTraceSidebar vm={app.traces} />
                     </>
                 }
                 main={
@@ -93,7 +85,6 @@ export const App = observer(function App() {
                             <FlowchartWorkspace
                                 vm={app.flowchart}
                                 CodeReference={CodeReference}
-                                details={null}
                                 onNewTrace={app.traces.toggleComposer}
                             />
                         )}

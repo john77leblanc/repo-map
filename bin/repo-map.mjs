@@ -83,7 +83,7 @@ doctor
 start / serve
   --port <n>          Port (default 4477, or REPO_MAP_PORT; start moves on if it's taken)
   --no-open           start: don't open the browser
-  --yes               start: don't ask questions; use defaults
+  --yes               start: don't open the browser (start never asks questions)
 
 Scripted setup examples are in SETUP.md.`;
 

@@ -13,7 +13,7 @@ interface DiagramViewModel {
     /** Node click handler; defaults to toggling `select`. */
     pick?(id: string): void;
     /** Nodes and layout edge indices to emphasize while the rest dims. */
-    highlight?: { nodes: string[]; edges: number[] } | null;
+    highlight?: { nodes: string[]; edges: number[]; primary?: string[] } | null;
     /** Pointer or keyboard focus entering (id) or leaving (null) a node. */
     hoverNode?(id: string | null): void;
     /** Pointer entering (layout edge index) or leaving (null) a path or its caption. Hover only, no click. */
@@ -60,6 +60,16 @@ const DiagramSvg = observer(function DiagramSvg({
             hit.dataset.i = path.dataset.i || '';
             path.parentNode?.appendChild(hit);
         });
+        // Two copies under each node shape draw the main-highlight ring: a wide accent
+        // stroke, then a narrower background stroke that leaves an even gap on any shape.
+        host.current.querySelectorAll<SVGElement>('.fn .fs').forEach((shape) => {
+            for (const name of ['fs-ring', 'fs-gap']) {
+                const copy = shape.cloneNode() as SVGElement;
+                copy.setAttribute('class', name);
+                copy.setAttribute('aria-hidden', 'true');
+                shape.parentNode?.insertBefore(copy, shape);
+            }
+        });
         if (canvas.current)
             vm.fit(canvas.current.clientWidth, canvas.current.clientHeight, initialZoom);
     }, [svg, vm, initialZoom]);
@@ -81,14 +91,28 @@ const DiagramSvg = observer(function DiagramSvg({
             path.setAttribute('marker-end', `url(#${on ? 'fc-arrow-on' : 'fc-arrow'})`);
         });
     }, [svg, layout, vm, vm.scale, vm.selectedId]);
+    // Keep a newly selected node visible, e.g. after following a connection from a side panel.
+    useLayoutEffect(() => {
+        if (!vm.selectedId || !canvas.current) return;
+        const node = host.current?.querySelector<SVGElement>(`.fn[data-id="${CSS.escape(vm.selectedId)}"]`);
+        if (!node) return;
+        const box = node.getBoundingClientRect();
+        const view = canvas.current.getBoundingClientRect();
+        if (box.left < view.left || box.right > view.right || box.top < view.top || box.bottom > view.bottom)
+            node.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }, [vm.selectedId]);
     const highlight = vm.highlight;
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');
         if (!element) return;
         const nodes = new Set(highlight?.nodes || []);
         const edges = new Set((highlight?.edges || []).map(String));
+        const primary = new Set(highlight?.primary || []);
         element.classList.toggle('hovering', !!highlight && (nodes.size > 0 || edges.size > 0));
-        element.querySelectorAll<SVGElement>('.fn').forEach((node) => node.classList.toggle('hl', nodes.has(node.dataset.id || '')));
+        element.querySelectorAll<SVGElement>('.fn').forEach((node) => {
+            node.classList.toggle('hl', nodes.has(node.dataset.id || ''));
+            node.classList.toggle('hl-main', primary.has(node.dataset.id || ''));
+        });
         element.querySelectorAll<SVGElement>('.fe, .fl').forEach((item) => item.classList.toggle('hl', edges.has(item.dataset.i || '')));
         element.querySelectorAll<SVGElement>('.fe').forEach((path) => path.setAttribute('marker-end',
             `url(#${path.classList.contains('hl') || path.classList.contains('on') ? 'fc-arrow-on' : 'fc-arrow'})`));

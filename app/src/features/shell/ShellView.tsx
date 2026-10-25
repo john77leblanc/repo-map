@@ -86,7 +86,7 @@ export const ShellView = observer(function ShellView({
                                 className="btn"
                                 id="tab-map"
                                 type="button"
-                                hidden={selectedTrace}
+                                hidden={selectedTrace || vm.collapsed}
                                 aria-label={settingsLabel}
                                 title={settingsLabel}
                                 onClick={vm.openSettings}
@@ -107,7 +107,7 @@ export const ShellView = observer(function ShellView({
                                 className="btn"
                                 id="trace-back"
                                 type="button"
-                                hidden={!selectedTrace}
+                                hidden={!selectedTrace || vm.collapsed}
                                 onClick={onBack}
                             >
                                 Back to all traces

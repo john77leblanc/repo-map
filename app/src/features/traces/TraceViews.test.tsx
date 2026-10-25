@@ -26,6 +26,16 @@ it('renders composer outputs and imports errors with legacy classes', async () =
     expect(vm.composerOpen).toBe(false);
     vm.dispose();
 });
+it('keeps node details out of the trace sidebar and shows the inferred warning in Flowchart view', () => {
+    const { deps, repo } = fixture();
+    const vm = new TraceViewModel(deps);
+    const inferredFlow = { ...flow, nodes: [flow.nodes[0], { ...flow.nodes[1], inferred: true }] };
+    vm.select(normalizeTrace({ ...raw, flow: inferredFlow }, repo.map), 'flowchart');
+    const { container } = render(<SelectedTraceSidebar vm={vm} />);
+    expect(container.querySelector('#fl-side')).toBeNull();
+    expect(screen.getByText(/1 part is inferred/)).toBeVisible();
+    vm.dispose();
+});
 it('supports tab keyboard navigation, copy fallback, and confirmed deletion', async () => {
     const { deps, repo, services } = fixture();
     const vm = new TraceViewModel(deps);
@@ -36,7 +46,7 @@ it('supports tab keyboard navigation, copy fallback, and confirmed deletion', as
     render(
         <>
             <TraceBackButton vm={vm} />
-            <SelectedTraceSidebar vm={vm} flowDetails={<p>Flow details slot</p>} />
+            <SelectedTraceSidebar vm={vm} />
         </>
     );
     expect(screen.getByText('Back to all traces')).toHaveFocus();

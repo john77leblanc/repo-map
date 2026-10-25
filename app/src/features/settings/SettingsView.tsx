@@ -1,6 +1,8 @@
 ﻿import { observer } from 'mobx-react-lite';
 import { useEffect, useRef } from 'react';
 import { AgentPicker } from '../../shared/ui/AgentPicker';
+import { ModalHeader } from '../../shared/ui/ModalHeader';
+import { ProgressLine } from '../../shared/ui/ProgressLine';
 import type { SettingsViewModel } from './SettingsViewModel';
 
 export interface SettingsViewProps {
@@ -24,17 +26,15 @@ export const SettingsView = observer(function SettingsView({
         <dialog
             ref={dialog}
             id="settings-dialog"
+            className="modal"
             aria-labelledby="settings-title"
             onCancel={onClose}
             onClose={onClose}
         >
-            <div className="fhead">
-                <h2 id="settings-title">Settings</h2>
-                <button className="btn" id="settings-close" type="button" onClick={onClose}>
-                    Close
-                </button>
+            <ModalHeader titleId="settings-title" title="Settings" closeId="settings-close" onClose={onClose} />
+            <div className="modal-body">
+                <SettingsPanel vm={vm} />
             </div>
-            <SettingsPanel vm={vm} />
         </dialog>
     );
 });
@@ -191,13 +191,13 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
                     </button>
                 </div>
                 <div className="row">
-                    <span
-                        className={'status' + (vm.busy ? ' busy' : vm.jobError ? ' err' : '')}
+                    <ProgressLine
                         id="job-status"
-                        aria-live="polite"
-                    >
-                        {vm.jobStatus}
-                    </span>
+                        text={vm.jobStatus}
+                        entries={vm.busy || (vm.jobLog.last && vm.jobStatus.startsWith(vm.jobLog.last)) ? vm.jobLog.entries : []}
+                        busy={vm.busy}
+                        error={vm.jobError}
+                    />
                     <button
                         className="btn sm"
                         id="job-stop"

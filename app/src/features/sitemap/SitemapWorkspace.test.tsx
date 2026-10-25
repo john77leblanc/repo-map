@@ -158,12 +158,12 @@ describe('Sitemap', () => {
         const { vm, services } = fixture();
         render(<SitemapWorkspace vm={vm} />);
         fireEvent.click(screen.getByRole('button', { name: 'Generate sitemap' }));
-        await waitFor(() => expect(screen.getByText('Sitemap saved.')).toBeTruthy());
+        await waitFor(() => expect(document.querySelector('#sitemap-status')?.textContent).toBe('Sitemap saved.'));
         expect(services.api.stream).toHaveBeenCalledWith('/api/sitemap/generate', {}, expect.any(AbortSignal), expect.any(Function));
         const saved = vm.sitemap;
         vi.mocked(services.api.stream).mockRejectedValueOnce(new Error('AI unavailable'));
         fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
-        await waitFor(() => expect(screen.getByText('AI unavailable')).toBeTruthy());
+        await waitFor(() => expect(document.querySelector('#sitemap-status')?.textContent).toBe('AI unavailable'));
         expect(vm.sitemap).toBe(saved);
         vm.dispose();
     });

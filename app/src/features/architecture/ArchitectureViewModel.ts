@@ -12,6 +12,13 @@ export interface ArchitectureDependencies {
     onInspect?: (id: string | null) => void;
 }
 
+export type ConnectionDirection = 'from' | 'to';
+export interface CardConnection {
+    edge: RepoMap['edges'][number];
+    /** The card at the other end. */
+    other: string;
+}
+
 export class ArchitectureViewModel {
     trace: Trace | null = null;
     groups: Record<string, boolean> = {};
@@ -22,6 +29,8 @@ export class ArchitectureViewModel {
     hover: string | null = null;
     pinned: string | null = null;
     selected: string | null = null;
+    /** Connection tab in card details; kept while moving between cards. */
+    connectionTab: ConnectionDirection = 'from';
     revealId: string | null = null;
     revealVersion = 0;
     disposed = false;
@@ -42,6 +51,17 @@ export class ArchitectureViewModel {
     }
     get nodes() {
         return new Map(this.map.nodes.map((n) => [n.id, n]));
+    }
+    /** Connections of a card: From = edges arriving from other cards, To = edges leaving to them. */
+    connectionsFor(id: string): Record<ConnectionDirection, CardConnection[]> {
+        const edges = this.map.edges;
+        return {
+            from: edges.filter((e) => e.to === id).map((edge) => ({ edge, other: edge.from })),
+            to: edges.filter((e) => e.from === id).map((edge) => ({ edge, other: edge.to })),
+        };
+    }
+    setConnectionTab(tab: ConnectionDirection) {
+        this.connectionTab = tab;
     }
     get inspected() {
         return this.selected ? this.nodes.get(this.selected) : undefined;

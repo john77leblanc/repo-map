@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
+import { ModalHeader } from '../../shared/ui/ModalHeader';
 import type { TraceJob } from './TraceJob';
 import type { TraceViewModel } from './TraceViewModel';
 import type { Trace, Workspace } from '../../models/types';
@@ -51,7 +52,7 @@ export const TraceComposer = observer(function TraceComposer({
         if (inline && vm.editing) prompt.current?.focus();
     }, [inline, !!vm.editing]);
     return (
-        <section id={inline ? 'trace-editor' : 'composer'} hidden={!inline && !vm.composerOpen}>
+        <section id={inline ? 'trace-editor' : 'composer'} className={inline ? undefined : 'modal-body'} hidden={!inline && !vm.composerOpen}>
             {!inline && <>
                 <p className="hint" id="trace-hint">
                     Ask how a process works or where a new feature would fit. {vm.deps.getPickLabel()}{' '}
@@ -174,15 +175,12 @@ const NewTraceModal = observer(function NewTraceModal({ vm, onRefreshAgents }: T
         } else if (!open && element.open) element.close();
     }, [open]);
     return (
-        <dialog ref={dialog} id="trace-dialog" aria-labelledby="new-trace-title"
+        <dialog ref={dialog} id="trace-dialog" className="modal" aria-labelledby="new-trace-title"
             onCancel={(e) => { e.preventDefault(); vm.closeComposer(); }}
             onClose={() => { if (open) vm.closeComposer(); }}>
-            <div className="fhead">
-                <h2 id="new-trace-title">{vm.activeJob
-                    ? vm.activeJob.title || <span className="trace-title-skeleton">Preparing title...</span>
-                    : 'New trace'}</h2>
-                <button className="btn" type="button" onClick={vm.closeComposer}>Close</button>
-            </div>
+            <ModalHeader titleId="new-trace-title" onClose={vm.closeComposer} title={vm.activeJob
+                ? vm.activeJob.title || <span className="trace-title-skeleton">Preparing title...</span>
+                : 'New trace'} />
             {!vm.selected && !vm.editing && <TraceComposer vm={vm} onRefreshAgents={onRefreshAgents} />}
         </dialog>
     );
@@ -407,16 +405,11 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
         </div>
     );
 });
-export interface SelectedTraceProps extends TraceViewProps {
-    flowDetails?: ReactNode;
-}
-export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({
-    vm,
-    flowDetails,
-}: SelectedTraceProps) {
+export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm }: TraceViewProps) {
     const code = useRef<HTMLTextAreaElement>(null);
     const section = useRef<HTMLElement>(null);
     const active = !!vm.selected;
+    const inferred = vm.flowInferred;
     useEffect(() => {
         if (active) {
             const scroller = section.current?.closest('.side-in');
@@ -488,12 +481,17 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({
             <section
                 id="trace-flow-details"
                 hidden={vm.workspace !== 'flowchart'}
-                aria-label="Flowchart details"
+                aria-label="Flowchart notes"
             >
                 <p id="trace-flow-empty" className="hint" hidden={!vm.selected?.pendingFlow}>
                     The supporting walkthrough was kept. Draw the flowchart to complete this output.
                 </p>
-                {flowDetails}
+                {inferred > 0 && (
+                    <p id="trace-flow-inferred" className="fwarn">
+                        {inferred} part{inferred === 1 ? ' is' : 's are'} inferred. Check them before
+                        relying on this chart.
+                    </p>
+                )}
             </section>
             <div id="trace-walkthrough">
                 <TraceWalkthrough vm={vm} />

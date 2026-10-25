@@ -132,6 +132,8 @@ it('bundles screen details and From/To navigation tabs into journey steps, with 
     expect(container.querySelector('#sitemap-svgbox svg')?.classList.contains('hovering')).toBe(true);
     expect(container.querySelector('[data-id="checkout"]')?.classList.contains('hl')).toBe(true);
     expect(container.querySelectorAll('.fe.hl')).toHaveLength(1);
+    // Only the screen the row names is the main highlight; the selected end stays a neighbour.
+    expect([...container.querySelectorAll('.fn.hl-main')].map((n) => (n as SVGElement).dataset.id)).toEqual(['checkout']);
     fireEvent.mouseLeave(checkout);
     // Leaving falls back to the pinned (selected) screen and its neighbours.
     expect(vm.highlight?.nodes[0]).toBe('cart');
@@ -139,6 +141,7 @@ it('bundles screen details and From/To navigation tabs into journey steps, with 
     expect(container.querySelectorAll('.fe.hl')).toHaveLength(vm.highlight!.edges.length);
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'Step 2 · cart' }));
     expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
+    expect([...container.querySelectorAll('.fn.hl-main')].map((n) => (n as SVGElement).dataset.id)).toEqual(['cart']);
     fireEvent.mouseLeave(screen.getByRole('button', { name: 'Step 2 · cart' }));
     // A non-journey screen shows its details below the journey.
     fireEvent.click(checkout);

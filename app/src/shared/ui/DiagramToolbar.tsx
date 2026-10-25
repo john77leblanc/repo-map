@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { ProgressEntry } from '../../models/ProgressLog';
+import { ProgressLine } from './ProgressLine';
 
 interface DiagramToolbarProps {
     prefix: string;
@@ -8,6 +10,8 @@ interface DiagramToolbarProps {
     extraActions?: ReactNode;
     diagramKey: { id: string; open: boolean; toggle: () => void };
     status: string;
+    /** Job progress history; when the status is its latest line, the status expands into it. */
+    log?: ProgressEntry[];
     busy: boolean;
     loading?: boolean;
     error: boolean;
@@ -21,7 +25,7 @@ interface DiagramToolbarProps {
 }
 
 function DiagramToolbar({ prefix, label, available, selectors, extraActions, diagramKey,
-    status, busy, loading, error, copied, onZoom, onFit, onCopy, onDownload, onStop, generation }: DiagramToolbarProps) {
+    status, log, busy, loading, error, copied, onZoom, onFit, onCopy, onDownload, onStop, generation }: DiagramToolbarProps) {
     return (
         <div className="diagram-toolbar flow-tools">
             <div className="flow-zoom" role="group" aria-label={label + ' controls'}>
@@ -33,8 +37,10 @@ function DiagramToolbar({ prefix, label, available, selectors, extraActions, dia
                     aria-expanded={diagramKey.open} aria-controls={diagramKey.id} onClick={diagramKey.toggle}>Diagram key</button>
             </div>
             <div className="flow-actions">
-                <span className={'status' + (busy || loading ? ' busy' : error ? ' err' : '')}
-                    id={prefix + '-status'} role="status" aria-live="polite">{status}</span>
+                {log && log.length > 1 && status === log[log.length - 1].text
+                    ? <ProgressLine id={prefix + '-status'} text={status} entries={log} busy={busy || loading} error={error} />
+                    : <span className={'status' + (busy || loading ? ' busy' : error ? ' err' : '')}
+                        id={prefix + '-status'} role="status" aria-live="polite">{status}</span>}
                 <button className="btn sm" id={prefix + '-mermaid'} type="button"
                     title="Mermaid source, for GitHub, GitLab, Notion and other Markdown tools"
                     disabled={!available} onClick={onCopy}>{copied ? 'Copied' : 'Copy Mermaid'}</button>

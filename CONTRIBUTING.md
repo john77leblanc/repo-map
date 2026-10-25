@@ -24,8 +24,6 @@ npm run test:e2e                # Playwright
 node /path/to/repo-map/bin/repo-map.mjs serve --dir /path/to/other-repo
 ```
 
-Startup uses the dependency-free `lib/spinner.mjs` helper while drafting or updating the map, including the docs pass. It animates only on TTY stdout, preserves progress lines, and must be stopped before result or cancellation messages and in `finally` cleanup. Standalone AI commands use plain progress output.
-
 ### Layout
 
 ```

@@ -22,18 +22,15 @@ npm install --save-dev @whitemane/repo-map
 npx repo-map
 ```
 
-The first run asks only what it needs:
+The terminal asks nothing. If the repo has no `.repo-map/` yet, it writes `.repo-map/config.json` with detected defaults, serves on port 4477 (or the next free one) and opens the browser. When there is no map yet, the browser opens on a three-step onboarding screen:
 
-1. **Map details** (only if the repo has no `.repo-map/` yet): a name, the folders that hold code, and a one-line description. Press Enter to accept each suggestion.
-2. **AI tool** (only if none is working yet): it lists what it finds on your machine (Claude Code, a running Ollama or LM Studio, Codex, Gemini) plus OpenAI, or **Skip**. Your choice is saved for every repo in `~/.config/repo-map/ai.json`. An OpenAI key you paste is used for that session only and never saved to a file.
-3. **Open the browser.** If port 4477 is taken, it uses the next free one.
-4. **Build the map** (only if there isn't one). The browser opens on a starter screen: pick the AI tool, model and effort, optionally tick **Also build the sitemap**, and press **Build**. The map and sitemap run side by side, each with its own progress line and **Stop** button, and usually take a few minutes. Your choice is saved for you in this repo (`.repo-map/local.json`) and can be changed later in **Settings / Map agent**. Without an AI tool, choose **Start from folders instead** for one card per code folder.
+1. **Project**: the map name, which folders hold code (top-level folders are listed with the detected ones ticked; add others such as `packages/api`), and an optional one-line description for the AI. Saved to `.repo-map/config.json`, so the team shares it.
+2. **AI tools**: pick the tool, model and effort for traces from the ones found on your machine (Claude Code, Codex, Gemini, a running Ollama or LM Studio, an API). It becomes your default in every repo (`~/.config/repo-map/ai.json`). Untick **Use the same for the map** to give the map its own tool or a stronger model, saved for you in this repo (`.repo-map/local.json`). With no tool found, the step explains how to set one up, with **Recheck**. API keys come only from environment variables: set `REPO_MAP_API_KEY`, then restart repo-map. **Skip AI for now** goes on without one.
+3. **Build**: optionally tick **Also build the sitemap**, and press **Build**. The map and sitemap run side by side, each with its own one-line progress (click it for the full history with elapsed seconds) and **Stop** button, and usually take a few minutes. Without an AI tool, choose **Start from folders instead** for one card per code folder.
 
-After that, `npx repo-map` (or `npm run map`) just opens the map. Teammates joining a repo that already has a map get only step 2, and only if they don't have an AI tool set up yet.
+After that, `npx repo-map` (or `npm run map`) just opens the map. A stale map is offered for update from the banner in the browser (or run `repo-map update`). Teammates joining a repo that already has a map pick their AI tool in **Settings**, or with `repo-map ai <tool>`.
 
-`npx @whitemane/repo-map` does the same without installing anything. When there's no terminal to ask questions in (CI, a pipe, or `--yes`), it uses the defaults and serves without opening the browser; the starter screen is waiting when you open it.
-
-While startup updates a stale map, a terminal spinner (`| / - \`) shows that work is continuing, even between progress messages. It clears when the work finishes, fails, or is stopped with Ctrl+C. Animation is only enabled for terminal output; standalone `update` and `docs` commands keep their plain progress output.
+`npx @whitemane/repo-map` does the same without installing anything. Without a terminal (CI, a pipe) or with `--yes`, it serves without opening the browser; onboarding is waiting when you open it.
 
 Everything else in this guide is for when you want more control.
 
@@ -204,7 +201,7 @@ With `"provider": "auto"` (the default), repo-map uses the first one that's read
 
 The setting above is only the **default**. In the browser, **Settings / Trace agent** lists every tool repo-map found on your machine, with its models and effort levels. This choice is remembered in that browser for new traces and flowchart redraws. **Custom model...** takes any model id the tool accepts. The refresh button beside **Create trace**, or the one in Settings, looks for tools again, for example after you start Ollama.
 
-Drawing and updating the map reads much more code than a trace, so it can use its own tool, model and effort. `repo-map` asks about this the first time; to change it later:
+Drawing and updating the map reads much more code than a trace, so it can use its own tool, model and effort. Onboarding offers this (untick **Use the same for the map**); to change it later:
 
 ```shell
 repo-map ai claude --model opus --effort high --for generate
@@ -370,7 +367,7 @@ Each saved trace is one question with linked outputs. The sidebar home shows the
 
 Click an architecture card or flowchart box for explanations, code references and linked documentation. Flowchart details appear in the selected trace sidebar, without architecture step numbers, step labels or the architecture walkthrough. Relevant code and documentation remain accessible. Switch outputs using its **Architecture** and **Flowchart** tabs. **Back to all traces** returns to the library and whole map without deleting saved data. Trace information stays beside the diagram so it does not shift vertically. Flowchart zoom, Fit, Mermaid and SVG export, redraw, progress and Stop controls sit above the diagram key. Its canvas fills the available height; process details remain in the sidebar. Settings and Back to all traces share the top sidebar control slot.
 
-Each diagram's **Diagram key** button is an accordion beside its controls, collapsed by default. Expanding it reveals the complete key below the controls. Architecture card details open in an overlay centered within the diagram, with explanations, code references, documentation and connection navigation. Its backdrop covers only the diagram, so the sidebar remains interactive by mouse and keyboard. Use **Close details**, Escape, or click its backdrop to dismiss it. Flowchart details remain in the trace sidebar. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
+Each diagram's **Diagram key** button is an accordion beside its controls, collapsed by default. Expanding it reveals the complete key below the controls. Architecture card details open in a panel on the right of the map, with explanations, code references, documentation, and connections in **From** (cards that send to it) and **To** (cards it sends to) tabs. Hovering a connection highlights that card. Use **Close** or Escape to dismiss it. Flowchart step details use the same kind of panel. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
 
 ### Sitemap and execution lanes
 

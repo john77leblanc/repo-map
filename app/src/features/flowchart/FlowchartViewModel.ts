@@ -1,10 +1,10 @@
 ﻿import { makeAutoObservable, observable, isObservable, observableRef, runInAction } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { AgentPick, Flow, Trace, StreamResult } from '../../models/types';
+import type { AgentPick, ChangeStatus, Flow, Trace, StreamResult } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
-import { normalizeFlow, flowToMermaid, flowLanes } from '../../../../lib/flow.mjs';
+import { normalizeFlow, flowToMermaid, flowLanes, countInferred } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
 import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
@@ -17,9 +17,16 @@ export interface FlowchartDeps {
     onTraceUpdated: (trace: Trace) => void;
     onNodeSelected?: (id: string | null) => void;
 }
+export type ConnectionTab = 'from' | 'to';
+export interface FlowConnection {
+    edge: Flow['edges'][number];
+    index: number;
+    other: string;
+}
 export class FlowchartViewModel {
     trace: Trace | null = null;
     selectedId: string | null = null;
+    connectionTab: ConnectionTab = 'to';
     scale = 1;
     keyOpen = false;
     busy = false;
@@ -94,11 +101,43 @@ export class FlowchartViewModel {
               ]
             : [];
     }
-    get inferred() {
-        return (
-            (this.trace?.flow?.nodes.filter((n) => n.inferred).length || 0) +
-            (this.trace?.flow?.edges.filter((e) => e.inferred).length || 0)
-        );
+    get inferred(): number {
+        return countInferred(this.trace?.flow);
+    }
+    /** Edges arriving at (from) and leaving (to) the selected node, with their index for edge highlighting. */
+    get connections() {
+        const empty = { from: [] as FlowConnection[], to: [] as FlowConnection[] };
+        const id = this.selectedId;
+        // Layout edges, not flow edges: their indices are what the diagram highlights.
+        const edges = this.layout?.edges as Flow['edges'] | undefined;
+        if (!id || !edges) return empty;
+        edges.forEach((edge, index) => {
+            if (edge.to === id) empty.from.push({ edge, index, other: edge.from });
+            if (edge.from === id) empty.to.push({ edge, index, other: edge.to });
+        });
+        return empty;
+    }
+    /** Proposal status for the selected node, with the rationale from its linked architecture change. */
+    get selectedChange(): { status: ChangeStatus; rationale: string } | null {
+        const node = this.selected;
+        if (!node || this.trace?.intent !== 'proposal') return null;
+        const stepId = node.step ? this.trace.steps[node.step - 1]?.id : null;
+        const change = stepId ? this.trace.proposal?.nodes.find((n) => n.id === stepId) : undefined;
+        const status = node.status || change?.status;
+        return status ? { status, rationale: change?.rationale || '' } : null;
+    }
+    nodeLabel(id: string) {
+        return this.trace?.flow?.nodes.find((node) => node.id === id)?.label || id;
+    }
+    setConnectionTab(tab: ConnectionTab) {
+        this.connectionTab = tab;
+    }
+    /** Side-panel connection hover: the edge, with the node the row names as the main highlight. */
+    hoverConnection(index: number | null, other: string | null = null) {
+        this.focus.hoverEdge(index, other);
+    }
+    close() {
+        this.select(null);
     }
     setTrace(trace: Trace | null) {
         this.stop(false);

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
+import { DirectionTabs } from '../../shared/ui/DirectionTabs';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
 import { useArchitectureWires } from './useArchitectureWires';
@@ -28,18 +29,9 @@ const Chevron = () => (
 export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
     vm,
 }: ArchitectureWorkspaceProps) {
-    const board = useRef<HTMLDivElement>(null),
-        dialog = useRef<HTMLDialogElement>(null);
+    const board = useRef<HTMLDivElement>(null);
     const geometry = useArchitectureWires(board, vm);
     const selected = vm.inspected;
-    useLayoutEffect(() => {
-        const el = dialog.current;
-        if (!el) return;
-        if (selected) {
-            if (!el.open) el.show();
-            el.querySelector<HTMLButtonElement>('[data-close]')?.focus({ preventScroll: true });
-        } else if (el.open) el.close();
-    }, [selected?.id]);
     useEffect(() => {
         const listener = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && !document.querySelector('dialog:modal')) {
@@ -184,7 +176,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                     <span className="key-change removed">Removed</span>
                 </p>
             </section>
-            <div className="arch-stage">
+            <div className={'arch-stage' + (selected ? ' details-open' : '')}>
                 <div className="scroller" id="scroller">
                     <p className="empty" id="map-empty" hidden={!!vm.map.nodes.length}>
                         This map is empty. Open Settings to redraw it with an AI tool.
@@ -318,7 +310,6 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                                         vm.selected === n.id
                                                                     }
                                                                     aria-controls="arch-details"
-                                                                    aria-haspopup="dialog"
                                                                     onClick={() =>
                                                                         vm.toggleNode(n.id)
                                                                     }
@@ -416,143 +407,129 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         </svg>
                     </div>
                 </div>
-                <div
-                    className="arch-details-shade"
-                    hidden={!selected}
-                    aria-hidden="true"
-                    onClick={vm.dismiss}
-                />
-                <dialog
-                    ref={dialog}
-                    id="arch-details"
-                    hidden={!selected}
-                    aria-labelledby="arch-details-title"
-                    aria-modal="false"
-                    data-id={selected?.id}
-                    onCancel={(e) => {
-                        e.preventDefault();
-                        vm.dismiss();
-                    }}
-                >
-                    {selected && (
-                        <>
-                            <button
-                                className="btn sm"
-                                type="button"
-                                data-close
-                                onClick={vm.dismiss}
-                            >
-                                Close details
-                            </button>
-                            <h2 id="arch-details-title">{selected.title || selected.id}</h2>
-                            <p className="description">
-                                {selected.desc ||
-                                    (selected.status === 'new' ? selected.rationale : '')}
-                            </p>
-                            {selected.status && (
-                                <p className="proposal-note">
-                                    {change(selected.status)}: {selected.rationale}
-                                    {selected.suggestedPath
-                                        ? ' Suggested path: ' + selected.suggestedPath
-                                        : ''}
-                                </p>
-                            )}
-                            <ul className="facts">
-                                {selected.facts?.map((f, i) => (
-                                    <li key={i}>{f}</li>
-                                ))}
-                            </ul>
-                            <div className="refs">
-                                {vm.trace?.steps.map((s, i) =>
-                                    s.id === selected.id ? (
-                                        <section key={i} className="arch-step">
-                                            <h3>
-                                                <span
-                                                    className="arch-step-number"
-                                                    aria-label={'Step ' + (i + 1)}
-                                                >
-                                                    {i + 1}
-                                                </span>
-                                                <span>Trace step</span>
-                                            </h3>
-                                            <p>{s.note}</p>
-                                            {vm.trace?.refs
-                                                .filter((r) => r.step === selected.id)
-                                                .map((r, j) => (
-                                                    <CodeReference
-                                                        key={selected.id + r.path + j}
-                                                        reference={r}
-                                                        repo={vm.repo}
-                                                    />
-                                                ))}
-                                        </section>
-                                    ) : null
+                {selected && (
+                    <aside
+                        className="fside arch-side"
+                        id="arch-details"
+                        aria-labelledby="arch-details-title"
+                        aria-live="polite"
+                        data-id={selected.id}
+                    >
+                        <div className="fside-head">
+                            <h3 id="arch-details-title">
+                                {selected.title || selected.id}
+                                {selected.status && ' '}
+                                {selected.status && (
+                                    <span className={'proposal-badge ' + selected.status}>{change(selected.status)}</span>
                                 )}
-                                {vm.repo.docs[selected.id]?.map((r, i) => (
-                                    <DocumentationReference
-                                        key={selected.id + r.path + i}
-                                        reference={r}
-                                        repo={vm.repo}
-                                    />
-                                ))}
-                            </div>
-                            <div className="conn">
-                                <h4>Connections</h4>
-                                <ul>
-                                    {['in', 'out'].flatMap((dir) =>
-                                        vm.map.edges
-                                            .filter(
-                                                (e) =>
-                                                    (dir === 'in' ? e.to : e.from) === selected.id
-                                            )
-                                            .map((e, i) => {
-                                                const id = dir === 'in' ? e.from : e.to;
-                                                return (
-                                                    <li key={dir + i}>
-                                                        <button
-                                                            className="cl"
-                                                            type="button"
-                                                            data-go={id}
-                                                            onClick={() => vm.inspect(id)}
-                                                        >
-                                                            <i className={'sw ' + e.type} />
-                                                            <b>{vm.nodes.get(id)?.title || id}</b>
-                                                            <span>
-                                                                {[
-                                                                    change(e.status),
-                                                                    e.label ||
-                                                                        connectionLabels[e.type],
-                                                                ]
-                                                                    .filter(Boolean)
-                                                                    .join(': ')}
-                                                            </span>
-                                                            {e.inferred && <em>inferred</em>}
-                                                        </button>
-                                                    </li>
-                                                );
-                                            })
-                                    )}
-                                </ul>
-                            </div>
-                            {selected.path && (
-                                <p className="path">
-                                    {vm.repo.bootstrap?.repo.ghBase ? (
-                                        <a
-                                            href={`${vm.repo.bootstrap.repo.ghBase}/tree/${vm.repo.bootstrap.repo.ghRef || 'HEAD'}/${selected.path}`}
-                                            target="_blank"
-                                            rel="noopener"
-                                        >
-                                            {selected.path}
-                                        </a>
-                                    ) : (
-                                        selected.path
-                                    )}
-                                </p>
+                            </h3>
+                            <button className="btn sm" type="button" data-close onClick={vm.dismiss}>Close</button>
+                        </div>
+                        <div className="arch-details-body">
+                        <p className="description">
+                            {selected.desc ||
+                                (selected.status === 'new' ? selected.rationale : '')}
+                        </p>
+                        {selected.status && (
+                            <p className="proposal-note">
+                                {change(selected.status)}: {selected.rationale}
+                                {selected.suggestedPath
+                                    ? ' Suggested path: ' + selected.suggestedPath
+                                    : ''}
+                            </p>
+                        )}
+                        <ul className="facts">
+                            {selected.facts?.map((f, i) => (
+                                <li key={i}>{f}</li>
+                            ))}
+                        </ul>
+                        <div className="refs">
+                            {vm.trace?.steps.map((s, i) =>
+                                s.id === selected.id ? (
+                                    <section key={i} className="arch-step">
+                                        <h3>
+                                            <span
+                                                className="arch-step-number"
+                                                aria-label={'Step ' + (i + 1)}
+                                            >
+                                                {i + 1}
+                                            </span>
+                                            <span>Trace step</span>
+                                        </h3>
+                                        <p>{s.note}</p>
+                                        {vm.trace?.refs
+                                            .filter((r) => r.step === selected.id)
+                                            .map((r, j) => (
+                                                <CodeReference
+                                                    key={selected.id + r.path + j}
+                                                    reference={r}
+                                                    repo={vm.repo}
+                                                />
+                                            ))}
+                                    </section>
+                                ) : null
                             )}
-                        </>
-                    )}
-                </dialog>
+                            {vm.repo.docs[selected.id]?.map((r, i) => (
+                                <DocumentationReference
+                                    key={selected.id + r.path + i}
+                                    reference={r}
+                                    repo={vm.repo}
+                                />
+                            ))}
+                        </div>
+                        <CardConnections vm={vm} id={selected.id} />
+                        {selected.path && (
+                            <p className="path">
+                                {vm.repo.bootstrap?.repo.ghBase ? (
+                                    <a
+                                        href={`${vm.repo.bootstrap.repo.ghBase}/tree/${vm.repo.bootstrap.repo.ghRef || 'HEAD'}/${selected.path}`}
+                                        target="_blank"
+                                        rel="noopener"
+                                    >
+                                        {selected.path}
+                                    </a>
+                                ) : (
+                                    selected.path
+                                )}
+                            </p>
+                        )}
+                        </div>
+                    </aside>
+                )}
             </div>
+        </section>
+    );
+});
+
+/** A card's connections, split into From (arriving) and To (leaving) tabs. */
+const CardConnections = observer(function CardConnections({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
+    const conns = vm.connectionsFor(id);
+    if (!conns.from.length && !conns.to.length) {
+        return <div className="conn"><h4>Connections</h4><p className="hint">No connections.</p></div>;
+    }
+    return (
+        <section className="conn" aria-label="Connections">
+            <h4>Connections</h4>
+            <DirectionTabs idPrefix={'arch-conn-' + id} label="Connection direction" active={vm.connectionTab}
+                onChange={vm.setConnectionTab}
+                tabs={[{ id: 'from', label: 'From', count: conns.from.length }, { id: 'to', label: 'To', count: conns.to.length }]}>
+                {(active) => (
+                    <ul>
+                        {conns[active].map(({ edge: e, other }, i) => (
+                            <li key={active + i}>
+                                <button className="cl" type="button" data-go={other} onClick={() => vm.inspect(other)}
+                                    onMouseEnter={() => vm.setHover(other)} onMouseLeave={() => vm.setHover(null)}
+                                    onFocus={() => vm.setHover(other)} onBlur={() => vm.setHover(null)}>
+                                    <i className={'sw ' + e.type} />
+                                    <b>{vm.nodes.get(other)?.title || other}</b>
+                                    <span>{[change(e.status), e.label || connectionLabels[e.type]].filter(Boolean).join(': ')}</span>
+                                    {e.inferred && <em>inferred</em>}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </DirectionTabs>
         </section>
     );
 });

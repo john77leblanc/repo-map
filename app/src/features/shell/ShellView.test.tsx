@@ -58,6 +58,8 @@ describe('shell', () => {
         expect(vm.settingsOpen).toBe(true);
         fireEvent.click(screen.getByRole('button', { name: 'Collapse panel' }));
         expect(vm.collapsed).toBe(true);
+        // Collapsed, the expand button is the only control left in the bar.
+        expect([...view.container.querySelectorAll('.side-bar button:not([hidden])')].map((b) => b.id)).toEqual(['side-toggle']);
         const boundary = screen
             .getByText('Library slot')
             .closest('[data-sidebar-content]') as HTMLElement;

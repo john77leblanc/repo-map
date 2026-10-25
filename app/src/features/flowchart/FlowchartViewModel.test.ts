@@ -70,6 +70,44 @@ describe('FlowchartViewModel', () => {
         expect(vm.scale).toBe(2.5);
         vm.dispose();
     });
+    it('lists connections by direction with layout edge indices', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace(trace);
+        expect(vm.connections).toEqual({ from: [], to: [] });
+        vm.select('a');
+        expect(vm.connectionTab).toBe('to');
+        expect(vm.connections.to).toEqual([{ edge: expect.objectContaining({ label: 'yes' }), index: 0, other: 'b' }]);
+        expect(vm.connections.from).toEqual([]);
+        expect(vm.nodeLabel('b')).toBe('Done');
+        vm.select('b');
+        expect(vm.connections.from.map((c) => c.other)).toEqual(['a']);
+        vm.hoverConnection(0, 'a');
+        expect(vm.highlight).toEqual({ nodes: ['a', 'b'], edges: [0], primary: ['a'] });
+        vm.setConnectionTab('from');
+        expect(vm.connectionTab).toBe('from');
+        vm.close();
+        expect(vm.selectedId).toBeNull();
+        vm.dispose();
+    });
+    it('shows proposal status with the linked change rationale', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace({
+            ...trace,
+            intent: 'proposal',
+            proposal: {
+                rationale: '', assumptions: [], questions: [], edges: [],
+                nodes: [{ id: 'checkout', title: 'Checkout', status: 'modified', rationale: 'Adds a retry.' } as never],
+            },
+        });
+        vm.select('a');
+        expect(vm.selectedChange).toEqual({ status: 'modified', rationale: 'Adds a retry.' });
+        vm.select('b');
+        expect(vm.selectedChange).toBeNull();
+        vm.setTrace(trace);
+        vm.select('a');
+        expect(vm.selectedChange).toBeNull();
+        vm.dispose();
+    });
     it('allows integration to reselect the saved trace from onTraceUpdated', async () => {
         const { vm, trace, onTraceUpdated } = fixture();
         onTraceUpdated.mockImplementation((updated) => vm.setTrace(updated));

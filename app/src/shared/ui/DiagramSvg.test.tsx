@@ -18,6 +18,9 @@ describe('DiagramSvg focus', () => {
         fireEvent.mouseOver(node('a').querySelector('text')!);
         expect(svg().classList.contains('hovering')).toBe(true);
         expect(['a', 'b', 'c'].map((id) => node(id).classList.contains('hl'))).toEqual([true, true, false]);
+        expect(['a', 'b', 'c'].map((id) => node(id).classList.contains('hl-main'))).toEqual([true, false, false]);
+        // Each shape gets a ring and a gap copy beneath it for the main-highlight outline.
+        expect([...node('a').children].slice(0, 3).map((child) => child.getAttribute('class'))).toEqual(['fs-ring', 'fs-gap', 'fs']);
         expect(container.querySelectorAll('.fe.hl')).toHaveLength(1);
         expect(container.querySelector('.fl.hl')?.textContent).toBe('go');
         // Captions paint after the boxes, and the highlighted one is last.

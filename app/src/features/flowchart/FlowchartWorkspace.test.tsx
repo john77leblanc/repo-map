@@ -1,6 +1,6 @@
 ﻿import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { FlowchartDetails, FlowchartWorkspace } from './FlowchartWorkspace';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+import { FlowchartWorkspace } from './FlowchartWorkspace';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { fixture } from './testFixture';
 import type { CodeRef } from '../../models/types';
@@ -25,23 +25,54 @@ describe('FlowchartWorkspace', () => {
         unmount();
         vm.dispose();
     });
-    it('composes separate sidebar details with doc labels and a Unicode decision arrow', () => {
+    it('opens the right panel only on selection, with doc labels and From/To connections', () => {
         const { vm, trace } = fixture();
         vm.setTrace(trace);
-        vm.select('a');
         vm.repo.docs.checkout[0].title = 'Checkout guide';
         const { container, unmount } = render(
-            <>
-                <FlowchartWorkspace vm={vm} CodeReference={CodeReference} details={null} />
-                <FlowchartDetails vm={vm} CodeReference={CodeReference} />
-            </>
+            <FlowchartWorkspace vm={vm} CodeReference={CodeReference} />
         );
-        expect(container.querySelectorAll('#fl-side')).toHaveLength(1);
+        expect(container.querySelector('#fl-side')).toBeNull();
         expect(container.querySelector('.fmain.details-closed')).toBeTruthy();
+        act(() => vm.select('a'));
+        const side = container.querySelector('.fmain #fl-side')!;
+        expect(side).toBeTruthy();
+        expect(container.querySelector('.fmain.details-closed')).toBeNull();
+        expect(side.querySelector('h3')?.textContent).toBe('Ready?');
         expect(screen.getByText('Checkout guide')).toBeTruthy();
         expect(screen.getByText('Agent guide')).toBeTruthy();
         expect(screen.getByText('README.md#L3-L4')).toBeTruthy();
-        expect(container.querySelector('#fl-side .fd')?.textContent).toBe('yes \u2192 Done');
+        expect(screen.getByRole('tab', { name: /To/ }).getAttribute('aria-selected')).toBe('true');
+        expect(side.querySelector('.flow-conn li')?.textContent).toBe('Doneyes');
+        fireEvent.mouseEnter(side.querySelector('[data-go="b"]')!);
+        expect([...container.querySelectorAll('.fn.hl-main')].map((n) => (n as SVGElement).dataset.id)).toEqual(['b']);
+        expect(container.querySelector('.fn[data-id="a"]')?.classList.contains('hl')).toBe(true);
+        fireEvent.click(side.querySelector('[data-go="b"]')!);
+        expect(vm.selectedId).toBe('b');
+        expect(screen.getByText(/Inferred\. Check this step/)).toBeTruthy();
+        expect(side.querySelector('[data-go="a"]')).toBeTruthy();
+        fireEvent.keyDown(side, { key: 'Escape' });
+        expect(vm.selectedId).toBeNull();
+        expect(container.querySelector('#fl-side')).toBeNull();
+        expect(document.activeElement).toBe(container.querySelector('.fn[data-id="b"]'));
+        act(() => vm.select('a'));
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(vm.selectedId).toBeNull();
+        unmount();
+        vm.dispose();
+    });
+    it('shows a connection change status as a coloured badge inside its button', () => {
+        const { vm, trace, flow } = fixture();
+        vm.setTrace({ ...trace, intent: 'proposal', flow: {
+            nodes: [{ ...flow.nodes[0], status: 'modified' }, flow.nodes[1]],
+            edges: [{ ...flow.edges[0], status: 'new' }],
+        } });
+        act(() => vm.select('a'));
+        const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
+        const badge = container.querySelector('#fl-side [data-go="b"] .proposal-badge.new');
+        expect(badge?.textContent).toBe('New');
+        expect(container.querySelector('#fl-side .flow-change h4.modified')?.textContent).toBe('Modified');
+        expect(container.querySelector('#fl-side .flow-conn li .hint')?.textContent).toBe('yes');
         unmount();
         vm.dispose();
     });

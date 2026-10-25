@@ -2,6 +2,7 @@
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentData, AgentPick } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
+import { ProgressLog } from '../../models/ProgressLog';
 
 export interface Catalog extends Omit<AgentData, 'default'> {
     default?: AgentPick | null;
@@ -94,6 +95,8 @@ export class SettingsViewModel {
     saveError = false;
     saving = false;
     jobStatus = '';
+    /** Progress of the running map job; jobStatus shows its latest line with the elapsed time. */
+    readonly jobLog = new ProgressLog();
     jobError = false;
     busy = false;
     redrawArmed = false;
@@ -238,6 +241,15 @@ export class SettingsViewModel {
         this.tracePick = this.normalizePick(pick);
         this.deps.services.storage.set(this.deps.repo.namespace + 'pick', this.tracePick);
     }
+    /** Make `pick` this person's default trace tool in every repo (~/.config/repo-map/ai.json). */
+    async saveTraceDefault(pick: AgentPick) {
+        this.setTracePick(pick);
+        await this.deps.services.api.request('/api/settings/trace', {
+            method: 'PUT',
+            body: JSON.stringify(this.tracePick || {}),
+        });
+        await this.loadCatalog(true);
+    }
     async setMapPick(pick: AgentPick | null) {
         if (this.disposed) return;
         this.mapPick = pick;
@@ -350,6 +362,7 @@ export class SettingsViewModel {
         this.jobError = false;
         const start = Date.now();
         let last = 'Starting…';
+        this.jobLog.start(last);
         const update = () => {
             if (!this.disposed && this.jobCtl === ctl)
                 runInAction(() => {
@@ -369,6 +382,7 @@ export class SettingsViewModel {
                 ctl.signal,
                 (text) => {
                     last = text;
+                    this.jobLog.push(text);
                     update();
                 }
             );
@@ -399,6 +413,7 @@ export class SettingsViewModel {
                         ? ' · ' + result.spend
                         : '';
                 this.jobStatus = text + spend + ' Reloading…';
+                this.jobLog.push(text + spend);
                 this.deps.onJobComplete?.(kind, result);
                 this.reloadTimer = setTimeout(() => {
                     if (!this.disposed) this.deps.services.browser.reload();
@@ -409,6 +424,7 @@ export class SettingsViewModel {
                 runInAction(() => {
                     this.jobError = !ctl.signal.aborted;
                     this.jobStatus = ctl.signal.aborted ? 'Stopped.' : message(e);
+                    this.jobLog.push(this.jobStatus);
                 });
         } finally {
             if (!this.disposed && ctl === this.jobCtl)

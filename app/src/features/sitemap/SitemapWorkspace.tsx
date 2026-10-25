@@ -6,6 +6,7 @@ import { DiagramMore } from '../../shared/ui/DiagramMore';
 import { SitemapLegend } from './SitemapLegend';
 import { SITEMAP_CSS } from './styles';
 import { CodeReference } from '../../shared/ui/CodeReference';
+import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
 import { FC_CSS, UI_CSS } from '../flowchart/styles';
 import type { SitemapViewModel, SitemapScope, ConnectionTab } from './SitemapViewModel';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
@@ -35,29 +36,11 @@ const ScreenDetails = observer(function ScreenDetails({ vm, id, stepRefs }: { vm
 const ConnectionTabs = observer(function ConnectionTabs({ vm, id }: { vm: SitemapViewModel; id: string }) {
     const nav = vm.navFor(id);
     if (!nav.from.length && !nav.to.length) return <p className="hint">No navigation found in code.</p>;
-    const tabs: [ConnectionTab, string][] = [['from', 'From'], ['to', 'To']];
-    const active = nav[vm.connectionTab].length ? vm.connectionTab : vm.connectionTab === 'to' ? 'from' : 'to';
-    const panel = `sitemap-nav-${id}-${active}`;
+    const tabs: DirectionTab<ConnectionTab>[] = [{ id: 'from', label: 'From', count: nav.from.length }, { id: 'to', label: 'To', count: nav.to.length }];
     return <section className="sitemap-nav" aria-label="Navigation">
         <h4>Navigation</h4>
-        <div className="sitemap-nav-tabs" role="tablist" aria-label="Navigation direction">
-            {tabs.map(([tab, label]) => <button key={tab} type="button" role="tab" id={`sitemap-nav-${id}-${tab}-tab`}
-                aria-selected={active === tab} aria-controls={panel} tabIndex={active === tab ? 0 : -1}
-                disabled={!nav[tab].length} onClick={() => vm.setConnectionTab(tab)}
-                onKeyDown={(e) => {
-                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-                    e.preventDefault();
-                    const buttons = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') || [])];
-                    const index = buttons.indexOf(e.currentTarget);
-                    const target = buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1
-                        : (index + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length];
-                    if (target) { target.focus(); target.click(); }
-                }}>
-                {label} ({nav[tab].length})
-            </button>)}
-        </div>
-        <div role="tabpanel" id={panel} aria-labelledby={`sitemap-nav-${id}-${active}-tab`}>
-            {nav[active].map((connection) => {
+        <DirectionTabs idPrefix={'sitemap-nav-' + id} label="Navigation direction" tabs={tabs} active={vm.connectionTab} onChange={vm.setConnectionTab}>
+            {(active) => nav[active].map((connection) => {
                 const { edge, original } = connection;
                 return <div className={'sitemap-connection' + (connection.journey ? '' : ' context')} key={connection.nav}>
                     <p><button className="btn sm" onClick={() => vm.select(connection.other)}
@@ -75,7 +58,7 @@ const ConnectionTabs = observer(function ConnectionTabs({ vm, id }: { vm: Sitema
                     {edge.refs.length > 0 && <div className="refs">{edge.refs.map((reference, i) => <CodeReference key={i} reference={reference} repo={vm.repo} />)}</div>}
                 </div>;
             })}
-        </div>
+        </DirectionTabs>
     </section>;
 });
 
@@ -100,7 +83,7 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     </label>}
                 </>}
                 diagramKey={{ id: 'sitemap-key', open: vm.keyOpen, toggle: vm.toggleKey }}
-                status={vm.loading ? 'Loading sitemap...' : vm.message} busy={vm.busy} loading={vm.loading}
+                status={vm.loading ? 'Loading sitemap...' : vm.message} log={vm.log.entries} busy={vm.busy} loading={vm.loading}
                 error={vm.error} copied={vm.copied} onZoom={vm.zoom} onFit={() => {
                     const canvas = root.current?.querySelector('#sitemap-canvas');
                     if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);

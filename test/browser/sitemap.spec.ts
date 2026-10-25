@@ -52,7 +52,7 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
     await expect(page.getByText('Not generated', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Generate sitemap', exact: true }).click();
-    await expect(page.getByText('Sitemap saved.')).toBeVisible();
+    await expect(page.locator('#sitemap-status')).toHaveText('Sitemap saved.');
     await page.getByLabel('Application', { exact: true }).selectOption('shop');
     await expect(page.locator('#sitemap-svgbox .fn')).toHaveCount(4);
     await page.locator('#sitemap-svgbox [data-id="checkout"]').focus();

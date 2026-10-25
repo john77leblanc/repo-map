@@ -4,6 +4,7 @@ import type { Services } from '../../shared/services/contracts';
 import type { AgentPick, StreamResult, Trace, Workspace } from '../../models/types';
 import { decodeTrace, encodeTrace, normalizeTrace, plain, spend } from '../../models/trace';
 import { TraceJob } from './TraceJob';
+import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
 export interface TraceDependencies {
@@ -106,6 +107,10 @@ export class TraceViewModel {
         if (trace.outputs.flowchart && trace.flow) outputs.push('flowchart');
         if (trace.outputs.sitemap && trace.sitemap) outputs.push('sitemap');
         return outputs;
+    }
+    /** Inferred nodes and edges in the selected trace's flowchart. */
+    get flowInferred(): number {
+        return countInferred(this.selected?.flow);
     }
     get availableOutputs() {
         return this.selected ? this.outputsFor(this.selected) : [];

@@ -134,7 +134,7 @@ test('running with no command sets everything up without questions when there is
     });
     child.kill();
     assert.match(out, /Created \.repo-map\/config\.json/);
-    assert.match(out, /No map yet\. Build it in the browser/);
+    assert.match(out, /No map yet\. Finish setup in the browser/);
     assert.match(out, /→ http:\/\/localhost:\d+/);
     // the first map is built from the browser's starter screen, not here
     assert.equal(existsSync(path.join(s.repo, '.repo-map', 'map.json')), false);
