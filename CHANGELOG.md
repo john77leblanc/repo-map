@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Map search moves to the side panel. The architecture toolbar ends with a right-aligned **Search** button (also `/` or Ctrl/Cmd+K). Results list every matching card by column, then group, with the repo tag in the workspace view and a snippet when only the description matched; an empty query lists every card. Arrow keys and Enter pick a result, as does a click; the card's details replace the results, and **← Results** (or Escape) goes back. Close ends the search and clears the highlight.
+- **Expand groups** and **Collapse groups** are now one button: **Expand all** while any group is closed, **Collapse all** once every group is open.
+- **Diagram key** is a toggle with a legend icon, filled while the key shows, on the architecture, flowchart and sitemap toolbars.
+- One view row for everything. **Architecture / Flowchart / Sitemap** tabs sit above the canvas for the map and for traces (the trace sidebar no longer has its own tabs), with a label saying what you are viewing. With linked repos, **This repo / Workspace** leads the row, before a divider. Views that don't exist yet keep a dashed tab and show a centered message with **Generate** (map architecture, repository sitemap, a trace's flowchart or sitemap; a trace without steps reruns with Architecture selected), or **New trace** for Flowchart on the map. A pulsing dot marks a view that is generating. Opening a trace from the library keeps the current view; leaving a trace from Flowchart returns to the last map view.
+
 ## 0.14.0
 
 - Traces cross repos. While the map shows the **Workspace**, a new trace runs over the merged map: the AI tool may step into linked repos (prefixed ids such as `api:orders-route`), reads their code through `<name>:path` (Claude Code via `--add-dir`, API models via prefixed read-only tools), and refs are checked inside the linked repo with its own exclusions. Steps on a placeholder card a seam explains move to the real card. Flowcharts nest their lanes inside one band per repo, in the diagram, SVG and Mermaid export (`subgraph` per repo), and a band's fold button collapses a whole repo into one box. A saved workspace trace always opens on the workspace map; steps in a repo that is no longer linked are kept and marked "not linked". Proposals stay on this repo's map.

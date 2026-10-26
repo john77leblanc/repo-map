@@ -36,7 +36,7 @@ it('keeps node details out of the trace sidebar and shows the inferred warning i
     expect(screen.getByText(/1 part is inferred/)).toBeVisible();
     vm.dispose();
 });
-it('supports tab keyboard navigation, copy fallback, and confirmed deletion', async () => {
+it('supports copy fallback and confirmed deletion, with no output tabs in the sidebar', async () => {
     const { deps, repo, services } = fixture();
     const vm = new TraceViewModel(deps);
     const t = normalizeTrace({ ...raw, flow }, repo.map);
@@ -50,9 +50,7 @@ it('supports tab keyboard navigation, copy fallback, and confirmed deletion', as
         </>
     );
     expect(screen.getByText('Back to all traces')).toHaveFocus();
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Architecture' }), { key: 'End' });
-    expect(screen.getByRole('tab', { name: 'Flowchart' })).toHaveFocus();
-    expect(screen.queryByRole('tab', { name: 'Sitemap' })).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
     fireEvent.click(screen.getByText('Copy trace code'));
     const code = await screen.findByLabelText('Trace code');
     await vi.waitFor(() => expect(code).toBeVisible());

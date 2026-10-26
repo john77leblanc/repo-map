@@ -73,9 +73,14 @@ export class ShellViewModel {
         else return false;
         return true;
     }
-    showRepository(workspace: 'architecture' | 'sitemap' = this.repositoryWorkspace) {
-        this.repositoryWorkspace = workspace;
+    /** Show a map view; architecture and sitemap are remembered for leaving a trace from Flowchart. */
+    showRepository(workspace: Workspace = this.repositoryWorkspace) {
+        if (workspace !== 'flowchart') this.repositoryWorkspace = workspace;
         this.showWorkspace(workspace);
+    }
+    /** Back on the map: keep the current view, except Flowchart, which only traces have. */
+    returnToMap() {
+        this.showRepository(this.workspace === 'flowchart' ? this.repositoryWorkspace : this.workspace);
     }
     showWorkspace(workspace: Workspace | 'sitemap') {
         this.workspace = workspace;

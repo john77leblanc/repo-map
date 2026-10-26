@@ -50,8 +50,8 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await page.getByRole('tab', { name: 'Architecture', exact: true }).focus();
     await page.keyboard.press('End');
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
-    await expect(page.getByText('Not generated', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Generate sitemap', exact: true }).click();
+    await expect(page.locator('#view-missing h2')).toHaveText("The sitemap view doesn't exist for this map");
+    await page.locator('#view-missing').getByRole('button', { name: 'Generate', exact: true }).click();
     await expect(page.locator('#sitemap-status')).toHaveText('Sitemap saved.');
     await page.getByLabel('Application', { exact: true }).selectOption('shop');
     await expect(page.locator('#sitemap-svgbox .fn')).toHaveCount(4);
@@ -99,7 +99,9 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await expect(page.locator('#sitemap-actions')).toBeHidden();
     await page.screenshot({ path: testInfo.outputPath('sitemap-desktop.png') });
     await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
-    await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveCount(0);
+    // The trace opens on Sitemap, which it doesn't have.
+    await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveClass(/missing/);
+    await expect(page.locator('#view-missing h2')).toHaveText("The sitemap view doesn't exist for this trace");
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     await expect(page.locator('#fl-svgbox .execution-lane')).toHaveCount(4);
     await page.getByRole('button', { name: 'Back to all traces', exact: true }).click();

@@ -116,11 +116,48 @@ describe('ArchitectureWorkspace', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Diagram key' }));
         fireEvent.click(screen.getByRole('button', { name: 'HTTP call' }));
         expect(vm.hidden.http).toBe(true);
-        const search = screen.getByRole('searchbox');
+        fireEvent.click(screen.getByRole('button', { name: /Search/ }));
+        const search = screen.getByRole('combobox', { name: 'Find a node' });
         fireEvent.change(search, { target: { value: 'two' } });
         fireEvent.keyDown(search, { key: 'Enter' });
         expect(vm.selected).toBe('two');
         expect(screen.getByRole('heading', { name: 'Two' })).toBeTruthy();
+    });
+    it('puts the search button last and lists results in the side panel', () => {
+        const { vm } = fixture();
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
+        const controls = [...container.querySelectorAll('.controls > *')];
+        expect(controls.at(-1)?.id).toBe('arch-search-toggle');
+        fireEvent.click(screen.getByRole('button', { name: /Search/ }));
+        expect(container.querySelector('.arch-stage.details-open > aside#arch-details')).toBeTruthy();
+        const results = screen.getByRole('listbox', { name: 'Matching nodes' });
+        expect([...results.querySelectorAll('[role=option]')].map((o) => o.textContent)).toEqual(['One', 'Two']);
+        const search = screen.getByRole('combobox', { name: 'Find a node' });
+        fireEvent.keyDown(search, { key: 'ArrowDown' });
+        expect(screen.getByRole('option', { name: 'Two' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('option', { name: 'One' }));
+        expect(screen.getByRole('heading', { name: 'One' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: '← Results' }));
+        expect(screen.getByRole('listbox', { name: 'Matching nodes' })).toBeTruthy();
+        // Escape on a picked card goes back to results; on results it closes the panel
+        fireEvent.click(screen.getByRole('option', { name: 'Two' }));
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(vm.searchOpen).toBe(true);
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(container.querySelector('#arch-details')).toBe(null);
+    });
+    it('opens search with "/" and Ctrl+K, but not while typing', () => {
+        const { vm } = fixture();
+        render(<ArchitectureWorkspace vm={vm} />);
+        const input = document.body.appendChild(document.createElement('input'));
+        fireEvent.keyDown(input, { key: '/' });
+        expect(vm.searchOpen).toBe(false);
+        input.remove();
+        fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
+        expect(vm.searchOpen).toBe(true);
+        act(() => vm.dismiss());
+        fireEvent.keyDown(document, { key: '/' });
+        expect(vm.searchOpen).toBe(true);
     });
     it('lists card contracts in its details panel', () => {
         const { vm } = fixture();

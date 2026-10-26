@@ -249,31 +249,18 @@ function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean 
         </section>
     );
 }
-export interface FlowchartWorkspaceProps extends FlowchartDetailsProps {
-    onNewTrace?: () => void;
-}
+export type FlowchartWorkspaceProps = FlowchartDetailsProps;
+/** A trace's flowchart. Without a trace the app shows the view switcher's message instead. */
 export const FlowchartWorkspace = observer(function FlowchartWorkspace({
     vm,
     CodeReference,
-    onNewTrace,
 }: FlowchartWorkspaceProps) {
     const root = useRef<HTMLElement>(null);
     const hasFlow = !!vm.trace?.flow;
     return (
         <>
             <style>{FC_CSS + UI_CSS}</style>
-            {!vm.trace ? (
-                <div id="flow-empty" className="flow-empty">
-                    <h2>Explore a process as a flowchart</h2>
-                    <p>
-                        Create a trace with Flowchart selected, or open a saved flowchart from the
-                        library.
-                    </p>
-                    <button className="btn primary" type="button" onClick={onNewTrace}>
-                        New trace
-                    </button>
-                </div>
-            ) : (
+            {!vm.trace ? null : (
                 <section ref={root} className="fdlg" id="flowdlg" aria-label="Flowchart">
                     <DiagramToolbar prefix="fl" label="Flowchart" available={hasFlow}
                         selectors={vm.hasLanes && <label>

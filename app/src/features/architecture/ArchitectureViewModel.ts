@@ -18,6 +18,30 @@ export interface ArchitectureDependencies {
 export type MapScope = 'repo' | 'workspace';
 
 export type ConnectionDirection = 'from' | 'to';
+/** Description text around a search hit, for results matched only by description. */
+export interface SearchSnippet {
+    before: string;
+    hit: string;
+    after: string;
+}
+export interface SearchSection {
+    col: number;
+    title: string;
+    groups: { id: string; title: string; repo?: string; nodes: { node: MapNode; snippet?: SearchSnippet }[] }[];
+}
+
+/** About `width` characters of `text` centred on the first match of `q` (lower-case). */
+function snippetOf(text: string, q: string, width = 70): SearchSnippet | undefined {
+    const at = text.toLowerCase().indexOf(q);
+    if (at < 0) return undefined;
+    const start = Math.max(0, at - Math.floor((width - q.length) / 2));
+    const end = Math.min(text.length, Math.max(start + width, at + q.length));
+    return {
+        before: (start > 0 ? '…' : '') + text.slice(start, at),
+        hit: text.slice(at, at + q.length),
+        after: text.slice(at + q.length, end) + (end < text.length ? '…' : ''),
+    };
+}
 export interface CardConnection {
     edge: RepoMap['edges'][number];
     /** The card at the other end. */
@@ -34,6 +58,10 @@ export class ArchitectureViewModel {
     hover: string | null = null;
     pinned: string | null = null;
     selected: string | null = null;
+    /** Search results open in the side panel (a picked card shows over them). */
+    searchOpen = false;
+    /** Highlighted search result, an index into `searchHits`. */
+    searchCursor = 0;
     /** Connection tab in card details; kept while moving between cards. */
     connectionTab: ConnectionDirection = 'from';
     revealId: string | null = null;
@@ -66,7 +94,7 @@ export class ArchitectureViewModel {
         if (this.scopeChoice === scope) return;
         this.scopeChoice = scope;
         this.deps.services.storage.set(this.repo.namespace + 'map-scope', scope);
-        this.dismiss();
+        this.backToResults();
     }
     isRepoCollapsed(name: string) {
         return this.collapsedRepos.includes(REPO_PREFIX + name);
@@ -78,7 +106,7 @@ export class ArchitectureViewModel {
     private setCollapsedRepos(ids: string[]) {
         this.collapsedRepos = ids;
         this.deps.services.storage.set(this.repo.namespace + 'repo-collapse', ids);
-        if (this.selected && !this.nodes.has(this.selected)) this.dismiss();
+        if (this.selected && !this.nodes.has(this.selected)) this.backToResults();
     }
     /** Expand a collapsed repo card, optionally opening one of its cards. */
     expandCollapsed(id: string, select?: string) {
@@ -86,7 +114,7 @@ export class ArchitectureViewModel {
         if (!node?.collapsed) return;
         this.setCollapsedRepos(this.collapsedRepos.filter((x) => 'c:' + x !== id));
         if (select) this.inspect(select);
-        else this.dismiss();
+        else this.backToResults();
     }
     /** A card's title, with its repo in the workspace view ("orders route (Shop API)"). */
     nodeTitle(id: string) {
@@ -185,13 +213,77 @@ export class ArchitectureViewModel {
     expand(open: boolean) {
         this.map.groups.forEach((g) => this.setGroup(g.id, open));
     }
+    /** Every group is open, so the groups button collapses them. */
+    get allOpen() {
+        return this.map.groups.length > 0 && this.map.groups.every((g) => this.isOpen(g.id));
+    }
+    /** Expand all while any group is closed; collapse all once every group is open. */
+    toggleGroups() {
+        this.expand(!this.allOpen);
+    }
     setQuery(value: string) {
         this.query = value;
+        this.searchCursor = 0;
         this.map.nodes.filter(this.matches).forEach((n) => this.setGroup(n.group, true));
     }
+    /** Cards by column, then group; every card when the query is empty. */
+    get searchSections(): SearchSection[] {
+        const q = this.query.trim().toLowerCase();
+        const columns = this.repo.bootstrap?.config.columns || [];
+        return columns
+            .map((c, col) => ({
+                col,
+                title: c.title,
+                groups: this.map.groups
+                    .filter((g) => g.col === col)
+                    .map((g) => ({
+                        id: g.id,
+                        title: g.title,
+                        repo: g.id.startsWith(REPO_PREFIX) ? undefined : g.repo,
+                        nodes: this.map.nodes
+                            .filter((n) => n.group === g.id && (!q || this.matches(n)))
+                            .map((node) => ({
+                                node,
+                                snippet:
+                                    q && ![node.id, node.title || ''].some((s) => s.toLowerCase().includes(q))
+                                        ? snippetOf(node.desc || '', q)
+                                        : undefined,
+                            })),
+                    }))
+                    .filter((g) => g.nodes.length),
+            }))
+            .filter((c) => c.groups.length);
+    }
+    /** Result card ids in display order, for arrow keys. */
+    get searchHits(): string[] {
+        return this.searchSections.flatMap((c) => c.groups.flatMap((g) => g.nodes.map((n) => n.node.id)));
+    }
+    /** The side panel shows a card, or the search results. */
+    get sideOpen() {
+        return !!this.inspected || this.searchOpen;
+    }
+    openSearch() {
+        this.searchOpen = true;
+        this.searchCursor = 0;
+        this.backToResults();
+    }
+    moveCursor(by: number) {
+        const last = this.searchHits.length - 1;
+        this.searchCursor = Math.max(0, Math.min(last, this.searchCursor + by));
+    }
+    setCursor(index: number) {
+        this.searchCursor = index;
+    }
     searchEnter() {
-        const n = this.map.nodes.find(this.matches);
-        if (n) this.inspect(n.id);
+        const id = this.searchHits[this.searchCursor];
+        if (id) this.inspect(id);
+    }
+    /** Leave the picked card, showing the search results again. */
+    backToResults() {
+        this.selected = null;
+        this.pinned = null;
+        this.hover = null;
+        this.deps.onInspect?.(null);
     }
     toggleKey() {
         this.keyOpen = !this.keyOpen;
@@ -211,10 +303,14 @@ export class ArchitectureViewModel {
         this.deps.onInspect?.(id);
     }
     toggleNode(id: string) {
-        if (this.selected === id) this.dismiss();
+        if (this.selected === id) this.backToResults();
         else this.inspect(id);
     }
+    /** Close the side panel: the card and the search. */
     dismiss() {
+        this.searchOpen = false;
+        this.query = '';
+        this.searchCursor = 0;
         this.selected = null;
         this.pinned = null;
         this.hover = null;

@@ -142,3 +142,28 @@ test('a workspace trace follows the order into the linked API, in repo bands tha
     await page.locator('[data-repo-band-fold="api"]').click();
     await expect(page.locator('#fl-svgbox .fn[data-id="f2"]')).toBeVisible();
 });
+
+test('search in the workspace view tags linked-repo groups and keeps results across a scope switch', async ({ page }) => {
+    await openWorkspace(page);
+    await page.locator('#arch-search-toggle').click();
+    const panel = page.locator('#arch-details');
+    await panel.getByRole('combobox', { name: 'Find a node' }).fill('orders route');
+    await expect(panel.locator('.search-grp h5 .repo-tag')).toHaveText('Shop API');
+    await panel.locator('[role=option][data-hit="api:orders-route"]').click();
+    await expect(page.locator('#arch-details-title')).toHaveText('orders route');
+    await page.locator('#arch-scope-repo').click();
+    await expect(panel.getByRole('combobox', { name: 'Find a node' })).toHaveValue('orders route');
+    await expect(panel.locator('[role=option][data-hit="api:orders-route"]')).toHaveCount(0);
+});
+
+test('the scope switch is disabled away from the Architecture view', async ({ page }) => {
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: 'Sitemap', exact: true }).click();
+    await expect(page.locator('#arch-scope-repo')).toBeDisabled();
+    await expect(page.locator('#arch-scope-ws')).toBeDisabled();
+    await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
+    await expect(page.locator('#arch-scope-ws')).toBeDisabled();
+    await page.getByRole('tab', { name: 'Architecture', exact: true }).click();
+    await expect(page.locator('#arch-scope-repo')).toBeEnabled();
+    await expect(page.locator('#arch-scope-ws')).toHaveAttribute('aria-pressed', 'true');
+});

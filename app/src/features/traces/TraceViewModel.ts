@@ -149,9 +149,6 @@ export class TraceViewModel {
     get flowInferred(): number {
         return countInferred(this.selected?.flow);
     }
-    get availableOutputs() {
-        return this.selected ? this.outputsFor(this.selected) : [];
-    }
     get rows() {
         return this.temp
             ? [this.temp, ...this.items.filter((t) => t.key !== this.temp?._doc)]
@@ -315,7 +312,11 @@ export class TraceViewModel {
     get planBusy() {
         return !!this.selected && !!this.deps.isPlanBusy?.(this.selected);
     }
-    async openSavedOutput(item: Trace, output: Workspace) {
+    /**
+     * Open a trace on `output`. `explicit` (an output was picked) may draw a missing flowchart
+     * or turn on the architecture output; otherwise a missing view just shows its message.
+     */
+    async openSavedOutput(item: Trace, output: Workspace, explicit = true) {
         if (this.editing) return;
         if (item.scope === 'workspace' && item !== this.temp && item !== this.selected && this.deps.workspaceReady) {
             await this.deps.workspaceReady();
@@ -336,7 +337,7 @@ export class TraceViewModel {
         }
         trace = isObservable(trace) ? trace : observable(trace);
         const selectionVersion = ++this.selectionVersion;
-        if (output === 'sitemap') {
+        if (output === 'sitemap' || !explicit) {
             this.select(trace, output);
             return;
         } else if (output === 'flowchart') {
@@ -352,6 +353,10 @@ export class TraceViewModel {
         }
         if (!this.disposed && selectionVersion === this.selectionVersion)
             this.select(trace, output);
+    }
+    /** Open a library trace on the view already showing. */
+    openTrace(item: Trace) {
+        return this.openSavedOutput(item, this.workspace, false);
     }
     openOutput(output: Workspace) {
         if (this.selected) return this.openSavedOutput(this.selected, output);

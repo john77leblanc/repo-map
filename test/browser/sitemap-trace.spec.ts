@@ -21,6 +21,9 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await page.route('**/api/sitemap', (route) => route.fulfill({ json: { sitemap: { ...base, screens: [] }, status: { state: 'stale' } } }));
     await page.goto('/');
     await page.locator('.trace-open').click();
+    // The trace opens on the current view; it has no architecture, so that view explains and offers Generate.
+    await expect(page.locator('#view-missing h2')).toHaveText("The architecture view doesn't exist for this trace");
+    await page.getByRole('tab', { name: 'Sitemap', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#sitemap-svgbox .change-new.fn')).toHaveCount(1);
     await expect(page.locator('#sitemap-svgbox .change-removed.fe')).toHaveCount(1);
@@ -75,13 +78,14 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     expect(await captions()).toEqual({ inside: true, fits: true, attached: true });
     await page.getByLabel('Show').selectOption('app');
     await page.screenshot({ path: testInfo.outputPath('sitemap-proposal.png') });
+    // All three tabs stay in the row; the outputs this trace lacks are marked and still reachable by keyboard.
+    await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).toHaveClass(/missing/);
+    await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toHaveClass(/missing/);
     await page.getByRole('tab', { name: 'Sitemap', exact: true }).focus();
-    await page.keyboard.press('Home');
-    await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
-    await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toHaveCount(0);
-    // With one available output, keyboard navigation stays on that tab.
-    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toBeFocused();
+    await expect(page.locator('#view-missing h2')).toHaveText("The flowchart view doesn't exist for this trace");
+    await page.keyboard.press('End');
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
     await expect(page.locator('#sitemap-svgbox .change-new.fn')).toHaveCount(1);
     await page.setViewportSize({ width: 768, height: 900 });
@@ -129,7 +133,7 @@ test('creating a Sitemap-only trace requires a base and preserves the question',
     expect(saved).toMatchObject({ sitemap, outputs: { sitemap: true } });
 });
 
-test('a missing Sitemap tab is hidden and can be regenerated through Edit without losing the saved trace', async ({ page }) => {
+test('a missing Sitemap tab is marked and can be regenerated through Edit without losing the saved trace', async ({ page }) => {
     await page.route('**/api/agents', (route) => route.fulfill({ json: { agents: [{ id: 'api', label: 'Test AI', available: true, defaultModel: 'test', models: [], efforts: [] }], default: { agent: 'api' } } }));
     await page.route('**/api/config', async (route) => {
         const response = await route.fetch();
@@ -149,8 +153,9 @@ test('a missing Sitemap tab is hidden and can be regenerated through Edit withou
         body: JSON.stringify(++attempts === 1 ? { type: 'error', message: 'Provider unavailable' } : { type: 'result', trace: { ...pending, sitemap } }) + '\n' }));
     await page.goto('/');
     await page.locator('.trace-open').click();
-    await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveClass(/missing/);
+    await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toHaveClass(/missing/);
+    await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).not.toHaveClass(/missing/);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(page.locator('#withsitemap')).toBeChecked();
     await page.getByRole('button', { name: 'Regenerate', exact: true }).click();

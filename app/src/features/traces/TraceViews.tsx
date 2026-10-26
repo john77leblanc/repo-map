@@ -217,14 +217,7 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
                         <button
                             className="trace-open"
                             type="button"
-                            onClick={() =>
-                                void vm.openSavedOutput(
-                                    trace,
-                                    trace.outputs?.architecture !== false
-                                        ? 'architecture'
-                                        : trace.outputs?.flowchart || trace.pendingFlow ? 'flowchart' : 'sitemap'
-                                )
-                            }
+                            onClick={() => void vm.openTrace(trace)}
                         >
                             <span className="trace-card-head">
                                 <span className="trace-card-title" title={trace.title}>{trace.title}</span>
@@ -445,37 +438,6 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
             </>}
             <div hidden={!!vm.editing}>
             <hr />
-            <div className="trace-tabs" role="tablist" aria-label="Trace output" hidden={!vm.availableOutputs.length}>
-                {vm.availableOutputs.map((output) => (
-                    <button
-                        className="btn"
-                        id={'trace-' + output}
-                        key={output}
-                        type="button"
-                        role="tab"
-                        aria-controls={
-                            output === 'architecture' ? 'architecture-workspace' : output === 'sitemap' ? 'sitemap-workspace' : 'flowdlg'
-                        }
-                        aria-selected={vm.workspace === output}
-                        tabIndex={vm.workspace === output ? 0 : -1}
-                        onClick={() => void vm.openOutput(output)}
-                        onKeyDown={(e) => {
-                            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-                            e.preventDefault();
-                            const tabs = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') || [])];
-                            const index = tabs.indexOf(e.currentTarget);
-                            const target = tabs[e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1
-                                : (index + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
-                            if (target && !target.disabled) {
-                                target.focus();
-                                target.click();
-                            }
-                        }}
-                    >
-                        {output === 'architecture' ? 'Architecture' : output === 'sitemap' ? 'Sitemap' : 'Flowchart'}
-                    </button>
-                ))}
-            </div>
             <textarea
                 id="codebox"
                 ref={code}

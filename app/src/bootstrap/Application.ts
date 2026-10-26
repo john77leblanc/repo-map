@@ -9,6 +9,7 @@ import { FlowchartViewModel } from '../features/flowchart/FlowchartViewModel';
 import { PlansViewModel } from '../features/plans/PlansViewModel';
 import { SitemapViewModel } from '../features/sitemap/SitemapViewModel';
 import { StartViewModel } from '../features/start/StartViewModel';
+import { ViewSwitcherViewModel } from '../features/shell/ViewSwitcherViewModel';
 import type { Services } from '../shared/services/contracts';
 import type { Trace, Workspace } from '../models/types';
 
@@ -23,6 +24,7 @@ export class Application {
     readonly sitemap: SitemapViewModel;
     readonly start: StartViewModel;
     readonly workspace: WorkspaceModel;
+    readonly views: ViewSwitcherViewModel;
     constructor(
         readonly repo: RepositoryModel,
         readonly services: Services
@@ -63,7 +65,7 @@ export class Application {
                 this.architecture.setTrace(null);
                 this.sitemap.setTrace(null);
                 this.architecture.setQuery('');
-                this.shell.showRepository();
+                this.shell.returnToMap();
                 this.plans.close();
             },
             onReveal: (id) => this.architecture.inspect(id),
@@ -74,6 +76,19 @@ export class Application {
             onRequestFlow: (trace) => {
                 this.traces.select(trace, 'flowchart');
                 return this.flowchart.generate(this.traces.selected!);
+            },
+        });
+        this.views = new ViewSwitcherViewModel({
+            repo,
+            shell: this.shell,
+            traces: this.traces,
+            architecture: this.architecture,
+            flowchart: this.flowchart,
+            sitemap: this.sitemap,
+            settings: this.settings,
+            onNewTrace: () => {
+                if (!this.traces.composerOpen) this.traces.toggleComposer();
+                this.shell.expandSidebar();
             },
         });
     }

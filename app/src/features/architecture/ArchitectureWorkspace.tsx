@@ -7,7 +7,9 @@ import { contractLabel } from '../../../../lib/contracts.mjs';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
 import { useArchitectureWires } from './useArchitectureWires';
 import { DocumentationReference } from './DocumentationReference';
-import { ScopeSwitch, WorkspaceBar } from './WorkspaceBar';
+import { WorkspaceBar } from './WorkspaceBar';
+import { SearchIcon, SearchPanel } from './SearchPanel';
+import { KeyToggle } from '../../shared/ui/KeyToggle';
 
 export interface ArchitectureWorkspaceProps {
     vm: ArchitectureViewModel;
@@ -32,14 +34,28 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
     vm,
 }: ArchitectureWorkspaceProps) {
     const board = useRef<HTMLDivElement>(null);
+    const section = useRef<HTMLElement>(null);
     const geometry = useArchitectureWires(board, vm);
     const selected = vm.inspected;
     useEffect(() => {
         const listener = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !document.querySelector('dialog:modal')) {
+            if (document.querySelector('dialog:modal')) return;
+            if (e.key === 'Escape') {
+                if (!vm.sideOpen) return;
                 e.preventDefault();
-                vm.dismiss();
+                if (vm.searchOpen && vm.inspected) vm.backToResults();
+                else vm.dismiss();
+                return;
             }
+            // "/" or Ctrl/Cmd+K opens search (this view is only mounted while shown)
+            const shortcut = (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) ||
+                (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey);
+            if (!shortcut) return;
+            const t = e.target as HTMLElement | null;
+            if (e.key === '/' && t?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+            e.preventDefault();
+            vm.openSearch();
+            requestAnimationFrame(() => section.current?.querySelector<HTMLInputElement>('#q')?.focus());
         };
         document.addEventListener('keydown', listener);
         return () => document.removeEventListener('keydown', listener);
@@ -72,57 +88,39 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
     };
     const edgeLabels = vm.repo.bootstrap?.config.edgeTypes as Record<string, string> | undefined;
     return (
-        <section id="architecture-workspace" aria-label="Architecture">
+        <section id="architecture-workspace" aria-label="Architecture" ref={section}>
             <header className="top" style={{ flex: 'none' }}>
                 <div className="canvas-controls">
                     <div className="controls">
-                        <label className="search">
-                            <svg viewBox="0 0 16 16" strokeWidth="1.6">
-                                <circle cx="7" cy="7" r="5" />
-                                <path d="M11 11l3.5 3.5" />
+                        <button
+                            className="btn groups-toggle"
+                            id="groups-toggle"
+                            type="button"
+                            disabled={!vm.map.groups.length}
+                            onClick={vm.toggleGroups}
+                        >
+                            <svg viewBox="0 0 16 16" aria-hidden="true">
+                                {vm.allOpen ? (
+                                    <path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3M2 8h12" />
+                                ) : (
+                                    <path d="M5 5.5l3-3 3 3M5 10.5l3 3 3-3M2 8h12" />
+                                )}
                             </svg>
-                            <input
-                                id="q"
-                                type="search"
-                                placeholder="Find a node"
-                                aria-label="Find a node"
-                                value={vm.query}
-                                onChange={(e) => vm.setQuery(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        vm.searchEnter();
-                                    }
-                                }}
-                            />
-                        </label>
-                        <button
-                            className="btn"
-                            id="expand"
-                            type="button"
-                            onClick={() => vm.expand(true)}
-                        >
-                            Expand groups
+                            {vm.allOpen ? 'Collapse all' : 'Expand all'}
                         </button>
+                        <KeyToggle id="architecture-key-toggle" controls="architecture-key" open={vm.keyOpen} onToggle={vm.toggleKey} />
                         <button
-                            className="btn"
-                            id="collapse"
+                            className="btn search-toggle"
+                            id="arch-search-toggle"
                             type="button"
-                            onClick={() => vm.expand(false)}
+                            title="Search (/ or Ctrl+K)"
+                            aria-expanded={vm.searchOpen}
+                            aria-controls="arch-details"
+                            onClick={() => (vm.searchOpen && !vm.inspected ? vm.dismiss() : vm.openSearch())}
                         >
-                            Collapse groups
+                            <SearchIcon />
+                            Search
                         </button>
-                        <button
-                            className="btn key-toggle"
-                            id="architecture-key-toggle"
-                            type="button"
-                            aria-expanded={vm.keyOpen}
-                            aria-controls="architecture-key"
-                            onClick={vm.toggleKey}
-                        >
-                            Diagram key
-                        </button>
-                        <ScopeSwitch vm={vm} />
                     </div>
                 </div>
             </header>
@@ -186,7 +184,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                     <span className="key-change removed">Removed</span>
                 </p>
             </section>
-            <div className={'arch-stage' + (selected ? ' details-open' : '')}>
+            <div className={'arch-stage' + (vm.sideOpen ? ' details-open' : '')}>
                 <div className="scroller" id="scroller">
                     <p className="empty" id="map-empty" hidden={!!vm.map.nodes.length}>
                         This map is empty. Open Settings to redraw it with an AI tool.
@@ -426,14 +424,20 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         </svg>
                     </div>
                 </div>
-                {selected && (
+                {vm.sideOpen && (
                     <aside
-                        className="fside arch-side"
+                        className={'fside arch-side' + (selected ? '' : ' arch-search-side')}
                         id="arch-details"
                         aria-labelledby="arch-details-title"
-                        aria-live="polite"
-                        data-id={selected.id}
+                        aria-live={selected ? 'polite' : undefined}
+                        data-id={selected?.id}
                     >
+                        {!selected ? <SearchPanel vm={vm} /> : <>
+                        {vm.searchOpen && (
+                            <button className="btn sm arch-back" type="button" id="arch-back-results" onClick={vm.backToResults}>
+                                ← Results
+                            </button>
+                        )}
                         <div className="fside-head">
                             <h3 id="arch-details-title">
                                 {selected.title || selected.id}
@@ -527,6 +531,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         )}
                         </div>
                         )}
+                        </>}
                     </aside>
                 )}
             </div>

@@ -52,6 +52,57 @@ describe('ArchitectureViewModel', () => {
         vm.dismiss();
         expect(vm.relevant).toBe(null);
     });
+    it('lists search results by column and group, all cards when the query is empty', () => {
+        const { vm, repo } = fixture();
+        repo.map.nodes[1].desc = 'Stores the shopping basket between visits';
+        vm.openSearch();
+        expect(vm.sideOpen).toBe(true);
+        expect(vm.searchSections.map((c) => [c.title, c.groups.map((g) => g.title)])).toEqual([['Code', ['Alpha', 'Beta']]]);
+        expect(vm.searchHits).toEqual(['one', 'two']);
+        vm.setQuery('basket');
+        expect(vm.searchHits).toEqual(['two']);
+        expect(vm.searchSections[0].groups[0].nodes[0].snippet).toEqual({
+            before: 'Stores the shopping ',
+            hit: 'basket',
+            after: ' between visits',
+        });
+        vm.setQuery('one');
+        expect(vm.searchSections[0].groups[0].nodes[0].snippet).toBeUndefined();
+        vm.setQuery('nothing');
+        expect(vm.searchSections).toEqual([]);
+    });
+    it('moves through results, opens one, goes back and closes', () => {
+        const { vm } = fixture();
+        vm.openSearch();
+        vm.moveCursor(-1);
+        expect(vm.searchCursor).toBe(0);
+        vm.moveCursor(5);
+        expect(vm.searchCursor).toBe(1);
+        vm.searchEnter();
+        expect(vm.selected).toBe('two');
+        expect(vm.searchOpen).toBe(true);
+        vm.backToResults();
+        expect(vm.selected).toBe(null);
+        expect(vm.sideOpen).toBe(true);
+        vm.setQuery('one');
+        vm.inspect('one');
+        vm.dismiss();
+        expect(vm.sideOpen).toBe(false);
+        expect(vm.query).toBe('');
+    });
+    it('one groups toggle expands all while any group is closed, then collapses all', () => {
+        const { vm } = fixture();
+        expect(vm.allOpen).toBe(false);
+        vm.toggleGroups();
+        expect(vm.allOpen).toBe(true);
+        expect(vm.isOpen('b')).toBe(true);
+        vm.toggleGroups();
+        expect(vm.isOpen('a')).toBe(false);
+        expect(vm.isOpen('b')).toBe(false);
+        vm.setGroup('a', true);
+        vm.toggleGroups();
+        expect(vm.allOpen).toBe(true);
+    });
     it('ignores navigation and trace updates after disposal', () => {
         const { vm, trace } = fixture();
         vm.dispose();

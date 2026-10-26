@@ -97,3 +97,25 @@ test('a streamed trace displays progress and preserves the prompt after cancella
     await expect(page.locator('#prompt')).toHaveValue('How does checkout work?');
     release();
 });
+
+test('one view row serves the map and traces: Flowchart on the map explains, a trace keeps the view, Back leaves Flowchart', async ({ page }) => {
+    await page.goto('/');
+    const tab = (name: string) => page.getByRole('tab', { name, exact: true });
+    await expect(page.locator('.view-context')).toHaveText('Map');
+    await expect(tab('Flowchart')).toHaveClass(/missing/);
+    await tab('Flowchart').click();
+    await expect(page.locator('#view-missing h2')).toHaveText('Flowcharts only exist for traces');
+    await page.locator('#view-missing').getByRole('button', { name: 'New trace', exact: true }).click();
+    await expect(page.locator('#composer')).toBeVisible();
+    await page.keyboard.press('Escape');
+    // Opening a trace keeps Flowchart, which this trace has.
+    await page.getByRole('button', { name: 'Checkout test How does checkout work?' }).click();
+    await expect(page.locator('.view-context')).toHaveText('Trace · Checkout test');
+    await expect(tab('Flowchart')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#fl-svgbox svg')).toBeVisible();
+    await expect(page.locator('#sidebar-trace [role=tab]')).toHaveCount(0);
+    // Back to the map from Flowchart lands on the last map view.
+    await page.getByRole('button', { name: 'Back to all traces', exact: true }).click();
+    await expect(tab('Architecture')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.view-context')).toHaveText('Map');
+});

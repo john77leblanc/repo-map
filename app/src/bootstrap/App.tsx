@@ -10,6 +10,8 @@ import { PlanModal } from '../features/plans/PlanModal';
 import { CodeReference } from '../shared/ui/CodeReference';
 import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
 import { StartView } from '../features/start/StartView';
+import { MissingView, ViewTabs } from '../features/shell/ViewTabs';
+import { ScopeSwitch } from '../features/architecture/WorkspaceBar';
 
 export const ApplicationContext = createContext<Application | null>(null);
 export function useApplication() {
@@ -50,43 +52,18 @@ export const App = observer(function App() {
                 }
                 main={
                     <>
-                        {!app.traces.selected && (
-                            <div className="repository-tabs" role="tablist" aria-label="Repository views">
-                                {(['architecture', 'sitemap'] as const).map((workspace) => (
-                                    <button
-                                        key={workspace}
-                                        className="btn"
-                                        role="tab"
-                                        id={'repository-tab-' + workspace}
-                                        aria-controls={workspace + '-workspace'}
-                                        aria-selected={app.shell.workspace === workspace}
-                                        tabIndex={app.shell.workspace === workspace ? 0 : -1}
-                                        onClick={() => app.shell.showRepository(workspace)}
-                                        onKeyDown={(event) => {
-                                            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-                                            event.preventDefault();
-                                            const next = event.key === 'Home' ? 'architecture'
-                                                : event.key === 'End' ? 'sitemap'
-                                                : workspace === 'architecture' ? 'sitemap' : 'architecture';
-                                            app.shell.showRepository(next);
-                                            document.getElementById('repository-tab-' + next)?.focus();
-                                        }}
-                                    >
-                                        {workspace === 'architecture' ? 'Architecture' : 'Sitemap'}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        {app.shell.workspace === 'sitemap' ? (
+                        <ViewTabs vm={app.views}
+                            leading={app.workspace.linked && (
+                                <ScopeSwitch vm={app.architecture} disabled={app.shell.workspace !== 'architecture'} />
+                            )} />
+                        {app.views.showMissing ? (
+                            <MissingView vm={app.views} />
+                        ) : app.shell.workspace === 'sitemap' ? (
                             <SitemapWorkspace vm={app.sitemap} />
                         ) : app.shell.workspace === 'architecture' ? (
                             <ArchitectureWorkspace vm={app.architecture} />
                         ) : (
-                            <FlowchartWorkspace
-                                vm={app.flowchart}
-                                CodeReference={CodeReference}
-                                onNewTrace={app.traces.toggleComposer}
-                            />
+                            <FlowchartWorkspace vm={app.flowchart} CodeReference={CodeReference} />
                         )}
                     </>
                 }

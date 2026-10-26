@@ -15,6 +15,17 @@ const test = base.extend<{ browserErrors: void }>({
 
 test.use({ reducedMotion: 'reduce' });
 
+/** Open (or close) every group with the one groups button, whatever state it starts in. */
+async function setAllGroups(page: Page, open: boolean) {
+    const button = page.locator('#groups-toggle');
+    if ((await button.textContent())?.trim() === 'Expand all') await button.click();
+    await expect(button).toHaveText('Collapse all');
+    if (!open) {
+        await button.click();
+        await expect(button).toHaveText('Expand all');
+    }
+}
+
 async function openMap(page: Page) {
     await page.goto('/');
     await expect(page.locator('#architecture-workspace')).toBeVisible();
@@ -22,18 +33,25 @@ async function openMap(page: Page) {
     await expect.poll(() => page.locator('.wires path.w').count()).toBeGreaterThan(0);
 }
 
-test('desktop architecture keeps its header inset beneath the repository tabs', async ({ page }) => {
+test('desktop architecture keeps its header inset beneath the view tabs', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openMap(page);
     const header = page.locator('#architecture-workspace > header.top');
     await expect(header.locator('.canvas-controls > .controls')).toBeVisible();
     const main = await page.locator('#architecture-workspace').boundingBox();
-    const tabs = await page.getByRole('tablist', { name: 'Repository views' }).boundingBox();
-    const search = await page.getByRole('searchbox', { name: 'Find a node' }).boundingBox();
-    expect(main).not.toBeNull(); expect(search).not.toBeNull();
+    const tabs = await page.locator('.view-tabs').boundingBox();
+    // The groups button comes first; Search sits last, against the right edge.
+    const first = await header.locator('.controls > *').first().boundingBox();
+    const search = await page.locator('#arch-search-toggle').boundingBox();
+    expect(main).not.toBeNull(); expect(first).not.toBeNull(); expect(search).not.toBeNull();
+    await expect(header.locator('.controls > *').first()).toHaveAttribute('id', 'groups-toggle');
+    // The scope switch leads the view row, before a divider and the view tabs.
+    await expect(page.locator('.view-tabs > *').first()).toHaveAttribute('aria-label', 'Map scope');
+    await expect(page.locator('.view-tabs > .view-divider + .view-tablist')).toHaveCount(1);
     expect(main!.y).toBeCloseTo(tabs!.y + tabs!.height, 0);
-    expect(search!.x - main!.x).toBeCloseTo(28, 0);
-    expect(search!.y - main!.y).toBeCloseTo(24, 0);
+    expect(first!.x - main!.x).toBeCloseTo(16, 0);
+    expect(first!.y - main!.y).toBeCloseTo(12, 0);
+    expect(main!.x + main!.width - (search!.x + search!.width)).toBeCloseTo(16, 0);
 });
 
 test('node details open in a side panel beside the map and close with the button or Escape', async ({ page }) => {
@@ -93,26 +111,46 @@ test('diagram key controls each connection type and remains independent of the i
     await expect(page.locator('#arch-details')).toBeHidden();
 });
 
-test('search expands matching groups and Enter opens the matching node', async ({ page }) => {
+test('search lists matches in the side panel; picking one opens it and Results goes back', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await openMap(page);
     const groups = page.locator('#cols details.grp');
-    await page.getByRole('button', { name: 'Collapse groups', exact: true }).click();
+    const panel = page.locator('#arch-details');
+    await setAllGroups(page, false);
     await expect(page.locator('#cols details.grp[open]')).toHaveCount(0);
-    const search = page.getByRole('searchbox', { name: 'Find a node' });
+    await page.locator('#arch-search-toggle').click();
+    const search = panel.getByRole('combobox', { name: 'Find a node' });
+    await expect(search).toBeFocused();
+    // Empty query: every card, by column then group.
+    await expect(panel.locator('[role=option]')).toHaveCount(await page.locator('.node').count());
     await search.fill('CART STORE');
     await expect(page.locator('details[data-g="g-state"]')).toHaveAttribute('open', '');
     await expect(page.locator('.node.match')).toHaveCount(1);
     await expect(page.locator('.node[data-id="cart-store"]')).toHaveClass(/match/);
+    await expect(panel.locator('[role=option]')).toHaveText(['cart store']);
     await search.press('Enter');
-    await expect(page.locator('#arch-details')).toBeVisible();
     await expect(page.locator('#arch-details-title')).toHaveText('cart store');
+    await panel.getByRole('button', { name: '← Results' }).click();
+    await expect(search).toHaveValue('CART STORE');
+    await search.fill('cart');
+    await search.press('ArrowDown');
+    const second = panel.locator('[role=option][aria-selected=true]');
+    const id = await second.getAttribute('data-hit');
+    await search.press('Enter');
+    await expect(panel).toHaveAttribute('data-id', id!);
     await page.keyboard.press('Escape');
+    await expect(search).toBeVisible();
     await search.fill('no-such-component');
     await expect(page.locator('.node.match')).toHaveCount(0);
-    await search.press('Enter');
-    await expect(page.locator('#arch-details')).toBeHidden();
-    await search.clear();
-    await page.getByRole('button', { name: 'Expand groups', exact: true }).click();
+    await expect(panel.getByText('No nodes match.')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await page.keyboard.press('/');
+    await expect(panel.getByRole('combobox', { name: 'Find a node' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    // Search opened some groups, so the button offers Expand all again.
+    await expect(page.locator('#groups-toggle')).toHaveText('Expand all');
+    await page.locator('#groups-toggle').click();
     await expect(page.locator('#cols details.grp[open]')).toHaveCount(await groups.count());
 });
 
@@ -164,7 +202,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 900, height: 700 
             await route.fulfill({ response, json: map });
         });
         await openMap(page);
-        await page.getByRole('button', { name: 'Expand groups', exact: true }).click();
+        await setAllGroups(page, true);
         const scroller = page.locator('#scroller');
         await expect.poll(() => scroller.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollWidth > el.clientWidth)).toBe(true);
         const bounds = await scroller.boundingBox();
