@@ -3,6 +3,7 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentData, AgentPick } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import { ProgressLog } from '../../models/ProgressLog';
+import type { WorkspaceModel } from '../../models/WorkspaceModel';
 
 export interface Catalog extends Omit<AgentData, 'default'> {
     default?: AgentPick | null;
@@ -37,6 +38,8 @@ export interface SettingsDeps {
     services: Services;
     onAvailabilityChange?: (available: boolean) => void;
     onJobComplete?: (kind: JobKind, result: JobResult) => void;
+    /** Linked repos, edited in the Linked repos section. */
+    workspace?: WorkspaceModel;
 }
 interface Counts {
     links?: number;

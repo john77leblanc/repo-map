@@ -7,6 +7,7 @@
  *   repo-map init       create .repo-map/config.json for this repo
  *   repo-map doctor     check which AI tool will be used and whether it works
  *   repo-map validate   check map.json for broken ids, groups and paths
+ *   repo-map export     write a map snapshot another repo can link to
  *   repo-map serve      open the map on http://localhost:4477
  */
 import { existsSync, promises as fs } from 'node:fs';
@@ -22,6 +23,7 @@ import { runStart } from '../lib/start.mjs';
 import { mapStatus, markCurrent } from '../lib/freshness.mjs';
 import { updateMap } from '../lib/update.mjs';
 import { validateMap } from '../lib/validate.mjs';
+import { exportSnapshot } from '../lib/workspace.mjs';
 
 const PKG_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HELP = `repo-map [command] [options]
@@ -40,6 +42,8 @@ Commands
   docs        Link the repo's documentation (docs, agent guidance, code comments) to the
               map's cards again (.repo-map/docs.json)
   validate    Check map.json for unknown ids, groups, kinds and missing paths
+  export      Write a snapshot of this map (with its commit) for another repo's workspace
+              to import, when that repo can't link this folder directly
   serve       Start the map on http://localhost:<port> (default)
 
 Common options
@@ -80,6 +84,10 @@ docs
 doctor
   --json              Print the result as JSON, with every tool found (exit code 1 when tracing is off)
 
+export
+  --out <file>        Where to write it (default: <repo name>.map.json in the current folder;
+                      - for stdout)
+
 start / serve
   --port <n>          Port (default 4477, or REPO_MAP_PORT; start moves on if it's taken)
   --no-open           start: don't open the browser
@@ -90,7 +98,7 @@ Scripted setup examples are in SETUP.md.`;
 const VALUE_FLAGS = {
     '--dir': 'dir', '--port': 'port', '--model': 'model', '--provider': 'provider',
     '--name': 'name', '--roots': 'roots', '--context': 'context', '--github': 'github',
-    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for',
+    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for', '--out': 'out',
 };
 const BOOL_FLAGS = {
     '--force': 'force', '--json': 'json', '--yes': 'yes',
@@ -403,6 +411,24 @@ async function cmdValidate(opts) {
     }
 }
 
+async function cmdExport(opts) {
+    const root = resolveRoot(opts);
+    const snapshot = await exportSnapshot(root);
+    if (!snapshot.map.nodes.length) {
+        throw new Error('This repo has no map to export yet.');
+    }
+    const text = JSON.stringify(snapshot, null, 2) + '\n';
+    if (opts.out === '-') {
+        process.stdout.write(text);
+        return;
+    }
+    const slug = snapshot.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'repo';
+    const out = path.resolve(opts.out || `${slug}.map.json`);
+    await fs.writeFile(out, text);
+    console.log(`Wrote ${out} (${snapshot.map.nodes.length} cards${snapshot.commit ? `, commit ${snapshot.commit.slice(0, 9)}` : ''}).`);
+    console.log('Import it in the other repo: Settings → Linked repos → Import snapshot.');
+}
+
 async function cmdServe(opts) {
     const root = resolveRoot(opts);
     const config = await loadConfig(root);
@@ -426,7 +452,7 @@ async function main() {
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;
     }
-    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, docs: cmdDocs, validate: cmdValidate, doctor: cmdDoctor, serve: cmdServe };
+    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, docs: cmdDocs, validate: cmdValidate, export: cmdExport, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

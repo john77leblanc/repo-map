@@ -1,0 +1,9 @@
+{
+  "links": [
+    {
+      "name": "api",
+      "dir": "../shop-api"
+    }
+  ],
+  "seams": []
+}

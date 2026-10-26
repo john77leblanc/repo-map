@@ -27,6 +27,7 @@ async function mockSettings(page: Page) {
             agents: [{ id: 'codex', label: 'Codex CLI', available: true, defaultModel: pick.model, models: [{ id: pick.model, efforts: ['low', 'high'] }], efforts: ['low', 'high'] }],
         });
         if (path === '/api/map/status') return json(state.status);
+        if (path === '/api/workspace') return json({ workspace: { links: [], seams: [] }, repos: [], map: { groups: [], nodes: [], edges: [], repos: [], seams: [], replaced: {} } });
         if (path === '/api/settings/generate' && request.method() === 'PUT') {
             const body = request.postDataJSON() as Record<string, string>;
             state.saves.push(body); state.generate = body.agent ? body : null;

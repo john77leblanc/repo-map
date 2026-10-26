@@ -1,0 +1,24 @@
+{
+  "groups": [
+    { "id": "g-callers", "col": 0, "title": "Callers", "open": true },
+    { "id": "g-routes", "col": 1, "title": "Routes", "open": true },
+    { "id": "g-data", "col": 2, "title": "Storage & events", "open": true },
+    { "id": "g-workers", "col": 3, "title": "Workers", "open": true },
+    { "id": "g-out", "col": 4, "title": "Downstream", "open": true }
+  ],
+  "nodes": [
+    { "id": "storefront", "group": "g-callers", "kind": "external", "title": "Storefront", "desc": "Web shop that places orders." },
+    { "id": "orders-route", "group": "g-routes", "kind": "service", "path": "src/routes/orders.js", "title": "orders route", "desc": "Creates and reads orders.", "facts": ["POST /orders", "GET /orders/:id"], "provides": ["http:POST /orders", "http:GET /orders/{}"] },
+    { "id": "orders-db", "group": "g-data", "kind": "topic", "path": "src/db/orders.js", "title": "orders store", "desc": "Keeps placed orders." },
+    { "id": "queue", "group": "g-data", "kind": "topic", "path": "src/workers/queue.js", "title": "event queue", "desc": "In-process publish/subscribe.", "provides": ["event:order.placed"] },
+    { "id": "receipts", "group": "g-workers", "kind": "service", "path": "src/workers/receipts.js", "title": "receipt mailer", "desc": "Emails a receipt when an order is placed.", "consumes": ["event:order.placed", "env:MAIL_API_URL"] },
+    { "id": "mail-api", "group": "g-out", "kind": "external", "title": "Mail service", "desc": "Sends email." }
+  ],
+  "edges": [
+    { "from": "storefront", "to": "orders-route", "type": "http", "label": "POST /orders" },
+    { "from": "orders-route", "to": "orders-db", "type": "sync", "label": "insert" },
+    { "from": "orders-route", "to": "queue", "type": "event", "label": "order.placed" },
+    { "from": "queue", "to": "receipts", "type": "event", "label": "order.placed" },
+    { "from": "receipts", "to": "mail-api", "type": "http", "label": "POST /send" }
+  ]
+}

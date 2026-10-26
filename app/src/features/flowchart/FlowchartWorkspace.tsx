@@ -27,23 +27,16 @@ const FLOW_KIND: Record<string, string> = {
     collapsed: 'Collapsed group',
 };
 
-/** Folding controls: shift-click selection, AI-suggested chunks, and Expand all. */
+/** Folding controls: select mode, AI-suggested chunks, and Expand all. The selection itself is in the side panel. */
 const FlowCollapseBar = observer(function FlowCollapseBar({ vm }: { vm: FlowchartViewModel }) {
     const chunks = vm.openChunks;
     return (
         <div className="flow-select-bar" id="fl-collapse" aria-label="Collapse steps">
-            {vm.marked.length > 0 ? (
-                <>
-                    <span>{vm.marked.length} selected</span>
-                    <button className="btn sm primary" id="fl-collapse-sel" type="button"
-                        disabled={vm.marked.length < 2} onClick={() => vm.collapseMarked()}>
-                        Collapse selection
-                    </button>
-                    <button className="btn sm" type="button" onClick={vm.clearMarks}>Clear</button>
-                </>
-            ) : (
-                <span className="hint">Shift-click steps to collapse them into one box.</span>
-            )}
+            <span className="hint">Shift-click steps, or use Select steps, to collapse them into one box.</span>
+            <button className="btn sm" id="fl-select-mode" type="button" aria-pressed={vm.selecting} onClick={vm.toggleSelecting}
+                title="While on, clicking a step adds it to the selection">
+                Select steps
+            </button>
             {chunks.length > 0 && (
                 <button className="btn sm" id="fl-collapse-suggested" type="button" onClick={vm.collapseSuggested}
                     title={chunks.map((c) => c.label).join(', ')}>
@@ -63,12 +56,8 @@ const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: {
     return (
         <>
             {vm.canRename(id) ? (
-                <label className="ft">
-                    Name{' '}
-                    <input type="text" aria-label="Group name" defaultValue={label} key={id}
-                        onBlur={(event) => vm.renameGroup(id, event.target.value)}
-                        onKeyDown={(event) => { if (event.key === 'Enter') vm.renameGroup(id, event.currentTarget.value); }} />
-                </label>
+                <input className="fside-input" type="text" aria-label="Group name" value={vm.groupLabel(id)}
+                    placeholder={label} maxLength={80} onChange={(event) => vm.renameGroup(id, event.target.value)} />
             ) : <h3>{label}</h3>}
             <h4>{members.length} hidden steps</h4>
             <ol className="flow-members">
@@ -83,6 +72,39 @@ const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: {
         </>
     );
 });
+/** The side panel while steps are selected: what's in the selection, Collapse and Clear. */
+const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: FlowchartViewModel }) {
+    const nodes = vm.markedNodes;
+    return (
+        <aside className="fside" id="fl-side" aria-label="Selected steps" aria-live="polite"
+            onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); vm.clearMarks(); } }}>
+            <div className="fside-head">
+                <p className="ft">Selection</p>
+                <button className="btn sm" id="fl-side-close" type="button" onClick={vm.clearMarks}>Close</button>
+            </div>
+            <hr className="fside-rule" />
+            <h3>{nodes.length} step{nodes.length === 1 ? '' : 's'} selected</h3>
+            <ol className="flow-members" id="fl-selection">
+                {nodes.map((n) => (
+                    <li key={n.id} data-marked={n.id}>
+                        <div className="flow-member-row">
+                            <span>{n.label}</span>
+                            <button className="btn sm unmark" type="button" data-unmark={n.id} aria-label={'Remove ' + n.label}
+                                onClick={() => vm.mark(n.id)}>Remove</button>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+            {nodes.length < 2 && <p className="hint">Pick at least two steps.</p>}
+            <div className="flow-select-actions">
+                <button className="btn sm primary" id="fl-collapse-sel" type="button" disabled={nodes.length < 2}
+                    onClick={() => vm.collapseMarked()}>Collapse</button>
+                <button className="btn sm" id="fl-clear-sel" type="button" onClick={vm.clearMarks}>Clear</button>
+            </div>
+        </aside>
+    );
+});
+
 /** Edges arriving at (From) and leaving (To) the selected node. Clicking one moves the selection. */
 const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: FlowchartViewModel; id: string }) {
     const conns = vm.connections;
@@ -126,6 +148,7 @@ export const FlowchartDetails = observer(function FlowchartDetails({
     vm,
     CodeReference,
 }: FlowchartDetailsProps) {
+    if (vm.marked.length) return <SelectionDetails vm={vm} />;
     const node = vm.selected;
     if (!node) return null;
     const change = vm.selectedChange;
@@ -281,7 +304,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                         </p>
                     )}
                     <div
-                        className={'fmain' + (vm.selected ? '' : ' details-closed')}
+                        className={'fmain' + (vm.panelOpen ? '' : ' details-closed')}
                         hidden={!hasFlow}
                     >
                         <DiagramSvg vm={vm} initialZoom={1.2 ** 2} />

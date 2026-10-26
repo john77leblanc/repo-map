@@ -499,3 +499,41 @@ dialog.modal>.fhead{flex:none}
 /* Proposal status beside a modal title: New green, Modified orange, Removed grey */
 .fhead h2 .proposal-badge{display:inline-block;margin-left:6px;vertical-align:3px;font-family:var(--f-ui);font-size:11px;font-weight:600;line-height:1.3}
 .proposal-badge.new{color:var(--sync)}.proposal-badge.modified{color:var(--event)}.proposal-badge.removed{color:var(--muted);text-decoration:line-through}
+/* Workspace: several linked repos in one map */
+.seg{display:inline-flex}
+.seg .btn{border-radius:0}
+.seg .btn:first-child{border-radius:6px 0 0 6px}
+.seg .btn:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
+.seg .btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ws-bar{padding:14px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));display:grid;gap:8px;font-size:12.5px}
+.ws-repos{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.ws-repos li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 6px 4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.ws-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ws-seams{display:flex;align-items:center;gap:8px;margin-left:auto}
+.link-form input{font:inherit;font-size:12.5px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.ws-seams-count{color:var(--muted);font-family:var(--f-mono);font-size:11.5px}
+.ws-proposals{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ws-proposals li{border:1px solid var(--line);border-left:3px solid var(--ext);border-radius:8px;background:var(--panel);padding:8px 10px}
+.ws-proposals p{margin:0 0 4px}
+.ws-proposals .btn{margin-right:6px;margin-top:6px}
+.fresh{font-family:var(--f-mono);font-size:11px;border-radius:4px;padding:1px 6px;background:var(--soft);color:var(--muted)}
+.fresh.ok{color:var(--sync)}
+.fresh.warn{color:var(--event);box-shadow:inset 0 0 0 1px var(--event)}
+.repo-tag{font-family:var(--f-mono);font-weight:400;font-size:10.5px;color:var(--ext);border:1px solid var(--ext);border-radius:4px;padding:0 5px;white-space:nowrap}
+.repo-of{margin:0 0 6px}
+.sw.seam{background:repeating-linear-gradient(90deg,var(--ext) 0 7px,transparent 7px 9px,var(--ext) 9px 11px,transparent 11px 13px)}
+.wires path.w.seam{stroke-width:2.2;stroke-dasharray:9 3 2 3;opacity:.75}
+.node.collapsed>.nh{box-shadow:3px 3px 0 -1px var(--panel),3px 3px 0 0 var(--line),6px 6px 0 -1px var(--panel),6px 6px 0 0 var(--line);margin-bottom:6px}
+.ws-members{margin:.25em 0 .75em;padding-left:1.2em}
+.seams ul{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}
+.seams .hint{margin:2px 0 4px}
+.link-list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.link-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.link-list li .btn{margin-left:auto}
+.link-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin:6px 0}
+.link-form label{display:grid;gap:2px;font-size:12px;color:var(--muted)}
+.file-btn{position:relative;overflow:hidden;display:inline-block}
+.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.file-btn[aria-disabled="true"]{opacity:.5}
+.file-btn:focus-within{outline:2px solid var(--http);outline-offset:1px}
+.seams .cl{flex-wrap:wrap}

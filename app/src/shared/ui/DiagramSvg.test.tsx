@@ -5,6 +5,35 @@ import { fixture } from '../../features/flowchart/testFixture';
 
 afterEach(cleanup);
 
+describe('DiagramSvg selection', () => {
+    it('marks steps with a tint and check badge, and plain clicks mark in select mode', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace({ ...trace, flow: {
+            nodes: [{ id: 'a', type: 'start', label: 'A' }, { id: 'b', type: 'decision', label: 'B?' }, { id: 'c', type: 'end', label: 'C' }],
+            edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c', label: 'yes' }],
+        } });
+        const { container } = render(<DiagramSvg vm={vm} />);
+        const node = (id: string) => container.querySelector(`[data-id="${id}"]`)!;
+        fireEvent.click(node('a'), { shiftKey: true });
+        expect(node('a').classList.contains('mk')).toBe(true);
+        expect(node('a').querySelectorAll('.mk-badge')).toHaveLength(1);
+        expect(node('a').getAttribute('aria-label')).toMatch(/, selected$/);
+        expect(vm.selectedId).toBe(null);
+        fireEvent.click(node('b'));
+        expect(vm.selectedId).toBe('b');
+        expect(node('b').classList.contains('mk')).toBe(false);
+        vm.toggleSelecting();
+        fireEvent.click(node('b'));
+        expect(vm.marked).toEqual(['a', 'b']);
+        expect(node('b').querySelectorAll('.mk-badge')).toHaveLength(1);
+        fireEvent.click(node('a'));
+        expect(vm.marked).toEqual(['b']);
+        expect(node('a').querySelector('.mk-badge')).toBe(null);
+        expect(node('a').getAttribute('aria-label')).not.toMatch(/selected/);
+        vm.dispose();
+    });
+});
+
 describe('DiagramSvg focus', () => {
     it('dims everything but a hovered node, its links, labels and neighbours; a pinned node stays focused', () => {
         const { vm, trace } = fixture();

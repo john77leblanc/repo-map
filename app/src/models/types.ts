@@ -15,6 +15,11 @@ export interface MapNode {
     status?: ChangeStatus;
     rationale?: string;
     suggestedPath?: string;
+    /** Workspace view: the repo this card comes from ('home' for this one). */
+    repo?: string;
+    /** Workspace view: a card standing in for a collapsed repo; `members` are the hidden card ids. */
+    collapsed?: boolean;
+    members?: string[];
 }
 export interface MapEdge {
     from: string;
@@ -24,6 +29,12 @@ export interface MapEdge {
     inferred?: boolean;
     status?: ChangeStatus;
     rationale?: string;
+    /** Workspace view: a connection between two repos, and how it was found. */
+    seam?: SeamVia;
+    keys?: string[];
+    why?: string;
+    refs?: CodeRef[];
+    merged?: number;
 }
 export interface MapGroup {
     id: string;
@@ -31,6 +42,50 @@ export interface MapGroup {
     title: string;
     open?: boolean;
     note?: string;
+    repo?: string;
+}
+export type SeamVia = 'contract' | 'ai' | 'manual';
+/** A connection between repos, as stored in workspace.json (or found by contract). */
+export interface Seam {
+    from: string;
+    to: string;
+    type: string;
+    via: SeamVia;
+    label?: string;
+    why?: string;
+    keys?: string[];
+    refs?: CodeRef[];
+}
+export interface WorkspaceLink {
+    name: string;
+    dir?: string;
+    snapshot?: string;
+}
+export interface WorkspaceFile {
+    links: WorkspaceLink[];
+    seams: Seam[];
+}
+export interface CheckoutFreshness {
+    map: { state: string; commit: string | null; changed: number; commitsSince: number };
+    remote: { state: string; branch?: string; ahead?: number; behind?: number; fetchedAt?: string | null };
+}
+export interface SnapshotFreshness {
+    snapshot: { state: string; exportedAt: string | null; commit: string | null; latest?: string; checkedAt?: string };
+}
+export interface WorkspaceRepo {
+    name: string;
+    title: string;
+    source: 'home' | 'dir' | 'snapshot';
+    readable: boolean;
+    dir?: string;
+    snapshot?: { file: string; remote?: string; commit?: string; exportedAt?: string };
+    error?: string;
+    freshness?: Partial<CheckoutFreshness> & Partial<SnapshotFreshness>;
+}
+export interface WorkspaceView {
+    workspace: WorkspaceFile;
+    repos: WorkspaceRepo[];
+    map: RepoMap & { repos: { name: string; title: string; count: number }[]; seams: Seam[]; replaced: Record<string, string> };
 }
 export interface RepoMap {
     nodes: MapNode[];

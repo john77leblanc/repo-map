@@ -249,32 +249,53 @@ for (const colorScheme of ['light', 'dark'] as const) test(`lane headings stay o
 });
 
 test('flowchart lanes and shift-selected steps collapse into one box and expand again', async ({ page }, testInfo) => {
+    // narrow enough that the chart is fitted below full size, so a refit would zoom in
+    await page.setViewportSize({ width: 1000, height: 800 });
     await page.goto('/');
     await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     const canvas = page.locator('#fl-canvas');
+    // lane headings are sized by the zoom, so their font size shows it
+    const zoom = () => canvas.locator('.diagram-lane-title').first().evaluate((el) => parseFloat((el as HTMLElement).style.fontSize));
+    const before = await zoom();
     await canvas.locator('.lane-fold[data-lane="web"]').click();
     const lane = canvas.locator('.fn[data-id="c:lane:web"]');
     await expect(lane).toBeVisible();
+    expect(await zoom(), 'collapsing keeps the zoom').toBeCloseTo(before, 1);
     await expect(canvas.locator('.fn[data-id="start"]')).toHaveCount(0);
-    await expect(canvas.locator('.lane-fold[data-lane="web"]')).toHaveText('Expand');
+    await expect(canvas.locator('.lane-fold[data-lane="web"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(canvas.locator('.lane-fold[data-lane="web"]')).toHaveAccessibleName(/^Expand /);
     await lane.click();
     await page.screenshot({ path: testInfo.outputPath('collapsed-lane.png') });
     const side = page.locator('#fl-side');
     await expect(side.getByRole('heading', { name: '2 hidden steps' })).toBeVisible();
     await side.locator('[data-member="done"]').click();
     await expect(canvas.locator('.fn[data-id="done"]')).toHaveClass(/sel/);
+    // shift-clicking while "done" is open selects both, and the side panel shows the selection
     await canvas.locator('.fn[data-id="start"]').click({ modifiers: ['Shift'] });
-    await canvas.locator('.fn[data-id="done"]').click({ modifiers: ['Shift'] });
     await expect(canvas.locator('.fn.mk')).toHaveCount(2);
-    await page.locator('#fl-collapse-sel').click();
+    await expect(canvas.locator('.fn.mk .mk-badge')).toHaveCount(2);
+    await expect(side).toHaveAttribute('aria-label', 'Selected steps');
+    await expect(side.locator('[data-marked]')).toHaveCount(2);
+    await page.screenshot({ path: testInfo.outputPath('selection.png') });
+    await side.locator('#fl-collapse-sel').click();
     await expect(canvas.locator('.fn[data-id="c:s1"]')).toBeVisible();
     await page.getByRole('textbox', { name: 'Group name' }).fill('Shopper screens');
-    await page.getByRole('textbox', { name: 'Group name' }).press('Enter');
+    await expect(canvas.locator('.fn[data-id="c:s1"]')).toContainText('Shopper screens');
+    await page.screenshot({ path: testInfo.outputPath('renamed.png') });
     await page.reload();
     await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     await expect(canvas.locator('.fn[data-id="c:s1"]')).toContainText('Shopper screens');
     await page.locator('#fl-expand-all').click();
     await expect(canvas.locator('.fn[data-id="start"]')).toBeVisible();
+    // Select steps: plain clicks add to the selection
+    await page.locator('#fl-select-mode').click();
+    await expect(page.locator('#fl-select-mode')).toHaveAttribute('aria-pressed', 'true');
+    await canvas.locator('.fn[data-id="start"]').click();
+    await canvas.locator('.fn[data-id="done"]').click();
+    await expect(side.locator('[data-marked]')).toHaveCount(2);
+    await side.locator('#fl-clear-sel').click();
+    await expect(canvas.locator('.fn.mk')).toHaveCount(0);
+    await expect(page.locator('#fl-side')).toHaveCount(0);
 });

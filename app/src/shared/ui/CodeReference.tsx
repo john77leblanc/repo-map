@@ -71,7 +71,8 @@ export const CodeReference = observer(function CodeReference({
         return () => vm.dispose();
     }, [vm]);
     const info = repo.bootstrap?.repo;
-    const href = info?.ghBase
+    // a linked repo's file (`api:src/x.js`) has no link into this repo on GitHub
+    const href = info?.ghBase && !/^[a-z][a-z0-9-]{1,30}:/.test(reference.path)
         ? `${info.ghBase}/blob/${info.ghRef}/${reference.path}${documentation && /\.(md|mdx|mdc)$/i.test(reference.path) ? '?plain=1' : ''}#L${reference.start}-L${reference.end}`
         : '';
     return (

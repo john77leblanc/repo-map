@@ -73,6 +73,7 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 | `doctor`   | List the AI tools found, with their models and effort levels, and check the ones traces and the map will use (`--json` for scripts) |
 | `update`   | Bring the map up to date with code changed since it was last evaluated (only the diff is sent); `--check` for scripts |
 | `validate` | Report unknown ids, groups, kinds and missing paths; exits 1 on errors, so it fits in CI |
+| `export`   | Write a snapshot of this map (`--out <file>`, or `-` for stdout) for another repo's workspace to import |
 | `serve`    | Start the map without any setup steps |
 
 Options: `--dir <repo root>`, `--port <n>` (or `REPO_MAP_PORT`), `--force`, `--model <id>`, `--effort <level>`, `--version`, `--help`.
@@ -130,8 +131,31 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 
 - `col` indexes `config.columns`. Groups with `"open": false` start collapsed, and edges into them attach to the group header.
 - `path` is the node's folder in the repo. Nodes without one (outside systems) get no code references.
-- `provides` / `consumes` (optional) are **contracts**: what a node serves to other repos and what it calls in them, as typed keys: `http:METHOD /path` (path params as `{id}`; `ANY` when the method is unknown), `event:topic`, `pkg:name`, `grpc:pkg.Service/Method`, and `env:VAR` for the variable holding a called service's base URL. The AI tool fills them when it draws or updates the map; keys are normalized (`http:post /orders/:id/` becomes `http:POST /orders/{}`) and unreadable ones are dropped with a `validate` warning. Matching keys are how maps of separate repos will be joined. Cards list them under **Serves to other repos** and **Calls in other repos**.
+- `provides` / `consumes` (optional) are **contracts**: what a node serves to other repos and what it calls in them, as typed keys: `http:METHOD /path` (path params as `{id}`; `ANY` when the method is unknown), `event:topic`, `pkg:name`, `grpc:pkg.Service/Method`, and `env:VAR` for the variable holding a called service's base URL. The AI tool fills them when it draws or updates the map; keys are normalized (`http:post /orders/:id/` becomes `http:POST /orders/{}`) and unreadable ones are dropped with a `validate` warning. Matching keys are how maps of separate repos are joined in a [workspace](#workspaces-several-repos-in-one-map). Cards list them under **Serves to other repos** and **Calls in other repos**.
 - `inferred: true` draws the edge dashed and tells the AI tool the link came from docs or naming rather than code.
+
+### Workspaces: several repos in one map
+
+`.repo-map/workspace.json` (committed) links other repos to this one. The map's **This repo / Workspace** switch then shows them all in one map, joined where one repo calls another.
+
+```json
+{
+  "links": [
+    { "name": "api", "dir": "../shop-api" },
+    { "name": "payments", "snapshot": "links/payments.map.json" }
+  ],
+  "seams": [
+    { "from": "payments-client", "to": "payments:charge-route", "type": "http", "label": "POST /charges", "via": "ai",
+      "why": "chargeCard posts to PAYMENTS_API_URL", "refs": [{ "path": "src/api/payments.js", "start": 3, "end": 9 }] }
+  ]
+}
+```
+
+- **links**: `name` (2-31 lowercase letters, digits or dashes) prefixes the linked repo's ids: `api:orders-route`. A `dir` link is another checkout with its own `.repo-map/`, read live, relative to this repo. A `snapshot` link is a map copied in with **Settings → Linked repos → Import snapshot** from a file made by `repo-map export` in that repo; it has no code access.
+- **seams** are connections between repos. Most are found for free by matching one card's `consumes` against another repo's `provides` (these are never stored). **Find seams** asks the map's AI tool for the rest: it can read files in linked folders, and must cite code for each connection. You accept or dismiss each one; accepted seams are stored here with `"via": "ai"`.
+- When a seam explains a placeholder card (an `external` card such as "Orders API" calling into the linked repo, or "Storefront" calling it), the placeholder is replaced by the real card.
+
+Each repo in the workspace bar shows whether its map is behind its checkout (**map stale**) and how far the checkout is behind its remote's default branch (**behind main 3**), from what was last fetched. **Refresh** runs `git fetch` for that repo (for a snapshot, `git ls-remote` on its recorded remote); repo-map never fetches on its own. Linked cards show their repo; **Collapse** folds a repo into one card that keeps its connections to the others.
 
 ### docs.json
 
@@ -157,7 +181,7 @@ New flowcharts identify where steps execute. When two or more participants are k
 
 Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (using shared pure layout helpers), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
 
-**Collapsing:** fold parts you already understand into one box. Use **Collapse** on a lane heading, or shift-click steps and choose **Collapse selection**. Large flowcharts come with AI-suggested sub-processes; **Collapse suggested** folds them all. Click a collapsed box to see its hidden steps, rename it, or **Expand** it; **Expand all** restores everything. Choices are remembered per trace in your browser and never change the saved flowchart.
+**Collapsing:** fold parts you already understand into one box. Use the collapse button on a lane heading, or select steps (Shift-click, or turn on **Select steps** and click) and choose **Collapse** in the side panel, which lists the selection. Large flowcharts come with AI-suggested sub-processes; **Collapse suggested** folds them all. Click a collapsed box to see its hidden steps, rename it, or **Expand** it; **Expand all** restores everything. Choices are remembered per trace in your browser and never change the saved flowchart.
 
 Optional flow metadata is `lanes: [{ id, label }]` `nodes[].lane` and `chunks: [{ id, label, nodes }]` (suggested sub-processes). It survives saving and sharing independently of proposal status and inferred behavior. SVG export follows the displayed layout. Mermaid preserves participant groups as subgraphs; other renderers may position them differently.
 
@@ -178,6 +202,7 @@ Use **More > Show info** for sitemap freshness, snapshot details, and analysis n
 - Listens on `127.0.0.1` only and rejects requests addressed to any other host name.
 - The API requires a custom header, so other websites open in your browser can't call it.
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
+- Linked repos (workspace `dir` links) are read with their own `codeRoots`, docs and the same exclusions, through a `<name>:` path prefix. Snapshot links have no file access. During **Find seams**, Claude Code gets each linked folder with `--add-dir` (still `Read`, `Grep`, `Glob` only); API models use the same prefixed read-only tools.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
 - Documents (`docs` in config.json, and agent guidance files) are readable outside `codeRoots`, with the same rules: never `.env*`, `.repo-map/` or `blocked` folders.
 - Settings can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.

@@ -47,6 +47,7 @@ export class FlowchartViewModel {
     collapse: FlowCollapse = emptyCollapse();
     /** Boxes picked with shift-click, waiting to be collapsed together. */
     marked: string[] = [];
+    selecting = false;
     connectionTab: ConnectionTab = 'to';
     scale = 1;
     keyOpen = false;
@@ -135,14 +136,41 @@ export class FlowchartViewModel {
         this.collapse = { ...this.collapse, lanes };
         this.saveCollapse();
     }
-    /** Shift-click: add or remove a box from the pending group. Collapsed boxes can't be nested. */
+    /**
+     * Shift-click (or a click in select mode): add or remove a box from the selection.
+     * The step open in the side panel joins as the first pick, and the panel then
+     * shows the selection. Collapsed boxes can't be nested.
+     */
     mark(id: string) {
         const node = this.displayFlow?.nodes.find((n) => n.id === id);
         if (!node || node.collapsed) return;
-        this.marked = this.marked.includes(id) ? this.marked.filter((m) => m !== id) : [...this.marked, id];
+        if (this.marked.includes(id)) {
+            this.marked = this.marked.filter((m) => m !== id);
+            return;
+        }
+        const open = this.selected;
+        const first = !this.marked.length && open && !open.collapsed && open.id !== id ? [open.id] : [];
+        this.marked = [...this.marked, ...first, id];
+        if (this.selectedId) this.select(null);
     }
     clearMarks() {
         this.marked = [];
+    }
+    /** Select mode: plain clicks add steps to the selection, for people without a Shift key. */
+    toggleSelecting() {
+        this.selecting = !this.selecting;
+    }
+    get markMode() {
+        return this.selecting;
+    }
+    /** The side panel shows a step, a collapsed box, or the selection. */
+    get panelOpen() {
+        return !!this.selected || this.marked.length > 0;
+    }
+    /** Marked steps in pick order, with their labels. */
+    get markedNodes() {
+        const shown = this.displayFlow?.nodes || [];
+        return this.marked.map((id) => shown.find((n) => n.id === id)).filter((n): n is NonNullable<typeof n> => !!n);
     }
     collapseMarked(label = '') {
         if (this.marked.length < 2) return;
@@ -183,6 +211,11 @@ export class FlowchartViewModel {
         this.collapse = { ...this.collapse, groups: this.collapse.groups.map((g) => (g.id === id ? { ...g, label } : g)) };
         if (this.collapseKey) this.deps.services.storage.set(this.collapseKey, this.collapse);
     }
+    /** A group's own name, '' when it uses the default ("First step (+N more)"). */
+    groupLabel(collapsedId: string) {
+        const id = collapsedId.replace(/^c:/, '');
+        return this.collapse.groups.find((g) => g.id === id)?.label || '';
+    }
     /** True for named groups the reader made or accepted; lanes keep their lane name. */
     canRename(collapsedId: string) {
         return !collapsedId.startsWith('c:' + LANE_GROUP);
@@ -213,6 +246,12 @@ export class FlowchartViewModel {
     setCompact(value: boolean) {
         this.compact = value;
         this.deps.services.storage.set(this.repo.namespace + 'flow-compact', value);
+    }
+    /** What the zoom is fitted to: the trace, its flowchart and the layout, but not what is collapsed. */
+    get fitKey() {
+        const t = this.trace;
+        if (!t?.flow) return '';
+        return [t._doc || t.key || t.title, this.compact, t.flow.nodes.length, t.flow.edges.length].join('|');
     }
     get svg() {
         return this.layout ? renderFlowSvg(this.layout, { title: this.trace?.title }) : '';
@@ -274,6 +313,7 @@ export class FlowchartViewModel {
         this.copied = false;
         this.selectedId = null;
         this.marked = [];
+        this.selecting = false;
         this.collapse = this.collapseKey ? readCollapse(this.deps.services.storage.get(this.collapseKey, null)) : emptyCollapse();
         this.focus.reset();
         this.status = '';

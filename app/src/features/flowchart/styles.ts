@@ -23,8 +23,20 @@
 export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fe-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke}
 .fc .fn:hover .fs{stroke-width:2.2}
-.fc .fn.mk .fs{stroke:var(--sync);stroke-width:2.6;stroke-dasharray:6 3}
-.diagram-lane-title .lane-fold{margin-left:.5em;font-size:.75em;padding:0 .4em}
+.fc .fn.mk .fs{fill:color-mix(in srgb,var(--http) 14%,var(--panel));stroke:var(--http);stroke-width:2.2}
+.fc .mk-badge circle{fill:var(--http);stroke:var(--panel);stroke-width:2}
+.fc .mk-badge path{fill:none;stroke:var(--panel);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fside-input{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;font-weight:600;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin:2px 0 10px}
+.fside-input:focus{outline:2px solid var(--http);outline-offset:1px}
+.fside-rule{border:0;border-top:1px solid var(--line);margin:8px 0 10px}
+.flow-member-row{display:flex;align-items:center;gap:.5em}
+.flow-member-row .unmark{margin-left:auto;flex:none}
+.flow-select-actions{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em}
+.flow-select-bar [aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
+.diagram-lane-title .lane-name{overflow:hidden;text-overflow:ellipsis;padding:0 2.2em}
+.diagram-lane-title .lane-fold{position:absolute;right:.4em;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:1.7em;height:1.7em;padding:0;border-radius:5px}
+.diagram-lane-title .lane-fold svg{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.diagram-lane-title .lane-fold[aria-pressed="true"]{background:var(--soft)}
 .flow-select-bar{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;padding:.35em .75em;border-bottom:1px solid var(--line)}
 .flow-members{margin:.25em 0 .75em;padding-left:1.2em}
 .flow-members li{margin:.15em 0}
@@ -35,7 +47,8 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .diagram-lane-title{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px 6px 0 0;font-weight:600;white-space:nowrap}
 .fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
 .fc .fe.on{stroke:var(--http);stroke-width:2.2}
-.fc.hovering .fn:not(.hl),.fc.hovering .fe:not(.hl){opacity:.2}
+.fc.hovering .fn:not(.hl):not(.mk),.fc.hovering .fe:not(.hl){opacity:.2}
+.fc .fn text{user-select:none;-webkit-user-select:none}
 .fc.hovering .fl:not(.hl){opacity:.08}
 .fc .fn.hl,.fc .fe.hl,.fc .fl.hl{opacity:1!important}
 .fc .fs-ring,.fc .fs-gap{display:none;fill:none;stroke-linejoin:round;pointer-events:none}

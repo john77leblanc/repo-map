@@ -25,6 +25,7 @@ const fixtures = {
     update: { summary: 'No changes' }, docs: { links: [{ node: 'checkout', path: 'README.md', start: 1, end: 4, title: 'Checkout', why: 'Overview', kind: 'doc' }] },
     sitemap: { version: 1, applicability: 'none', summary: 'Backend only', applications: [], screens: [], navigation: [], gaps: [] },
     sitemapTrace: { sitemap: sitemapTrace },
+    seams: { seams: [{ from: 'checkout', to: 'api:orders', type: 'http', label: 'POST /orders', why: 'Posts the order', refs: [{ path: 'src/order.mjs', start: 1, end: 5 }] }] },
 };
 
 for (const [name, schema] of Object.entries(RESPONSE_SCHEMAS)) {

@@ -7,6 +7,38 @@ import type { CodeRef } from '../../models/types';
 
 const Reference = ({ reference }: { reference: CodeRef }) => <span>{reference.path}</span>;
 describe('FlowchartWorkspace', () => {
+    it('lists selected steps in the side panel, collapses them there, and renames the group as you type', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace({ ...trace, flow: {
+            nodes: [{ id: 'a', type: 'start', label: 'Open' }, { id: 'b', type: 'process', label: 'Save' }, { id: 'c', type: 'end', label: 'Done' }],
+            edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }],
+        } });
+        const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
+        expect(container.querySelector('.fmain.details-closed')).toBeTruthy();
+        act(() => vm.mark('a'));
+        const side = () => container.querySelector('#fl-side')!;
+        expect(side().getAttribute('aria-label')).toBe('Selected steps');
+        expect(container.querySelector('.fmain.details-closed')).toBe(null);
+        expect(screen.getByRole('heading', { name: '1 step selected' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Collapse' })).toBeDisabled();
+        act(() => vm.mark('b'));
+        expect([...side().querySelectorAll('[data-marked]')].map((li) => li.getAttribute('data-marked'))).toEqual(['a', 'b']);
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Open' }));
+        expect(vm.marked).toEqual(['b']);
+        act(() => vm.mark('c'));
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+        expect(vm.selected?.collapsed).toBe(true);
+        const name = screen.getByRole('textbox', { name: 'Group name' }) as HTMLInputElement;
+        expect(name.value).toBe('');
+        expect(name.placeholder).toBe('Save (+1 more)');
+        fireEvent.change(name, { target: { value: 'Finish' } });
+        expect(vm.selected?.label).toBe('Finish');
+        expect(container.querySelector('label.ft')).toBe(null);
+        fireEvent.click(screen.getByRole('button', { name: 'Select steps' }));
+        expect(vm.selecting).toBe(true);
+        unmount();
+        vm.dispose();
+    });
     it('renders all legend symbols and shows change labels only for proposals', () => {
         const { vm, trace } = fixture();
         vm.setTrace(trace);

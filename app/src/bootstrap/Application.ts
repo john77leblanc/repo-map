@@ -1,5 +1,6 @@
 import { runInAction } from 'mobx';
 import { RepositoryModel } from '../models/RepositoryModel';
+import { WorkspaceModel } from '../models/WorkspaceModel';
 import { ShellViewModel } from '../features/shell/ShellViewModel';
 import { SettingsViewModel } from '../features/settings/SettingsViewModel';
 import { TraceViewModel } from '../features/traces/TraceViewModel';
@@ -21,6 +22,7 @@ export class Application {
     readonly plans: PlansViewModel;
     readonly sitemap: SitemapViewModel;
     readonly start: StartViewModel;
+    readonly workspace: WorkspaceModel;
     constructor(
         readonly repo: RepositoryModel,
         readonly services: Services
@@ -30,8 +32,9 @@ export class Application {
         this.shell = new ShellViewModel({ repo, services, onWorkspaceChange: (workspace) => {
             if (workspace === 'sitemap') void this.sitemap.load();
         } });
-        this.settings = new SettingsViewModel({ repo, services });
-        this.architecture = new ArchitectureViewModel({ repo, services });
+        this.workspace = new WorkspaceModel(services);
+        this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace });
+        this.architecture = new ArchitectureViewModel({ repo, services, workspace: this.workspace });
         this.start = new StartViewModel({ repo, services, settings: this.settings, sitemap: this.sitemap });
         const getPick = () => this.settings.currentPick();
         const saveTrace = (trace: Trace) => this.traces.saveExisting(trace);
@@ -79,7 +82,7 @@ export class Application {
         this.shell.expandSidebar();
     }
     async init() {
-        await Promise.all([this.settings.init(), this.traces.init()]);
+        await Promise.all([this.settings.init(), this.traces.init(), this.workspace.load()]);
     }
     dispose() {
         this.start.dispose();
@@ -90,6 +93,7 @@ export class Application {
         this.architecture.dispose();
         this.settings.dispose();
         this.shell.dispose();
+        this.workspace.dispose();
     }
 }
 

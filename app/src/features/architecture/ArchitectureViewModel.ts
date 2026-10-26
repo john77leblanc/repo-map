@@ -3,6 +3,8 @@ import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
 import type { MapNode, RepoMap, Trace } from '../../models/types';
 import { proposalMap } from '../../../../lib/proposal.mjs';
+import { REPO_PREFIX, collapseRepos } from '../../../../lib/workspace-map.mjs';
+import type { WorkspaceModel } from '../../models/WorkspaceModel';
 import { neighborhood } from '../../shared/diagramFocus';
 
 export interface ArchitectureDependencies {
@@ -10,7 +12,10 @@ export interface ArchitectureDependencies {
     services: Services;
     onReveal?: (id: string) => void;
     onInspect?: (id: string | null) => void;
+    /** Linked repos (workspace.json); without it the map shows this repo only. */
+    workspace?: WorkspaceModel;
 }
+export type MapScope = 'repo' | 'workspace';
 
 export type ConnectionDirection = 'from' | 'to';
 export interface CardConnection {
@@ -34,20 +39,76 @@ export class ArchitectureViewModel {
     revealId: string | null = null;
     revealVersion = 0;
     disposed = false;
+    /** This repo only, or every linked repo in one map. */
+    scopeChoice: MapScope = 'repo';
+    /** `repo:<name>` ids folded into one card each (workspace view). */
+    collapsedRepos: string[] = [];
     constructor(readonly deps: ArchitectureDependencies) {
         makeAutoObservable(this, { deps: false, trace: observableRef }, { autoBind: true });
         this.groups = deps.services.storage.get<Record<string, boolean>>(
             deps.repo.namespace + 'groups',
             {}
         );
+        const storage = deps.services.storage;
+        this.scopeChoice = storage.get<MapScope>(deps.repo.namespace + 'map-scope', 'repo') === 'workspace' ? 'workspace' : 'repo';
+        const folded = storage.get<unknown>(deps.repo.namespace + 'repo-collapse', []);
+        this.collapsedRepos = Array.isArray(folded) ? folded.filter((x): x is string => typeof x === 'string') : [];
+    }
+    get workspace() {
+        return this.deps.workspace;
+    }
+    /** The scope actually shown: workspace only when another repo is linked. */
+    get scope(): MapScope {
+        return this.scopeChoice === 'workspace' && !!this.workspace?.linked ? 'workspace' : 'repo';
+    }
+    setScope(scope: MapScope) {
+        if (this.scopeChoice === scope) return;
+        this.scopeChoice = scope;
+        this.deps.services.storage.set(this.repo.namespace + 'map-scope', scope);
+        this.dismiss();
+    }
+    isRepoCollapsed(name: string) {
+        return this.collapsedRepos.includes(REPO_PREFIX + name);
+    }
+    toggleRepo(name: string) {
+        const id = REPO_PREFIX + name;
+        this.setCollapsedRepos(this.isRepoCollapsed(name) ? this.collapsedRepos.filter((x) => x !== id) : [...this.collapsedRepos, id]);
+    }
+    private setCollapsedRepos(ids: string[]) {
+        this.collapsedRepos = ids;
+        this.deps.services.storage.set(this.repo.namespace + 'repo-collapse', ids);
+        if (this.selected && !this.nodes.has(this.selected)) this.dismiss();
+    }
+    /** Expand a collapsed repo card, optionally opening one of its cards. */
+    expandCollapsed(id: string, select?: string) {
+        const node = this.nodes.get(id);
+        if (!node?.collapsed) return;
+        this.setCollapsedRepos(this.collapsedRepos.filter((x) => 'c:' + x !== id));
+        if (select) this.inspect(select);
+        else this.dismiss();
+    }
+    /** A card's title, with its repo in the workspace view ("orders route (Shop API)"). */
+    nodeTitle(id: string) {
+        const n = this.nodes.get(id) || this.workspace?.view?.map.nodes.find((x) => x.id === id);
+        const repo = this.repoTitle(n?.repo);
+        return (n?.title || id) + (repo && !n?.collapsed ? ` (${repo})` : '');
+    }
+    /** Connections of a card that cross between repos. */
+    seamsFor(id: string) {
+        return this.map.edges.filter((e) => e.seam && (e.from === id || e.to === id));
+    }
+    /** Title of the repo a card or group comes from, in the workspace view. */
+    repoTitle(repo: string | undefined) {
+        return repo && repo !== 'home' ? this.workspace?.titles[repo] || repo : '';
     }
     get repo() {
         return this.deps.repo;
     }
     get map(): RepoMap {
-        return this.trace?.proposal
-            ? (proposalMap(this.repo.map, this.trace.proposal) as RepoMap)
-            : this.repo.map;
+        // proposals are drawn on this repo's map; other traces also read on the workspace map
+        if (this.trace?.proposal) return proposalMap(this.repo.map, this.trace.proposal) as RepoMap;
+        const merged = this.scope === 'workspace' ? this.workspace?.view?.map : null;
+        return merged ? (collapseRepos(merged, this.collapsedRepos, this.workspace!.titles) as RepoMap) : this.repo.map;
     }
     get nodes() {
         return new Map(this.map.nodes.map((n) => [n.id, n]));

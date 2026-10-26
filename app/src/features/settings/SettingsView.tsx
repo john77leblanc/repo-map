@@ -4,6 +4,7 @@ import { AgentPicker } from '../../shared/ui/AgentPicker';
 import { ModalHeader } from '../../shared/ui/ModalHeader';
 import { ProgressLine } from '../../shared/ui/ProgressLine';
 import type { SettingsViewModel } from './SettingsViewModel';
+import { LinkedRepos } from './LinkedRepos';
 
 export interface SettingsViewProps {
     vm: SettingsViewModel;
@@ -234,6 +235,7 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
                     {vm.saveStatus}
                 </p>
             </section>
+            {vm.deps.workspace && <LinkedRepos model={vm.deps.workspace} />}
             <section>
                 <h2>Trace agent</h2>
                 <p className="hint">

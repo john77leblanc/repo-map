@@ -1,0 +1,17 @@
+{
+    "name": "Shop API",
+    "description": "Demo orders backend for repo-map's workspace example.",
+    "github": false,
+    "codeRoots": ["src/"],
+    "columns": [
+        { "title": "Callers", "subtitle": "Who calls this API" },
+        { "title": "Routes", "subtitle": "HTTP endpoints" },
+        { "title": "Storage & events", "subtitle": "Data and the queue" },
+        { "title": "Workers", "subtitle": "Jobs triggered by events" },
+        { "title": "Downstream", "subtitle": "Systems the data ends up in" }
+    ],
+    "kinds": { "service": "module", "topic": "queue", "external": "outside the repo" },
+    "edgeTypes": { "http": "API call", "event": "event", "sync": "data" },
+    "prompt": { "context": "A tiny Node HTTP API. Routes in src/routes, storage in src/db, background workers in src/workers.", "hints": "" },
+    "footnote": "A fictional example that ships with repo-map."
+}

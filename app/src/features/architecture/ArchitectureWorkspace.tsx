@@ -7,6 +7,7 @@ import { contractLabel } from '../../../../lib/contracts.mjs';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
 import { useArchitectureWires } from './useArchitectureWires';
 import { DocumentationReference } from './DocumentationReference';
+import { ScopeSwitch, WorkspaceBar } from './WorkspaceBar';
 
 export interface ArchitectureWorkspaceProps {
     vm: ArchitectureViewModel;
@@ -64,7 +65,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                 key={i}
                 id={overlay ? undefined : 'proposal-wire-' + i}
                 d={w.d}
-                className={`w ${e.type}${e.inferred ? ' inf' : ''}${e.status ? ' change-' + e.status : ''}${on ? ' on' : ''}`}
+                className={`w ${e.type}${e.inferred ? ' inf' : ''}${w.edges.some((x) => x.seam) ? ' seam' : ''}${e.status ? ' change-' + e.status : ''}${on ? ' on' : ''}`}
                 markerEnd={`url(#m-${e.type})`}
             />
         );
@@ -121,9 +122,11 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         >
                             Diagram key
                         </button>
+                        <ScopeSwitch vm={vm} />
                     </div>
                 </div>
             </header>
+            <WorkspaceBar vm={vm} />
             <section
                 className="diagram-key"
                 id="architecture-key"
@@ -148,6 +151,12 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         <i className="sw inf" />
                         Inferred
                     </span>
+                    {vm.scope === 'workspace' && (
+                        <span className="chip" style={{ cursor: 'default' }} data-key-seam>
+                            <i className="sw seam" />
+                            Between repos
+                        </span>
+                    )}
                     <span className="note">
                         {['service', 'topic', 'external'].map((k) => (
                             <span key={k}>
@@ -259,6 +268,9 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                     <svg className="car" viewBox="0 0 10 10">
                                                         <path d="M3.5 2l3 3-3 3" />
                                                     </svg>
+                                                    {!g.id.startsWith('repo:') && vm.repoTitle(g.repo) && (
+                                                        <span className="repo-tag">{vm.repoTitle(g.repo)}</span>
+                                                    )}
                                                     <span>{g.title}</span>
                                                     <span className="gc">
                                                         {
@@ -282,6 +294,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                                     (n.status
                                                                         ? ' change-' + n.status
                                                                         : '') +
+                                                                    (n.collapsed ? ' collapsed' : '') +
                                                                     (vm.selected === n.id
                                                                         ? ' open'
                                                                         : '') +
@@ -334,6 +347,11 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                                     <span className="nm">
                                                                         {n.title || n.id}
                                                                     </span>
+                                                                    {n.collapsed && (
+                                                                        <span className="dcount" title={`${n.members?.length} cards folded into one`}>
+                                                                            {n.members?.length} cards
+                                                                        </span>
+                                                                    )}
                                                                     {!!vm.repo.docs[n.id]
                                                                         ?.length && (
                                                                         <span
@@ -426,7 +444,11 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             </h3>
                             <button className="btn sm" type="button" data-close onClick={vm.dismiss}>Close</button>
                         </div>
+                        {selected.collapsed ? (
+                            <CollapsedRepoDetails vm={vm} id={selected.id} />
+                        ) : (
                         <div className="arch-details-body">
+                        {vm.repoTitle(selected.repo) && <p className="hint repo-of">From <b>{vm.repoTitle(selected.repo)}</b></p>}
                         <p className="description">
                             {selected.desc ||
                                 (selected.status === 'new' ? selected.rationale : '')}
@@ -486,6 +508,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                 />
                             ))}
                         </div>
+                        <CardSeams vm={vm} id={selected.id} />
                         <CardConnections vm={vm} id={selected.id} />
                         {selected.path && (
                             <p className="path">
@@ -503,9 +526,73 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             </p>
                         )}
                         </div>
+                        )}
                     </aside>
                 )}
             </div>
+        </section>
+    );
+});
+
+/** A collapsed repo: the cards it hides, each opening that card, and Expand. */
+const CollapsedRepoDetails = observer(function CollapsedRepoDetails({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
+    const node = vm.nodes.get(id)!;
+    const all = vm.workspace?.view?.map.nodes || [];
+    return (
+        <div className="arch-details-body">
+            <p className="description">
+                {node.members?.length} cards from <b>{node.title}</b> are folded into this card. Its connections to other repos still show.
+            </p>
+            <button className="btn sm" type="button" id="arch-expand-repo" onClick={() => vm.expandCollapsed(id)}>
+                Expand
+            </button>
+            <h4>Hidden cards</h4>
+            <ul className="ws-members">
+                {node.members?.map((m) => (
+                    <li key={m}>
+                        <button className="cl" type="button" data-member={m} onClick={() => vm.expandCollapsed(id, m)}>
+                            {all.find((n) => n.id === m)?.title || m}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            <CardSeams vm={vm} id={id} />
+            <CardConnections vm={vm} id={id} />
+        </div>
+    );
+});
+
+const HOW = { contract: 'matched contract', ai: 'found by AI', manual: 'added by hand' } as const;
+
+/** Connections to other repos: how each was found, and the code behind it. */
+const CardSeams = observer(function CardSeams({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
+    const seams = vm.seamsFor(id);
+    if (!seams.length) return null;
+    return (
+        <section className="seams" aria-label="Connections to other repos">
+            <h4>Connections to other repos</h4>
+            <ul>
+                {seams.map((e) => {
+                    const other = e.from === id ? e.to : e.from;
+                    return (
+                        <li key={e.from + '>' + e.to} data-seam={e.from + '>' + e.to}>
+                            <button className="cl" type="button" onClick={() => vm.inspect(other)}>
+                                <i className="sw seam" />
+                                <b>{(e.from === id ? '→ ' : '← ') + vm.nodeTitle(other)}</b>
+                                <span>{e.label}</span>
+                                <em>{HOW[e.seam!]}</em>
+                            </button>
+                            {e.why && <p className="hint">{e.why}</p>}
+                            {e.refs?.map((r, i) => <CodeReference key={r.path + i} reference={r} repo={vm.repo} />)}
+                            {e.seam !== 'contract' && (
+                                <button className="btn sm" type="button" data-remove-seam onClick={() => void vm.workspace?.removeSeam(e)}>
+                                    Remove connection
+                                </button>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
         </section>
     );
 });
@@ -530,7 +617,7 @@ const CardConnections = observer(function CardConnections({ vm, id }: { vm: Arch
                                     onMouseEnter={() => vm.setHover(other)} onMouseLeave={() => vm.setHover(null)}
                                     onFocus={() => vm.setHover(other)} onBlur={() => vm.setHover(null)}>
                                     <i className={'sw ' + e.type} />
-                                    <b>{vm.nodes.get(other)?.title || other}</b>
+                                    <b>{vm.nodeTitle(other)}</b>
                                     <span>{[change(e.status), e.label || connectionLabels[e.type]].filter(Boolean).join(': ')}</span>
                                     {e.inferred && <em>inferred</em>}
                                 </button>

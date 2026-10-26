@@ -8,6 +8,8 @@ interface DiagramViewModel {
     scale: number;
     selectedId: string | null;
     fit(width: number, height: number, zoom?: number): void;
+    /** When set, the diagram only refits when this changes, so redraws such as collapsing keep the zoom. */
+    fitKey?: string;
     zoom(factor: number): void;
     select(id: string | null): void;
     /** Node click handler; defaults to toggling `select`. */
@@ -21,6 +23,8 @@ interface DiagramViewModel {
     /** Shift-click: add a node to (or drop it from) a multi-selection. */
     mark?(id: string): void;
     marked?: string[];
+    /** Select mode: plain clicks mark instead of opening a node. */
+    markMode?: boolean;
     /** Lane heading fold buttons, when the diagram supports collapsing lanes. */
     toggleLane?(id: string): void;
     isLaneCollapsed?(id: string): boolean;
@@ -49,6 +53,7 @@ const DiagramSvg = observer(function DiagramSvg({
     const scaledWidth = layout ? Math.round(layout.width * vm.scale) : 0;
     const headerScale = layout?.width ? scaledWidth / layout.width : 1;
     const headerHeight = 56 * headerScale;
+    const fitted = useRef<string | null>(null);
     useLayoutEffect(() => {
         if (!host.current) return;
         host.current.innerHTML = svg;
@@ -77,8 +82,11 @@ const DiagramSvg = observer(function DiagramSvg({
                 shape.parentNode?.insertBefore(copy, shape);
             }
         });
-        if (canvas.current)
+        const key = vm.fitKey;
+        if (canvas.current && (key === undefined || key !== fitted.current)) {
+            fitted.current = key ?? null;
             vm.fit(canvas.current.clientWidth, canvas.current.clientHeight, initialZoom);
+        }
     }, [svg, vm, initialZoom]);
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');
@@ -111,8 +119,29 @@ const DiagramSvg = observer(function DiagramSvg({
     const marked = vm.marked;
     useLayoutEffect(() => {
         const set = new Set(marked || []);
-        host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) => node.classList.toggle('mk', set.has(node.dataset.id || '')));
-    }, [svg, marked]);
+        type Box = { id: string; type: string; x: number; y: number; w: number; h: number };
+        const boxes = new Map(((layout?.nodes || []) as Box[]).map((n) => [n.id, n]));
+        host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) => {
+            const id = node.dataset.id || '';
+            const on = set.has(id);
+            node.classList.toggle('mk', on);
+            // A check badge on the box's top-right corner (on the edge for diamonds).
+            node.querySelector('.mk-badge')?.remove();
+            const label = (node.getAttribute('aria-label') || '').replace(/, selected$/, '');
+            node.setAttribute('aria-label', on ? label + ', selected' : label);
+            const box = boxes.get(id);
+            if (!on || !box) return;
+            const diamond = box.type === 'decision';
+            const cx = diamond ? box.x + box.w * 0.75 : box.x + box.w - 2;
+            const cy = diamond ? box.y + box.h * 0.25 : box.y + 2;
+            const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            badge.setAttribute('class', 'mk-badge');
+            badge.setAttribute('aria-hidden', 'true');
+            badge.setAttribute('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
+            badge.innerHTML = '<circle r="9"/><path d="M-4 0.5 -1.2 3.3 4 -2.6"/>';
+            node.appendChild(badge);
+        });
+    }, [svg, marked, layout]);
     const highlight = vm.highlight;
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');
@@ -165,9 +194,14 @@ const DiagramSvg = observer(function DiagramSvg({
                                 {vm.toggleLane && lane.id && (vm.isLaneCollapsed?.(lane.id) || vm.laneFoldable?.(lane.id)) && (
                                     <button className="btn sm lane-fold" type="button" data-lane={lane.id}
                                         aria-pressed={!!vm.isLaneCollapsed?.(lane.id)}
+                                        aria-label={vm.isLaneCollapsed?.(lane.id) ? `Expand ${lane.label}` : `Collapse ${lane.label}`}
                                         title={vm.isLaneCollapsed?.(lane.id) ? `Expand ${lane.label}` : `Collapse ${lane.label} into one box`}
                                         onClick={() => vm.toggleLane?.(lane.id)}>
-                                        {vm.isLaneCollapsed?.(lane.id) ? 'Expand' : 'Collapse'}
+                                        <svg viewBox="0 0 16 16" aria-hidden="true">
+                                            {vm.isLaneCollapsed?.(lane.id)
+                                                ? <path d="M5 2.5 8 5.5 11 2.5M5 13.5 8 10.5 11 13.5" />
+                                                : <path d="M5 5.5 8 2.5 11 5.5M5 10.5 8 13.5 11 10.5" />}
+                                        </svg>
                                     </button>
                                 )}
                             </div>
@@ -191,7 +225,7 @@ const DiagramSvg = observer(function DiagramSvg({
                     // Paths and captions are hover-only; clicking them keeps the current selection.
                     if (edgeIndex(event.target) !== null) return;
                     const node = (event.target as Element).closest<SVGElement>('.fn');
-                    if (node?.dataset.id && event.shiftKey && vm.mark) return vm.mark(node.dataset.id);
+                    if (node?.dataset.id && (event.shiftKey || vm.markMode) && vm.mark) return vm.mark(node.dataset.id);
                     if (node?.dataset.id && vm.pick) return vm.pick(node.dataset.id);
                     vm.select(
                         node?.dataset.id && node.dataset.id !== vm.selectedId
@@ -204,7 +238,7 @@ const DiagramSvg = observer(function DiagramSvg({
                     const node = (event.target as Element).closest<SVGElement>('.fn');
                     if (node?.dataset.id) {
                         event.preventDefault();
-                        if (event.shiftKey && vm.mark) vm.mark(node.dataset.id);
+                        if ((event.shiftKey || vm.markMode) && vm.mark) vm.mark(node.dataset.id);
                         else vm.select(node.dataset.id);
                     }
                 }}

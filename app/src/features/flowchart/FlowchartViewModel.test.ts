@@ -206,6 +206,7 @@ describe('FlowchartViewModel', () => {
         expect(vm.selectedId).toBe('c');
         vm.expandAll();
         vm.collapseChunk('k1');
+        vm.close();
         vm.mark('b');
         vm.mark('zz');
         vm.mark('c:chunk:k1');
@@ -224,5 +225,40 @@ describe('FlowchartViewModel', () => {
         expect(next.displayFlow?.nodes.find((n) => n.collapsed)?.members).toEqual(['s', 'a', 'e']);
         vm.dispose();
         next.dispose();
+    });
+    it('starts a selection from the open step, shows it in the panel, and renames groups live', () => {
+        const { vm, trace } = fixture();
+        trace.flow = {
+            nodes: [
+                { id: 'b', type: 'process', label: 'Save' },
+                { id: 'c', type: 'process', label: 'Reply' },
+                { id: 'e', type: 'end', label: 'Done' },
+            ],
+            edges: [{ from: 'b', to: 'c' }, { from: 'c', to: 'e' }],
+        };
+        vm.setTrace(trace);
+        expect(vm.panelOpen).toBe(false);
+        vm.select('b');
+        vm.mark('e');
+        expect(vm.marked).toEqual(['b', 'e']);
+        expect(vm.selectedId).toBe(null);
+        expect(vm.panelOpen).toBe(true);
+        expect(vm.markedNodes.map((n) => n.id)).toEqual(['b', 'e']);
+        vm.mark('b');
+        vm.mark('e');
+        expect(vm.panelOpen).toBe(false);
+        expect(vm.markMode).toBe(false);
+        vm.toggleSelecting();
+        expect(vm.markMode).toBe(true);
+        vm.mark('b');
+        vm.mark('c');
+        vm.collapseMarked();
+        expect(vm.groupLabel('c:s1')).toBe('');
+        vm.renameGroup('c:s1', 'Wr');
+        expect(vm.groupLabel('c:s1')).toBe('Wr');
+        expect(vm.selected?.label).toBe('Wr');
+        vm.setTrace(trace);
+        expect(vm.markMode).toBe(false);
+        vm.dispose();
     });
 });

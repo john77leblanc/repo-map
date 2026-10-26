@@ -48,16 +48,17 @@ Existing shared pure `.mjs` helpers, including `app/flowchart.mjs`, `lib/flow.mj
 - Map freshness: `map.json` records the commit it was evaluated at. `lib/freshness.mjs` diffs HEAD vs that commit (restricted to `codeRoots`) → state `current|stale|unrecorded|unknown|starter|empty`. `lib/update.mjs` sends map + diff to AI, gets back a patch, applies it with pure `applyPatch`.
 - `lib/scaffold.mjs` — starter config + no-AI folder-based starter map. `lib/generate.mjs` — full AI-drafted map, then the docs pass.
 - Docs pass: `lib/docs.mjs` (`linkDocs` → `.repo-map/docs.json` `{commit, links: {nodeId: [{path,start,end,title,why,kind}]}}`, kind `guide|doc|comment`, cleaned by `cleanLinks`; `docsStatus`, `pruneDocs`). Runs after generate, via `repo-map docs`, the Map tab, and from `updateMap` when documents changed or cards were added. `lib/guidance.mjs` reads AGENTS.md/CLAUDE.md/etc. (follows `@file` imports once) and every prompt in `lib/prompts.mjs` includes it via `aboutRepo()`.
+- Workspaces: `.repo-map/workspace.json` links other repos (`dir` live, or imported `snapshot` under `.repo-map/links/`). Pure `lib/workspace-map.mjs` (`mergeMaps` prefixes linked ids `<name>:`, joins seams by contract and replaces explained `external` placeholders; `collapseRepos`); `lib/workspace.mjs` loads links, freshness vs the remote default branch (`git fetch` only on request), export/import, and `<name>:` file reads; `lib/seams.mjs` is the **Find seams** AI pass (map lock). Routes: `GET/PUT /api/workspace`, `POST /api/workspace/{fetch,import,seams}`. The browser's `WorkspaceModel` is shared by the map's workspace view and Settings → Linked repos. `examples/shop` links `examples/shop-api`.
 - File access: `safePath` (codeRoots only) vs `readablePath` (codeRoots or docs per `config.docs` globs + guidance files). `readLines`, `/api/file` and the API tools' `read_file` use `readablePath`; same `.env`/`blocked`/`.repo-map` exclusions.
 - `lib/repo.mjs` — git helpers and the safe file reader.
 
 ## Invariants
 
 - **Read-only AI.** Runners must never get tools that write files, run shell, or browse. Claude Code runs with `Read`, `Grep`, `Glob` only.
-- **File access** limited to `codeRoots`; `.env*`, `.repo-map/` and `blocked` segments always refused. Applies to the code viewer and API-model tools alike.
+- **File access** limited to `codeRoots`; `.env*`, `.repo-map/` and `blocked` segments always refused. Applies to the code viewer and API-model tools alike. Linked repos are read only through a `<name>:` prefix, under their own `codeRoots` with the same exclusions; snapshot links are never read.
 - API keys only from env vars, never written to config.
 - Adding a provider: wire into `detectProvider` and `runAi`, document in SETUP.md, add a test with a fake server or script (see `test/ai.test.mjs`).
-- `examples/shop/` is used by both `npm run example` and the tests; changes there affect test expectations.
+- `examples/shop/` and its linked sibling `examples/shop-api/` are used by `npm run example` and the tests (the e2e server copies both side by side); changes there affect test expectations.
 - User-facing docs: README.md (overview, config/map schema), SETUP.md (install, AI tool config, troubleshooting), CONTRIBUTING.md (layout, releasing). Update them and CHANGELOG.md when behavior changes.
 
 ## Packaging

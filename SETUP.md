@@ -343,13 +343,23 @@ For big refactors, redraw the whole map with **Redraw map** in the browser's Set
 
 After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: Settings offers **Mark as current**, which does the same as `update --mark`.
 
+### Linking other repos (workspaces)
+
+When a frontend calls a backend in another repo, link the two so the map can show both. In the frontend repo, open **Settings → Linked repos**, give the backend a short name (`api`) and its folder (`../shop-api`), and choose **Link folder**. The backend needs its own map first (run `repo-map` there). This writes `.repo-map/workspace.json`; commit it so teammates with the same folder layout get the link too.
+
+Teammates without the backend's code can use a snapshot instead: run `repo-map export` in the backend repo, then **Import snapshot** in the frontend's Settings. The snapshot is saved under `.repo-map/links/`, so commit that too. Re-export when the backend's map changes; the workspace bar marks it **snapshot old** once **Refresh** sees a newer commit on its remote.
+
+On the map, **Workspace** shows both repos. Connections whose `consumes`/`provides` contracts match appear immediately; **Find seams** asks the map's AI tool for the rest, which you accept or dismiss. **Refresh** next to a repo runs `git fetch` for it, so the badge can say how far it is behind its default branch.
+
 ### Settings
 
 The sidebar's **Settings** button opens a dedicated panel for map maintenance and AI preferences:
 
 - **Status**: up to date or not, the files that changed, and whether documents changed since the docs were linked.
 - **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
-- **Map agent**: the tool, model and effort that draw and update the map and link its docs, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
+- **Map agent**: the tool, model and effort that draw and update the map, link its docs and find seams between linked repos, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
+
+- **Linked repos**: other repos shown beside this one in the workspace view: link a folder, import a snapshot, or remove a link.
 
 **Trace agent** sets the tool, model and effort used for process architecture and flowcharts. This preference is remembered in your browser for this repo and used for new traces and flowchart redraws.
 
