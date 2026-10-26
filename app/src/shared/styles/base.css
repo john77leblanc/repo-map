@@ -97,6 +97,7 @@ details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--fo
 .facts{margin:0 0 8px;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
 .facts li{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
 .facts li::before{content:"› ";color:var(--line)}
+.contracts h4{margin:6px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .path{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-bottom:8px;word-break:break-all}
 .conn h4{font-family:var(--f-head);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 3px;font-weight:600}
 .conn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}

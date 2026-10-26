@@ -121,7 +121,8 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
   "nodes": [{
     "id": "checkout-page", "group": "g-checkout", "kind": "service", "tag": "web",
     "path": "src/pages/checkout", "title": "optional display name",
-    "desc": "One or two sentences.", "facts": ["/checkout", "placeOrder()"]
+    "desc": "One or two sentences.", "facts": ["/checkout", "placeOrder()"],
+    "provides": ["http:GET /checkout"], "consumes": ["http:POST /orders", "env:ORDERS_API_URL"]
   }],
   "edges": [{ "from": "checkout-page", "to": "orders-api", "type": "http", "label": "POST /orders", "inferred": false }]
 }
@@ -129,6 +130,7 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 
 - `col` indexes `config.columns`. Groups with `"open": false` start collapsed, and edges into them attach to the group header.
 - `path` is the node's folder in the repo. Nodes without one (outside systems) get no code references.
+- `provides` / `consumes` (optional) are **contracts**: what a node serves to other repos and what it calls in them, as typed keys: `http:METHOD /path` (path params as `{id}`; `ANY` when the method is unknown), `event:topic`, `pkg:name`, `grpc:pkg.Service/Method`, and `env:VAR` for the variable holding a called service's base URL. The AI tool fills them when it draws or updates the map; keys are normalized (`http:post /orders/:id/` becomes `http:POST /orders/{}`) and unreadable ones are dropped with a `validate` warning. Matching keys are how maps of separate repos will be joined. Cards list them under **Serves to other repos** and **Calls in other repos**.
 - `inferred: true` draws the edge dashed and tells the AI tool the link came from docs or naming rather than code.
 
 ### docs.json

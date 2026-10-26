@@ -11,8 +11,8 @@
     { "id": "cart-page", "group": "g-pages", "kind": "service", "path": "src/pages/cart", "desc": "Shows the items in the cart and links to checkout.", "facts": ["/cart"] },
     { "id": "checkout-page", "group": "g-pages", "kind": "service", "path": "src/pages/checkout", "desc": "Collects the shopper's email and places the order.", "facts": ["/checkout"] },
     { "id": "cart-store", "group": "g-state", "kind": "topic", "path": "src/stores", "title": "cart store", "desc": "In-memory cart shared by the cart and checkout pages." },
-    { "id": "orders-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "orders client", "desc": "Charges the card, then creates the order.", "facts": ["placeOrder()", "ORDERS_API_URL"] },
-    { "id": "payments-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "payments client", "desc": "Charges the shopper's card.", "facts": ["chargeCard()", "PAYMENTS_API_URL"] },
+    { "id": "orders-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "orders client", "desc": "Charges the card, then creates the order.", "facts": ["placeOrder()", "ORDERS_API_URL"], "consumes": ["http:POST /orders", "env:ORDERS_API_URL"] },
+    { "id": "payments-client", "group": "g-api", "kind": "service", "path": "src/api", "title": "payments client", "desc": "Charges the shopper's card.", "facts": ["chargeCard()", "PAYMENTS_API_URL"], "consumes": ["http:POST /charges", "env:PAYMENTS_API_URL"] },
     { "id": "orders-api", "group": "g-backends", "kind": "external", "title": "Orders API", "desc": "Stores orders." },
     { "id": "payments-api", "group": "g-backends", "kind": "external", "title": "Payments API", "desc": "Payment processor." }
   ],

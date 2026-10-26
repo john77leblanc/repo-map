@@ -122,4 +122,14 @@ describe('ArchitectureWorkspace', () => {
         expect(vm.selected).toBe('two');
         expect(screen.getByRole('heading', { name: 'Two' })).toBeTruthy();
     });
+    it('lists card contracts in its details panel', () => {
+        const { vm } = fixture();
+        runInAction(() => {
+            Object.assign(vm.deps.repo.map!.nodes[0], { provides: ['http:GET /one/{}'], consumes: ['http:ANY /two', 'env:TWO_URL'] });
+        });
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
+        fireEvent.click(screen.getByRole('button', { name: 'One' }));
+        expect(container.querySelector('[data-contracts=provides]')?.textContent).toBe('Serves to other reposGET /one/{}');
+        expect([...container.querySelectorAll('[data-contracts=consumes] li')].map((li) => li.textContent)).toEqual(['/two', 'env TWO_URL']);
+    });
 });

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Record **contracts** on map nodes: optional `provides` / `consumes` lists of typed keys (`http:POST /orders`, `event:order.placed`, `pkg:@shop/client`, `grpc:Svc/Method`, `env:ORDERS_API_URL`). The AI tool fills them when drawing or updating the map, and `repo-map validate` warns about unreadable entries. Keys are normalized and matched by the pure helpers in `lib/contracts.mjs` (`normalizeContract`, `contractsMatch`, `matchContracts`), the groundwork for joining maps of several repos. Architecture card details list them under **Serves to other repos** and **Calls in other repos**. The example shop map declares its order and payment calls.
+
+- Fix: suggested flowchart chunks are now allowed by the AI response contract, so flowcharts that include them aren't rejected.
+
 - Collapse parts of a flowchart into one box. Each lane heading has **Collapse** / **Expand**; shift-click (or Shift+Enter) steps and choose **Collapse selection** to group any steps. For flowcharts over 15 boxes, the AI tool also suggests sub-processes (`flow.chunks`), applied with **Collapse suggested**. A collapsed box is drawn as a card stack with its step count, keeps merged connections, and opens a side panel listing its hidden steps, a name field and **Expand**. **Expand all** restores the full chart. Collapse choices are remembered per trace in your browser; Mermaid and SVG exports follow the displayed chart. Shared pure helper: `lib/collapse.mjs` (`collapseGraph`).
 
 - Keep saved-trace cards compact: the title stays on one line and the prompt on three, cut off with "..." (hover for the full text). This applies to running trace jobs too. Proposal traces show a **Proposal** tag, or **Plan** once an implementation plan exists.

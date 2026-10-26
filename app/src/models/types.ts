@@ -9,6 +9,9 @@ export interface MapNode {
     desc?: string;
     path?: string;
     facts?: string[];
+    /** Contract keys (lib/contracts.mjs): what this node serves to, and calls in, other repos. */
+    provides?: string[];
+    consumes?: string[];
     status?: ChangeStatus;
     rationale?: string;
     suggestedPath?: string;

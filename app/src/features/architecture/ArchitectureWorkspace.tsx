@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { DirectionTabs } from '../../shared/ui/DirectionTabs';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
+import { contractLabel } from '../../../../lib/contracts.mjs';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
 import { useArchitectureWires } from './useArchitectureWires';
 import { DocumentationReference } from './DocumentationReference';
@@ -443,6 +444,14 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                 <li key={i}>{f}</li>
                             ))}
                         </ul>
+                        {(['provides', 'consumes'] as const).map((field) => selected[field]?.length ? (
+                            <section key={field} className="contracts" data-contracts={field}>
+                                <h4>{field === 'provides' ? 'Serves to other repos' : 'Calls in other repos'}</h4>
+                                <ul className="facts">
+                                    {selected[field]!.map((key) => <li key={key} title={key}>{contractLabel(key)}</li>)}
+                                </ul>
+                            </section>
+                        ) : null)}
                         <div className="refs">
                             {vm.trace?.steps.map((s, i) =>
                                 s.id === selected.id ? (
