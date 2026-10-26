@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { anchorBranchCaptions, fitCaptions, layoutFlow, placeRow, renderFlowSvg, wrap } from '../app/flowchart.mjs';
 import { withDefaults } from '../lib/config.mjs';
-import { countInferred, flowToMermaid, normalizeFlow } from '../lib/flow.mjs';
+import { countInferred, flowLanes, flowRepos, flowToMermaid, normalizeFlow } from '../lib/flow.mjs';
 import { flowPrompt, tracePrompt } from '../lib/prompts.mjs';
 import { startServer } from '../lib/server.mjs';
 
@@ -335,4 +335,84 @@ test('countInferred counts inferred nodes and edges', () => {
         nodes: [{ id: 'a', inferred: true }, { id: 'b' }],
         edges: [{ from: 'a', to: 'b', inferred: true }, { from: 'b', to: 'a' }],
     }), 2);
+});
+
+/** A flow across two repos: a frontend lane in this repo, two lanes in the linked API. */
+const crossRepo = () => ({
+    nodes: [
+        { id: 'a', type: 'start', label: 'Shopper places order', lane: 'web' },
+        { id: 'b', type: 'process', label: 'Save the order', lane: 'api' },
+        { id: 'c', type: 'process', label: 'Queue the receipt', lane: 'worker' },
+        { id: 'd', type: 'end', label: 'Order confirmed', lane: 'web' },
+    ],
+    edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'd' }],
+    lanes: [{ id: 'api', label: 'Orders API', repo: 'api' }, { id: 'web', label: 'Frontend', repo: 'home' },
+        { id: 'worker', label: 'Worker', repo: 'api' }, { id: 'x', label: 'Unused', repo: 'api' }],
+});
+const REPOS = [{ name: 'home', title: 'Shop' }, { name: 'api', title: 'Shop API' }];
+
+test('normalizeFlow keeps lane repos the workspace knows, and saved repos on reload', () => {
+    const flow = normalizeFlow(crossRepo(), 4, { repos: REPOS });
+    assert.deepEqual(flow.repos, [{ id: 'home', label: 'Shop' }, { id: 'api', label: 'Shop API' }]);
+    assert.deepEqual(flow.lanes.map((l) => l.repo), ['api', 'home', 'api']);
+    // unknown repo names are dropped from lanes
+    const odd = normalizeFlow({ ...crossRepo(), lanes: crossRepo().lanes.map((l) => ({ ...l, repo: l.repo === 'api' ? 'nope' : l.repo })) }, 4, { repos: REPOS });
+    assert.deepEqual(odd.repos, [{ id: 'home', label: 'Shop' }]);
+    assert.ok(odd.lanes.every((l) => l.repo !== 'nope'));
+    // a saved flow (no server repos) keeps its own
+    assert.deepEqual(normalizeFlow(flow, 4), flow);
+    // a home-only trace has no repos at all
+    const plain = normalizeFlow(crossRepo(), 4);
+    assert.equal(plain.repos, undefined);
+    assert.ok(plain.lanes.every((l) => !l.repo));
+});
+
+test('lanes sit together per repo, inside one band each', () => {
+    const flow = normalizeFlow(crossRepo(), 4, { repos: REPOS });
+    assert.deepEqual(flowLanes(flow).map((l) => l.id), ['web', 'api', 'worker']);
+    assert.deepEqual(flowRepos(flow), [{ id: 'home', label: 'Shop', lanes: ['web'] }, { id: 'api', label: 'Shop API', lanes: ['api', 'worker'] }]);
+    const layout = layoutFlow(flow);
+    assert.equal(layout.laneTop > 0, true);
+    for (const band of layout.repoBands) {
+        for (const lane of layout.lanes.filter((l) => band.lanes.includes(l.id))) {
+            assert.ok(lane.x >= band.x && lane.x + lane.w <= band.x + band.w + 0.01, `${lane.id} inside ${band.id}`);
+        }
+    }
+    assert.ok(layout.nodes.every((n) => n.y > layout.laneTop + 48), 'boxes start below both header rows');
+    const svg = renderFlowSvg(layout);
+    assert.equal((svg.match(/class="repo-band"/g) || []).length, 2);
+    // one repo only: no bands
+    const single = normalizeFlow({ ...crossRepo(), lanes: crossRepo().lanes.map((l) => ({ ...l, repo: 'home' })) }, 4, { repos: REPOS });
+    assert.deepEqual(flowRepos(single), []);
+    assert.deepEqual(layoutFlow(single).repoBands, []);
+    assert.equal(layoutFlow(single).laneTop, 0);
+});
+
+test('Mermaid nests lane subgraphs inside repo subgraphs', () => {
+    const text = flowToMermaid(normalizeFlow(crossRepo(), 4, { repos: REPOS }));
+    const lines = text.split('\n').map((l) => l.trim());
+    const api = lines.indexOf('subgraph repo2["Shop API"]');
+    assert.ok(api > lines.indexOf('subgraph repo1["Shop"]'));
+    assert.ok(lines.indexOf('subgraph lane2["Orders API"]') > api);
+    assert.ok(lines.indexOf('subgraph lane3["Worker"]') > api);
+});
+
+test('lanes outside every repo sit in a last band, so every lane has one', () => {
+    const raw = crossRepo();
+    raw.lanes.push({ id: 'mail', label: 'Mail service' });
+    raw.nodes.push({ id: 'm', type: 'process', label: 'Send receipt', lane: 'mail' });
+    raw.edges.push({ from: 'c', to: 'm' });
+    const flow = normalizeFlow(raw, 5, { repos: REPOS });
+    const bands = flowRepos(flow);
+    assert.deepEqual(bands.at(-1), { id: '~other', label: 'Outside services', lanes: ['mail'] });
+    // an unassigned box joins it, and the band is then just "Other"
+    flow.nodes.push({ id: 'u', type: 'process', label: 'Somewhere' });
+    flow.edges.push({ from: 'm', to: 'u' });
+    assert.deepEqual(flowRepos(flow).at(-1), { id: '~other', label: 'Other', lanes: ['mail', ''] });
+    const layout = layoutFlow(flow);
+    const covered = new Set(layout.repoBands.flatMap((b) => b.lanes));
+    assert.ok(layout.lanes.every((l) => covered.has(l.id)));
+    // bands never overlap
+    const sorted = [...layout.repoBands].sort((a, b) => a.x - b.x);
+    for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i].x >= sorted[i - 1].x + sorted[i - 1].w + 8);
 });

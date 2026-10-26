@@ -227,3 +227,65 @@ test('workspace API: view, edit, read linked files and find seams with an AI too
     assert.equal((await fetch(`${base}/api/workspace`, { method: 'PUT', headers: H, body: '{"links":"x"}' })).status, 400);
     assert.equal((await fetch(`${base}/api/workspace/fetch`, { method: 'POST', headers: H, body: '{"name":"nope"}' })).status, 404);
 });
+
+test('workspace trace: merged map in the prompt, linked repos readable, prefixed refs checked', async (t) => {
+    const { shop } = copyExamples(t);
+    const prompts = [];
+    const fake = createServer((req, res) => {
+        let b = '';
+        req.on('data', (c) => (b += c));
+        req.on('end', () => {
+            if (req.method === 'GET') return res.end(JSON.stringify({ data: [{ id: 'fake' }] }));
+            const body = JSON.parse(b);
+            const prompt = body.messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+            prompts.push({ prompt, tools: (body.tools || []).map((x) => x.function?.name) });
+            const reply = prompt.includes('Classify this request') ? { intent: 'description', title: 'Placing an order' } : {
+                intent: 'description', title: 'Placing an order', summary: 'Checkout posts the order to the API.', gaps: '',
+                steps: [
+                    { id: 'orders-client', note: 'posts the order', refs: [{ path: 'src/api/orders.js', start: 1, end: 3, why: 'the call' }] },
+                    { id: 'api:orders-route', note: 'saves it', refs: [{ path: 'api:src/routes/orders.js', start: 1, end: 3, why: 'the route' },
+                        { path: 'api:.env', start: 1, end: 1, why: 'blocked' }, { path: 'other:src/x.js', start: 1, end: 2, why: 'unknown repo' }] },
+                ],
+                edges: [['orders-client', 'api:orders-route']],
+                flow: { nodes: [{ id: 'f1', type: 'start', label: 'Place order', lane: 'web' }, { id: 'f2', type: 'end', label: 'Saved', lane: 'route' }],
+                    edges: [{ from: 'f1', to: 'f2' }],
+                    lanes: [{ id: 'web', label: 'Frontend', repo: 'home' }, { id: 'route', label: 'Orders route', repo: 'api' }] },
+            };
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(reply) }, finish_reason: 'stop' }] }));
+        });
+    });
+    await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+    writeFileSync(path.join(shop, '.repo-map', 'local.json'), JSON.stringify({ ai: { provider: 'api', api: { baseUrl: `http://127.0.0.1:${fake.address().port}/v1`, model: 'fake' } } }));
+    const { server, port } = await startServer({ root: shop, port: 49500 + Math.floor(Math.random() * 400), findFreePort: true });
+    t.after(() => {
+        server.close();
+        fake.close();
+    });
+    const H = { 'x-map': '1', 'content-type': 'application/json' };
+    const run = async (body) => {
+        const text = await (await fetch(`http://127.0.0.1:${port}/api/trace`, { method: 'POST', headers: H, body: JSON.stringify(body) })).text();
+        return text.trim().split('\n').map((l) => JSON.parse(l)).find((e) => e.type === 'result' || e.type === 'error');
+    };
+
+    const out = await run({ prompt: 'How is an order placed?', flow: true, scope: 'workspace' });
+    assert.equal(out.type, 'result', JSON.stringify(out));
+    const main = prompts.at(-1);
+    assert.match(main.prompt, /WORKSPACE:/);
+    assert.match(main.prompt, /api:orders-route/);
+    assert.ok(main.tools.some((name) => /^api/.test(name) || name === 'read_file'), 'repo tools offered');
+    assert.equal(out.trace.scope, 'workspace');
+    assert.deepEqual(out.trace.repos, ['home', 'api']);
+    assert.deepEqual(out.trace.steps[1].refs.map((r) => r.path), ['api:src/routes/orders.js']);
+    assert.deepEqual(out.trace.flow.repos, [{ id: 'home', label: 'Shop Map' }, { id: 'api', label: 'Shop API' }]);
+    assert.equal(out.trace.flow.lanes[1].repo, 'api');
+
+    // This repo only: no workspace in the prompt, and linked refs are dropped
+    prompts.length = 0;
+    const home = await run({ prompt: 'How is an order placed?', flow: true });
+    assert.equal(home.type, 'result');
+    assert.doesNotMatch(prompts.at(-1).prompt, /WORKSPACE:/);
+    assert.equal(home.trace.scope, undefined);
+    assert.deepEqual(home.trace.steps[1].refs, []);
+    assert.equal(home.trace.flow.repos, undefined);
+});

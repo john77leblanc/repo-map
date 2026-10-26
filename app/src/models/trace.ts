@@ -6,6 +6,15 @@ import type { CodeRef, Flow, Plan, Proposal, RepoMap, StreamResult, Trace, Sitem
 
 type PlainTrace = Omit<Trace, 'pairs' | '_doc' | 'key' | 'createdAt'>;
 type TraceStep = Trace['steps'][number];
+/** The workspace's merged map, with placeholder cards that seams replaced (old id -> real id). */
+type WorkspaceMap = RepoMap & { replaced?: Record<string, string> };
+
+const LINKED_ID = /^([a-z][a-z0-9-]{1,30}):/;
+
+/** The linked repo a prefixed id or path belongs to, or '' for this repo. */
+function linkOf(id: string): string {
+    return id.match(LINKED_ID)?.[1] || '';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -39,25 +48,37 @@ function cleanRefs(value: unknown, steps: readonly TraceStep[]): CodeRef[] | nul
         .slice(0, 20);
 }
 
-function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
+/**
+ * Clean a trace from the AI tool, a saved file or a shared code. A workspace
+ * trace is checked against `workspace` (the merged map) when it is loaded;
+ * steps in a repo that is no longer linked are kept, so they can be shown as missing.
+ */
+function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, workspace?: WorkspaceMap | null): Trace {
     if (!isRecord(value)) throw new Error('no trace');
     const raw = value;
     const intent = raw.intent === 'proposal' ? 'proposal' : 'description';
+    const scope = raw.scope === 'workspace' && intent === 'description' ? 'workspace' : undefined;
+    const map: WorkspaceMap = scope && workspace ? workspace : homeMap;
+    const replaced = map.replaced || {};
+    const swap = (id: string) => replaced[id] || id;
     // These shared JS normalizers validate and construct their output schemas.
     const proposal =
         intent === 'proposal' ? (normalizeProposal(raw.proposal, map) as Proposal) : null;
     const known = new Set(map.nodes.map((node) => node.id));
     proposal?.nodes.forEach((node) => known.add(node.id));
+    const repos = new Set(map.nodes.map((node) => linkOf(node.id)));
+    // A prefixed id from a repo that isn't in the map any more: kept, shown as not linked.
+    const unlinked = (id: string) => !!scope && !!linkOf(id) && !repos.has(linkOf(id));
     const rawSteps = array(raw.steps).map(record);
     const seen = new Set<string>();
     const steps: TraceStep[] = rawSteps
         .slice(0, 40)
         .map((step) => ({
-            id: String(step.id || '').trim(),
+            id: swap(String(step.id || '').trim()),
             note: String(step.note || '').slice(0, 4000),
         }))
         .filter((step) => {
-            if (!known.has(step.id) || seen.has(step.id)) return false;
+            if ((!known.has(step.id) && !unlinked(step.id)) || seen.has(step.id)) return false;
             seen.add(step.id);
             return true;
         });
@@ -71,7 +92,7 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
               array(step.refs).map((item) => {
                   const ref = record(item);
                   return {
-                      step: step.id,
+                      step: swap(String(step.id || '').trim()),
                       path: ref.path,
                       start: ref.start,
                       end: ref.end,
@@ -90,7 +111,7 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
     for (const pair of array(raw.edges)) {
         if (!Array.isArray(pair)) continue;
         const endpoints = array(pair);
-        addPair(String(endpoints[0]), String(endpoints[1]));
+        addPair(swap(String(endpoints[0])), swap(String(endpoints[1])));
     }
     for (let i = 1; i < steps.length; i++) addPair(steps[i - 1].id, steps[i].id);
     proposal?.edges.forEach((edge) => pairs.add(edge.from + '|' + edge.to));
@@ -98,7 +119,7 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
     const flow = normalizeFlow(raw.flow, rawSteps.length) as Flow | null;
     flow?.nodes.forEach((node) => {
         if (!node.step) return;
-        const id = rawSteps[node.step - 1]?.id;
+        const id = swap(String(rawSteps[node.step - 1]?.id || ''));
         const index = steps.findIndex((step) => step.id === id);
         if (index < 0) delete node.step;
         else node.step = index + 1;
@@ -114,13 +135,14 @@ function normalizeTrace(value: unknown, map: RepoMap, prompt?: string): Trace {
         steps,
         edges: [...pairs].map((pair) => pair.split('|')),
         pairs,
-        refs: cleanRefs(refs, steps) || [],
+        refs: cleanRefs(refs.map((r) => (isRecord(r) ? { ...r, step: swap(String(r.step || '')) } : r)), steps) || [],
         flow,
         sitemap,
         pendingSitemap: raw.pendingSitemap === true,
         outputs: traceOutputs(raw),
         pendingFlow: raw.pendingFlow === true,
         used: cleanUsed(raw.used),
+        ...(scope ? { scope, repos: array(raw.repos).map(String).filter((r) => r === 'home' || LINKED_ID.test(r + ':')).slice(0, 12) } : {}),
     };
 }
 
@@ -155,6 +177,10 @@ function plain(trace: Trace): PlainTrace {
     if (trace.sitemap) result.sitemap = trace.sitemap;
     if (trace.pendingSitemap) result.pendingSitemap = true;
     if (trace.used) result.used = trace.used;
+    if (trace.scope) {
+        result.scope = trace.scope;
+        result.repos = trace.repos || [];
+    }
     return result;
 }
 
@@ -162,12 +188,12 @@ function encodeTrace(trace: Trace): string {
     return 'rmap1:' + btoa(unescape(encodeURIComponent(JSON.stringify(plain(trace)))));
 }
 
-function decodeTrace(code: string, map: RepoMap): Trace {
+function decodeTrace(code: string, map: RepoMap, workspace?: WorkspaceMap | null): Trace {
     const text = code.trim();
     const prefix = text.match(/^(rmap1|msmap1):/);
     if (!prefix) throw new Error('prefix');
     const raw: unknown = JSON.parse(decodeURIComponent(escape(atob(text.slice(prefix[0].length)))));
-    return normalizeTrace(raw, map);
+    return normalizeTrace(raw, map, undefined, workspace);
 }
 
 function spend(result: StreamResult): string {
@@ -176,5 +202,5 @@ function spend(result: StreamResult): string {
     return result.spend ? ' · ' + String(result.spend) : '';
 }
 
-export { normalizeTrace, plain, encodeTrace, decodeTrace, cleanRefs, cleanUsed, spend };
-export type { PlainTrace };
+export { normalizeTrace, plain, encodeTrace, decodeTrace, cleanRefs, cleanUsed, linkOf, spend };
+export type { PlainTrace, WorkspaceMap };

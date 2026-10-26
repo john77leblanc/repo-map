@@ -354,14 +354,16 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                     )}
                 </section>
             )}
+            {vm.workspace === 'architecture' && vm.unlinkedRepos(t).length > 0 && (
+                <p className="hint" id="trace-unlinked">
+                    Some steps are in {vm.unlinkedRepos(t).join(', ')}, which is no longer linked. Link it again in Settings → Linked repos to see them on the map.
+                </p>
+            )}
             {vm.workspace === 'architecture' && (
                 <ol className="steps">
                     {t.steps.map((step, i) => {
                         const change = t.proposal?.nodes.find((n) => n.id === step.id);
-                        const title =
-                            vm.repo.map.nodes.find((n) => n.id === step.id)?.title ||
-                            change?.title ||
-                            step.id;
+                        const title = vm.stepTitle(t, step.id);
                         return (
                             <li key={step.id}>
                                 <button type="button" onClick={() => vm.reveal(step.id)}>

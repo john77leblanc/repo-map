@@ -1,4 +1,4 @@
-import { runInAction } from 'mobx';
+import { runInAction, when } from 'mobx';
 import { RepositoryModel } from '../models/RepositoryModel';
 import { WorkspaceModel } from '../models/WorkspaceModel';
 import { ShellViewModel } from '../features/shell/ShellViewModel';
@@ -52,6 +52,10 @@ export class Application {
             getPick,
             getPickLabel: () => this.settings.pickLabel(),
             getWorkspace: () => this.shell.workspace,
+            getScope: () => this.architecture.scope,
+            getWorkspaceMap: () => this.workspace.view?.map || null,
+            getRepoTitles: () => this.workspace.titles,
+            workspaceReady: () => when(() => this.workspace.loaded),
             sitemap: this.sitemap,
             onSelect: (trace, workspace) => this.showTrace(trace, workspace),
             onClear: () => {

@@ -57,9 +57,10 @@ export class ArchitectureViewModel {
     get workspace() {
         return this.deps.workspace;
     }
-    /** The scope actually shown: workspace only when another repo is linked. */
+    /** The scope actually shown: workspace only when another repo is linked. A workspace trace always shows the workspace. */
     get scope(): MapScope {
-        return this.scopeChoice === 'workspace' && !!this.workspace?.linked ? 'workspace' : 'repo';
+        if (!this.workspace?.linked) return 'repo';
+        return this.scopeChoice === 'workspace' || this.trace?.scope === 'workspace' ? 'workspace' : 'repo';
     }
     setScope(scope: MapScope) {
         if (this.scopeChoice === scope) return;

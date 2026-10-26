@@ -523,6 +523,8 @@ dialog.modal>.fhead{flex:none}
 .repo-of{margin:0 0 6px}
 .sw.seam{background:repeating-linear-gradient(90deg,var(--ext) 0 7px,transparent 7px 9px,var(--ext) 9px 11px,transparent 11px 13px)}
 .wires path.w.seam{stroke-width:2.2;stroke-dasharray:9 3 2 3;opacity:.75}
+.focusing .wires path.w.seam{opacity:.07}
+.focusing .wires path.w.seam.on{opacity:1}
 .node.collapsed>.nh{box-shadow:3px 3px 0 -1px var(--panel),3px 3px 0 0 var(--line),6px 6px 0 -1px var(--panel),6px 6px 0 0 var(--line);margin-bottom:6px}
 .ws-members{margin:.25em 0 .75em;padding-left:1.2em}
 .seams ul{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}

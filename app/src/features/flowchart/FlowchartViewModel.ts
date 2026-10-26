@@ -5,7 +5,7 @@ import { collapseGraph } from '../../../../lib/collapse.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
-import { normalizeFlow, flowToMermaid, flowLanes, countInferred } from '../../../../lib/flow.mjs';
+import { normalizeFlow, flowToMermaid, flowLanes, flowRepos, countInferred } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
 import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
@@ -24,17 +24,22 @@ export interface FlowConnection {
     index: number;
     other: string;
 }
-/** What the reader has folded away: whole lanes, and named groups of boxes. Saved per trace in the browser. */
+/** What the reader has folded away: whole repos, whole lanes, and named groups of boxes. Saved per trace in the browser. */
 export interface FlowCollapse {
     lanes: string[];
     groups: CollapseGroup[];
+    /** Repo bands of a workspace trace. */
+    repos?: string[];
 }
 const LANE_GROUP = 'lane:';
-const emptyCollapse = (): FlowCollapse => ({ lanes: [], groups: [] });
+const REPO_GROUP = 'repo:';
+const emptyCollapse = (): FlowCollapse => ({ lanes: [], groups: [], repos: [] });
+const strings = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []);
 function readCollapse(value: unknown): FlowCollapse {
     const raw = value && typeof value === 'object' ? (value as Partial<FlowCollapse>) : {};
     return {
-        lanes: Array.isArray(raw.lanes) ? raw.lanes.filter((id) => typeof id === 'string') : [],
+        repos: strings(raw.repos),
+        lanes: strings(raw.lanes),
         groups: Array.isArray(raw.groups)
             ? raw.groups.filter((g) => g && typeof g.id === 'string' && Array.isArray(g.members))
                 .map((g) => ({ id: g.id, label: String(g.label || ''), members: g.members.filter((m) => typeof m === 'string') }))
@@ -83,22 +88,57 @@ export class FlowchartViewModel {
     get repo() {
         return this.deps.repo;
     }
-    /** Every group to fold right now: collapsed lanes first, then named groups. */
+/** Every group to fold right now: collapsed repos first (they win any overlap), then lanes, then named groups. */
     get collapseGroups(): CollapseGroup[] {
         const flow = this.trace?.flow;
         if (!flow) return [];
+        const bands = this.repoBands;
+        const repos = (this.collapse.repos || []).map((repo) => bands.find((b) => b.id === repo)).filter((b) => !!b).map((band) => ({
+            id: REPO_GROUP + band.id,
+            label: band.label,
+            members: this.bandMembers(band.id),
+        }));
         const lanes = this.collapse.lanes.map((lane) => ({
             id: LANE_GROUP + lane,
             label: flow.lanes?.find((l) => l.id === lane)?.label || lane,
             members: flow.nodes.filter((n) => n.lane === lane).map((n) => n.id),
         }));
-        return [...lanes, ...this.collapse.groups];
+        return [...repos, ...lanes, ...this.collapse.groups];
+    }
+    /** Boxes in a repo band's lanes (an unassigned box sits in the '' lane). */
+    private bandMembers(id: string) {
+        const lanes = this.repoBands.find((b) => b.id === id)?.lanes || [];
+        return (this.trace?.flow?.nodes || []).filter((n) => lanes.includes(n.lane && this.trace?.flow?.lanes?.some((l) => l.id === n.lane) ? n.lane : '')).map((n) => n.id);
     }
     /** The flow as drawn: the saved flow with the reader's collapsed groups folded in. */
     get displayFlow(): Flow | null {
         const flow = this.trace?.flow;
         if (!flow) return null;
-        return this.collapseGroups.length ? (collapseGraph(flow, this.collapseGroups) as Flow) : flow;
+        if (!this.collapseGroups.length) return flow;
+        const out = collapseGraph(flow, this.collapseGroups) as Flow;
+        // A collapsed repo spans its lanes: draw it in the repo's first lane, inside its band.
+        out.nodes = out.nodes.map((n) => {
+            if (!n.id.startsWith('c:' + REPO_GROUP)) return n;
+            const lane = this.repoBands.find((b) => b.id === n.id.slice(2 + REPO_GROUP.length))?.lanes[0];
+            return lane ? { ...n, lane } : n;
+        });
+        return out;
+    }
+    /** Repo bands of a workspace trace's flowchart. */
+    get repoBands(): { id: string; label: string; lanes: string[] }[] {
+        return this.trace?.flow ? flowRepos(this.trace.flow) : [];
+    }
+    isRepoCollapsed(id: string) {
+        return !!this.collapse.repos?.includes(id);
+    }
+    toggleRepoBand(id: string) {
+        const repos = this.collapse.repos || [];
+        this.collapse = { ...this.collapse, repos: repos.includes(id) ? repos.filter((r) => r !== id) : [...repos, id] };
+        this.saveCollapse();
+    }
+    /** A repo needs two or more boxes to be worth folding. */
+    repoFoldable(id: string) {
+        return this.bandMembers(id).length >= 2;
     }
     get collapsedCount() {
         return this.displayFlow?.nodes.filter((n) => n.collapsed).length || 0;
@@ -197,7 +237,9 @@ export class FlowchartViewModel {
         const id = collapsedId.replace(/^c:/, '');
         this.collapse = id.startsWith(LANE_GROUP)
             ? { ...this.collapse, lanes: this.collapse.lanes.filter((l) => l !== id.slice(LANE_GROUP.length)) }
-            : { ...this.collapse, groups: this.collapse.groups.filter((g) => g.id !== id) };
+            : id.startsWith(REPO_GROUP)
+                ? { ...this.collapse, repos: (this.collapse.repos || []).filter((r) => r !== id.slice(REPO_GROUP.length)) }
+                : { ...this.collapse, groups: this.collapse.groups.filter((g) => g.id !== id) };
         this.saveCollapse();
         if (select) this.select(select);
         else if (this.selectedId === collapsedId) this.select(null);
@@ -216,9 +258,9 @@ export class FlowchartViewModel {
         const id = collapsedId.replace(/^c:/, '');
         return this.collapse.groups.find((g) => g.id === id)?.label || '';
     }
-    /** True for named groups the reader made or accepted; lanes keep their lane name. */
+    /** True for named groups the reader made or accepted; lanes and repos keep their own name. */
     canRename(collapsedId: string) {
-        return !collapsedId.startsWith('c:' + LANE_GROUP);
+        return !collapsedId.startsWith('c:' + LANE_GROUP) && !collapsedId.startsWith('c:' + REPO_GROUP);
     }
     /** Hidden steps of a collapsed box, in flow order. */
     members(collapsedId: string) {

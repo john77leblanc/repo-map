@@ -2,7 +2,8 @@ import { makeAutoObservable, observable, observableRef, isObservable, runInActio
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
 import type { AgentPick, StreamResult, Trace, Workspace } from '../../models/types';
-import { decodeTrace, encodeTrace, normalizeTrace, plain, spend } from '../../models/trace';
+import { decodeTrace, encodeTrace, linkOf, normalizeTrace, plain, spend } from '../../models/trace';
+import type { WorkspaceMap } from '../../models/trace';
 import { TraceJob } from './TraceJob';
 import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
@@ -20,6 +21,14 @@ export interface TraceDependencies {
     isPlanBusy?(trace: Trace): boolean;
     onRequestFlow(trace: Trace): void | Promise<void>;
     sitemap?: SitemapViewModel;
+    /** The map scope: new traces follow the workspace when it is shown. */
+    getScope?(): 'repo' | 'workspace';
+    /** The workspace's merged map, once loaded. */
+    getWorkspaceMap?(): WorkspaceMap | null;
+    /** Titles of linked repos by name. */
+    getRepoTitles?(): Record<string, string>;
+    /** Resolves once the workspace has loaded (or failed to), so workspace traces read the merged map. */
+    workspaceReady?(): Promise<void>;
 }
 export class TraceViewModel {
     selected: Trace | null = null;
@@ -82,6 +91,33 @@ export class TraceViewModel {
     }
     get repo() {
         return this.deps.repo;
+    }
+    /** Ask for a workspace trace? Only while the map shows the workspace. */
+    private get scopeBody(): { scope?: 'workspace' } {
+        return this.deps.getScope?.() === 'workspace' ? { scope: 'workspace' } : {};
+    }
+    private normalize(raw: unknown, prompt?: string) {
+        return normalizeTrace(raw, this.repo.map, prompt, this.deps.getWorkspaceMap?.() || null);
+    }
+    /** A step's card title; a step in a repo that is no longer linked says so. */
+    stepTitle(trace: Trace, id: string) {
+        const map = trace.scope ? this.deps.getWorkspaceMap?.() : null;
+        const node = (map || this.repo.map).nodes.find((n) => n.id === id);
+        const link = linkOf(id);
+        if (node) {
+            const repo = link ? this.deps.getRepoTitles?.()[link] || link : '';
+            return (node.title || id) + (repo ? ` (${repo})` : '');
+        }
+        const change = trace.proposal?.nodes.find((n) => n.id === id);
+        if (change) return change.title || id;
+        return link ? `${id.slice(link.length + 1)} (from ${link}, not linked)` : id;
+    }
+    /** Steps whose repo is no longer linked. */
+    unlinkedRepos(trace: Trace) {
+        if (!trace.scope) return [];
+        const map = this.deps.getWorkspaceMap?.();
+        const present = new Set((map?.nodes || []).map((n) => linkOf(n.id)));
+        return [...new Set(trace.steps.map((s) => linkOf(s.id)).filter((l) => l && !present.has(l)))];
     }
     get workspace() {
         return this.deps.getWorkspace();
@@ -281,12 +317,16 @@ export class TraceViewModel {
     }
     async openSavedOutput(item: Trace, output: Workspace) {
         if (this.editing) return;
+        if (item.scope === 'workspace' && item !== this.temp && item !== this.selected && this.deps.workspaceReady) {
+            await this.deps.workspaceReady();
+            if (this.disposed || this.editing) return;
+        }
         let trace: Trace;
         try {
             trace =
                 item === this.temp || item === this.selected
                     ? item
-                    : Object.assign(normalizeTrace(item, this.repo.map), {
+                    : Object.assign(this.normalize(item), {
                           _doc: item.key || item._doc,
                           createdAt: item.createdAt,
                       });
@@ -378,9 +418,10 @@ export class TraceViewModel {
             );
     }
     async importTrace() {
+        await this.deps.workspaceReady?.();
         let trace: Trace;
         try {
-            trace = decodeTrace(this.importCode, this.repo.map);
+            trace = decodeTrace(this.importCode, this.repo.map, this.deps.getWorkspaceMap?.() || null);
         } catch {
             this.importMessage = "That isn't a valid trace code.";
             return;
@@ -456,13 +497,13 @@ export class TraceViewModel {
                 if (!this.deps.sitemap?.sitemap) throw new Error('Generate the repository sitemap before tracing screens. Your question has been kept.');
             }
             const result = await this.deps.services.api.stream<StreamResult>('/api/trace',
-                { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...job.pick },
+                { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.scopeBody, ...job.pick },
                 signal, (text) => { last = text; tick(); },
                 (title) => { if (current() && job.state === 'running') runInAction(() => { job.title = title.trim().slice(0, 80); }); });
             if (!current()) return;
             job.clearTicker();
             if (!result) throw new Error(job.agentLabel + ' ended without an answer. Run repo-map doctor to check your setup.');
-            const trace = observable(normalizeTrace({ ...(result.trace as object), outputs, used: result.used }, this.repo.map, prompt));
+            const trace = observable(this.normalize({ ...(result.trace as object), outputs, used: result.used }, prompt));
             trace.createdAt = job.createdAt;
             trace.outputs = {
                 architecture: outputs.architecture && trace.steps.length > 0,
@@ -563,7 +604,9 @@ export class TraceViewModel {
         try {
             const result = await this.deps.services.api.stream<StreamResult>(
                 '/api/trace',
-                { prompt, ...(original ? { previousTrace: plain(original), architecture: outputs.architecture } : {}), flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.deps.getPick() },
+                { prompt, ...(original ? { previousTrace: plain(original), architecture: outputs.architecture } : {}), flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}),
+                    // a revision keeps the original's scope
+                    ...(original ? (original.scope ? { scope: original.scope } : {}) : this.scopeBody), ...this.deps.getPick() },
                 ctl.signal,
                 (text) => {
                     last = text;
@@ -579,11 +622,7 @@ export class TraceViewModel {
                     this.deps.getPickLabel() +
                         ' ended without an answer. Run repo-map doctor to check your setup.'
                 );
-            const trace = normalizeTrace(
-                { ...(result.trace as object), outputs, used: result.used },
-                this.repo.map,
-                prompt
-            );
+            const trace = this.normalize({ ...(result.trace as object), outputs, used: result.used }, prompt);
             if (original) {
                 if ((outputs.architecture && !trace.steps.length) || (outputs.flowchart && !trace.flow) || (outputs.sitemap && !trace.sitemap)) {
                     throw new Error('Not all requested outputs were returned. The original trace and edited question were kept. Try again.');

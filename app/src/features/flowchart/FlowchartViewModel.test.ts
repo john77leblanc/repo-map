@@ -170,6 +170,38 @@ describe('FlowchartViewModel', () => {
         expect(svg).not.toContain('var(--');
         vm.dispose();
     });
+    it('folds a whole repo of a workspace trace into one box inside its band', () => {
+        const { vm, trace } = fixture();
+        trace.flow = {
+            repos: [{ id: 'home', label: 'Shop' }, { id: 'api', label: 'Shop API' }],
+            lanes: [{ id: 'web', label: 'Frontend', repo: 'home' }, { id: 'route', label: 'Route', repo: 'api' }, { id: 'worker', label: 'Worker', repo: 'api' }],
+            nodes: [
+                { id: 's', type: 'start', label: 'Open', lane: 'web' },
+                { id: 'b', type: 'process', label: 'Save', lane: 'route' },
+                { id: 'c', type: 'process', label: 'Queue', lane: 'worker' },
+                { id: 'e', type: 'end', label: 'Done', lane: 'web' },
+            ],
+            edges: [{ from: 's', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'e' }],
+        };
+        vm.setTrace(trace);
+        expect(vm.repoBands.map((b) => b.id)).toEqual(['home', 'api']);
+        expect(vm.repoFoldable('api')).toBe(true);
+        expect(vm.layout?.repoBands).toHaveLength(2);
+        vm.toggleRepoBand('api');
+        expect(vm.isRepoCollapsed('api')).toBe(true);
+        const box = vm.displayFlow?.nodes.find((n) => n.id === 'c:repo:api');
+        expect(box?.members).toEqual(['b', 'c']);
+        expect(box?.lane).toBe('route');
+        expect(vm.canRename('c:repo:api')).toBe(false);
+        expect(vm.layout?.repoBands.map((b: { id: string }) => b.id)).toEqual(['home', 'api']);
+        vm.expand('c:repo:api');
+        expect(vm.isRepoCollapsed('api')).toBe(false);
+        expect(vm.collapsedCount).toBe(0);
+        vm.toggleRepoBand('api');
+        vm.expandAll();
+        expect(vm.collapsedCount).toBe(0);
+        vm.dispose();
+    });
     it('collapses lanes, shift-selected steps and suggested chunks, and remembers them per trace', () => {
         const { vm, trace, services } = fixture();
         trace.flow = {
@@ -200,7 +232,7 @@ describe('FlowchartViewModel', () => {
         expect(vm.collapsedCount).toBe(2);
         const key = vm.repo.namespace + 'flow-collapse:checkout.json';
         expect(services.storage.set).toHaveBeenLastCalledWith(key, {
-            lanes: ['api'], groups: [{ id: 'chunk:k1', label: 'Kick off', members: ['s', 'a'] }],
+            repos: [], lanes: ['api'], groups: [{ id: 'chunk:k1', label: 'Kick off', members: ['s', 'a'] }],
         });
         vm.expand('c:lane:api', 'c');
         expect(vm.selectedId).toBe('c');

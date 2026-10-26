@@ -155,6 +155,8 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 - **seams** are connections between repos. Most are found for free by matching one card's `consumes` against another repo's `provides` (these are never stored). **Find seams** asks the map's AI tool for the rest: it can read files in linked folders, and must cite code for each connection. You accept or dismiss each one; accepted seams are stored here with `"via": "ai"`.
 - When a seam explains a placeholder card (an `external` card such as "Orders API" calling into the linked repo, or "Storefront" calling it), the placeholder is replaced by the real card.
 
+**Traces across repos.** While the map shows **Workspace**, a new trace runs over the merged map and can follow a process into linked repos: steps may be linked cards, code references read `<name>:path` files, and the flowchart draws each repo as a band holding its own lanes (fold a band to collapse that repo into one box). The trace remembers it was a workspace trace and opens on the workspace map; steps in a repo you've since unlinked are kept and marked "not linked". Proposals (change requests) stay on this repo's map.
+
 Each repo in the workspace bar shows whether its map is behind its checkout (**map stale**) and how far the checkout is behind its remote's default branch (**behind main 3**), from what was last fetched. **Refresh** runs `git fetch` for that repo (for a snapshot, `git ls-remote` on its recorded remote); repo-map never fetches on its own. Linked cards show their repo; **Collapse** folds a repo into one card that keeps its connections to the others.
 
 ### docs.json
@@ -202,7 +204,7 @@ Use **More > Show info** for sitemap freshness, snapshot details, and analysis n
 - Listens on `127.0.0.1` only and rejects requests addressed to any other host name.
 - The API requires a custom header, so other websites open in your browser can't call it.
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
-- Linked repos (workspace `dir` links) are read with their own `codeRoots`, docs and the same exclusions, through a `<name>:` path prefix. Snapshot links have no file access. During **Find seams**, Claude Code gets each linked folder with `--add-dir` (still `Read`, `Grep`, `Glob` only); API models use the same prefixed read-only tools.
+- Linked repos (workspace `dir` links) are read with their own `codeRoots`, docs and the same exclusions, through a `<name>:` path prefix. Snapshot links have no file access. During **Find seams** and workspace traces, Claude Code gets each linked folder with `--add-dir` (still `Read`, `Grep`, `Glob` only); API models use the same prefixed read-only tools.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
 - Documents (`docs` in config.json, and agent guidance files) are readable outside `codeRoots`, with the same rules: never `.env*`, `.repo-map/` or `blocked` folders.
 - Settings can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.

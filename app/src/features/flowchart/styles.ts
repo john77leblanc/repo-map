@@ -44,6 +44,9 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .diagram-with-lanes .execution-lane text{visibility:hidden}
 .diagram-lane-headings{position:sticky;top:0;z-index:2;min-width:100%;box-sizing:border-box;padding-inline:12px;background:var(--bg);border-bottom:1px solid var(--line)}
 .diagram-lane-heading-row{position:relative;margin:0 auto}
+.diagram-lane-title.diagram-repo-title{background:var(--soft);border-radius:8px 8px 0 0;font-weight:700;letter-spacing:.01em}
+.fc .repo-band rect{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:5 4}
+.fc .repo-band text{font-size:13px;font-weight:700;fill:var(--muted)}
 .diagram-lane-title{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px 6px 0 0;font-weight:600;white-space:nowrap}
 .fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
 .fc .fe.on{stroke:var(--http);stroke-width:2.2}

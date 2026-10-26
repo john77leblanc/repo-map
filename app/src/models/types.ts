@@ -137,7 +137,10 @@ export interface CollapseGroup {
     members: string[];
 }
 export interface Flow {
-    lanes?: { id: string; label: string }[];
+    /** `repo` ("home" or a link name) on workspace traces. */
+    lanes?: { id: string; label: string; repo?: string }[];
+    /** Repos whose lanes are drawn inside one band each (workspace traces). */
+    repos?: { id: string; label: string }[];
     /** AI-suggested sub-processes the reader may collapse. */
     chunks?: { id: string; label: string; nodes: string[] }[];
     nodes: FlowNode[];
@@ -210,6 +213,10 @@ export interface Trace {
     proposal?: Proposal | null;
     plan?: Plan | null;
     used?: { agent: string; model: string; effort: string; label: string } | null;
+    /** Traced over the workspace: step ids and refs may carry a `<name>:` prefix. */
+    scope?: 'workspace';
+    /** Repos the workspace had when traced ("home" plus link names). */
+    repos?: string[];
     _doc?: string;
     key?: string;
     createdAt?: number;

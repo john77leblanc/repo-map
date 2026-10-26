@@ -12,7 +12,12 @@
  */
 
 import { CHANGE_LABELS } from '../lib/proposal.mjs';
-import { flowLanes } from '../lib/flow.mjs';
+import { flowLanes, flowRepos } from '../lib/flow.mjs';
+
+/** Extra header height for the repo band titles above the lane titles. */
+const BAND_H = 34;
+/** Space between the lanes of two repos. */
+const BAND_GAP = 18;
 
 const FONT_W = 6.7;          // average glyph width at 12.5px
 const LINE_H = 16;
@@ -93,9 +98,11 @@ function placeRow(want, sep) {
 }
 
 function layoutFlow(flow, { lanes = true } = {}) {
-    if (!flow.nodes.length) return { width: 0, height: 0, nodes: [], edges: [], lanes: [] };
+    if (!flow.nodes.length) return { width: 0, height: 0, nodes: [], edges: [], lanes: [], repoBands: [], laneTop: 0 };
     const participants = flowLanes(flow);
     const useLanes = lanes && participants.filter((lane) => lane.id).length >= 2;
+    const bands = useLanes ? flowRepos(flow) : [];
+    const laneTop = bands.length ? BAND_H : 0;
     const nodes = flow.nodes.map((n, i) => ({ ...n, ...sizeNode(n), idx: i }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const edges = flow.edges.filter((e) => byId.has(e.from) && byId.has(e.to)).map((e, i) => ({ ...e, idx: i }));
@@ -275,7 +282,11 @@ function layoutFlow(flow, { lanes = true } = {}) {
         const owner = new Map(nodes.map((n) => [n.id, n.lane || '']));
         fwd.forEach((e) => e.chain.slice(1, -1).forEach((id) => owner.set(id, owner.get(e.from))));
         let left = 0;
+        let prevRepo;
         for (const participant of participants) {
+            // a gap between repo bands, so their outlines don't touch
+            if (bands.length && prevRepo !== undefined && participant.repo !== prevRepo) left += BAND_GAP;
+            prevRepo = participant.repo;
             const rows = layers.map((row) => row.filter((it) => owner.get(it.id) === participant.id));
             const widths = rows.map((row) => row.reduce((sum, it) => sum + it.w + GAP_X, 0));
             const contentWidth = Math.max(220, participant.label.length * 8 + 48, ...widths.map((width) => width + GAP_X));
@@ -318,7 +329,7 @@ function layoutFlow(flow, { lanes = true } = {}) {
     const labelled = new Set(fwd.filter((e) => e.label || CHANGE_LABELS[e.status]).map((e) => rank.get(e.from)));
     const rowH = layers.map((L) => Math.max(0, ...L.map((it) => it.h)));
     const rowY = [];
-    let y = MARGIN + (useLanes ? 48 : 0);
+    let y = MARGIN + (useLanes ? 48 + laneTop : 0);
     rowH.forEach((h, r) => {
         rowY.push(y);
         y += Math.max(h, 8) + GAP_Y + (labelled.has(r) ? 10 : 0);
@@ -446,6 +457,12 @@ function layoutFlow(flow, { lanes = true } = {}) {
         nodes: nodes.map(({ idx, ...n }) => n),
         edges: routed.sort((a, b) => a.idx - b.idx).map(({ chain, idx, ...e }) => e),
         lanes: laneBounds,
+        laneTop,
+        repoBands: bands.map((band) => {
+            const own = laneBounds.filter((lane) => band.lanes.includes(lane.id));
+            const x0 = Math.min(...own.map((lane) => lane.x));
+            return { id: band.id, label: band.label, lanes: band.lanes, x: x0, w: Math.max(...own.map((lane) => lane.x + lane.w)) - x0 };
+        }),
     };
 }
 
@@ -531,8 +548,12 @@ function renderFlowSvg(layout, { title = '' } = {}) {
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" class="fc" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" role="img" aria-label="${escXml(title || 'Flowchart')}">`);
     parts.push('<defs><marker id="fc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="fa" d="M0 0.5L7.5 4L0 7.5z"/></marker></defs>');
     parts.push('<g class="fe-all">');
+    const top = layout.laneTop || 0;
+    for (const band of layout.repoBands || []) {
+        parts.push(`<g class="repo-band"><rect x="${r1(band.x - 4)}" y="2" width="${r1(band.w + 8)}" height="${r1(layout.height - 4)}" rx="9"/><text x="${r1(band.x + band.w / 2)}" y="24" text-anchor="middle">${escXml(band.label)}</text></g>`);
+    }
     for (const lane of layout.lanes || []) {
-        parts.push(`<g class="execution-lane"><rect x="${r1(lane.x)}" y="8" width="${r1(lane.w)}" height="${r1(layout.height - 16)}" rx="6"/><text x="${r1(lane.x + lane.w / 2)}" y="36" text-anchor="middle">${escXml(lane.label)}</text></g>`);
+        parts.push(`<g class="execution-lane"><rect x="${r1(lane.x)}" y="${8 + top}" width="${r1(lane.w)}" height="${r1(layout.height - 16 - top)}" rx="6"/><text x="${r1(lane.x + lane.w / 2)}" y="${36 + top}" text-anchor="middle">${escXml(lane.label)}</text></g>`);
     }
     layout.edges.forEach((e, i) => {
         parts.push(`<path class="fe${e.context ? ' context' : ''}${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
