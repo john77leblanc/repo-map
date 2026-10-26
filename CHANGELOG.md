@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
 
 - Traces cross repos. While the map shows the **Workspace**, a new trace runs over the merged map: the AI tool may step into linked repos (prefixed ids such as `api:orders-route`), reads their code through `<name>:path` (Claude Code via `--add-dir`, API models via prefixed read-only tools), and refs are checked inside the linked repo with its own exclusions. Steps on a placeholder card a seam explains move to the real card. Flowcharts nest their lanes inside one band per repo, in the diagram, SVG and Mermaid export (`subgraph` per repo), and a band's fold button collapses a whole repo into one box. A saved workspace trace always opens on the workspace map; steps in a repo that is no longer linked are kept and marked "not linked". Proposals stay on this repo's map.
 
