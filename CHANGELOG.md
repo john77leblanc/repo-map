@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
 
 - Show several repos in one map. `.repo-map/workspace.json` links other repos, either a sibling folder read live or a map snapshot made with the new `repo-map export` and imported in **Settings → Linked repos**. The map's **This repo / Workspace** switch merges them: linked ids get a `<name>:` prefix, their groups are tagged with the repo, and **seams** (connections between repos) are drawn with their own line style. Seams come from matching `consumes` against `provides` contracts, or from **Find seams**, an AI pass over the leftovers that must cite code in both repos and whose suggestions you accept or dismiss. Placeholder cards a seam explains ("Orders API", "Storefront") are replaced by the real card. Each repo shows freshness badges (**map stale**, **behind main N**, **snapshot old**) from what was last fetched; **Refresh** runs `git fetch` (or `git ls-remote` for a snapshot) only when clicked. **Collapse** folds a whole repo into one card that keeps its seams; which repos are folded is remembered in your browser. Linked files open in the code viewer through `<name>:path`, with the same exclusions; during **Find seams** Claude Code gets linked folders via `--add-dir` and API models get prefixed read-only tools. New example: `examples/shop-api`, linked from `examples/shop`.
 
