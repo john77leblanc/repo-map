@@ -68,9 +68,20 @@ export interface FlowNode {
     inferred?: boolean;
     status?: ChangeStatus;
     lane?: string;
+    /** Set on a box standing in for a collapsed group; `members` are the hidden box ids. */
+    collapsed?: boolean;
+    members?: string[];
+}
+/** A group of boxes shown as one box. */
+export interface CollapseGroup {
+    id: string;
+    label: string;
+    members: string[];
 }
 export interface Flow {
     lanes?: { id: string; label: string }[];
+    /** AI-suggested sub-processes the reader may collapse. */
+    chunks?: { id: string; label: string; nodes: string[] }[];
     nodes: FlowNode[];
     edges: {
         from: string;

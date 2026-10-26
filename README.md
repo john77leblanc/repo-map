@@ -155,7 +155,9 @@ New flowcharts identify where steps execute. When two or more participants are k
 
 Box types: *start*, *end*, *action* (the person does something), *process* (the system does something), *decision* (a check with labelled outcomes) and *error* (a failure outcome). Dashed boxes and arrows are inferred rather than read in code. The chart is laid out by repo-map itself (using shared pure layout helpers), saved inside the trace, and included in trace codes. **Copy Mermaid** gives source that GitHub, GitLab and Notion render; **Download SVG** gives a standalone image.
 
-Optional flow metadata is `lanes: [{ id, label }]` and `nodes[].lane`. It survives saving and sharing independently of proposal status and inferred behavior. SVG export follows the displayed layout. Mermaid preserves participant groups as subgraphs; other renderers may position them differently.
+**Collapsing:** fold parts you already understand into one box. Use **Collapse** on a lane heading, or shift-click steps and choose **Collapse selection**. Large flowcharts come with AI-suggested sub-processes; **Collapse suggested** folds them all. Click a collapsed box to see its hidden steps, rename it, or **Expand** it; **Expand all** restores everything. Choices are remembered per trace in your browser and never change the saved flowchart.
+
+Optional flow metadata is `lanes: [{ id, label }]` `nodes[].lane` and `chunks: [{ id, label, nodes }]` (suggested sub-processes). It survives saving and sharing independently of proposal status and inferred behavior. SVG export follows the displayed layout. Mermaid preserves participant groups as subgraphs; other renderers may position them differently.
 
 ### Sitemap
 

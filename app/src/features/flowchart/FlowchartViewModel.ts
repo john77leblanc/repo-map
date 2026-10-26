@@ -1,6 +1,7 @@
 ﻿import { makeAutoObservable, observable, isObservable, observableRef, runInAction } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { AgentPick, ChangeStatus, Flow, Trace, StreamResult } from '../../models/types';
+import type { AgentPick, ChangeStatus, CollapseGroup, Flow, Trace, StreamResult } from '../../models/types';
+import { collapseGraph } from '../../../../lib/collapse.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
@@ -23,9 +24,29 @@ export interface FlowConnection {
     index: number;
     other: string;
 }
+/** What the reader has folded away: whole lanes, and named groups of boxes. Saved per trace in the browser. */
+export interface FlowCollapse {
+    lanes: string[];
+    groups: CollapseGroup[];
+}
+const LANE_GROUP = 'lane:';
+const emptyCollapse = (): FlowCollapse => ({ lanes: [], groups: [] });
+function readCollapse(value: unknown): FlowCollapse {
+    const raw = value && typeof value === 'object' ? (value as Partial<FlowCollapse>) : {};
+    return {
+        lanes: Array.isArray(raw.lanes) ? raw.lanes.filter((id) => typeof id === 'string') : [],
+        groups: Array.isArray(raw.groups)
+            ? raw.groups.filter((g) => g && typeof g.id === 'string' && Array.isArray(g.members))
+                .map((g) => ({ id: g.id, label: String(g.label || ''), members: g.members.filter((m) => typeof m === 'string') }))
+            : [],
+    };
+}
 export class FlowchartViewModel {
     trace: Trace | null = null;
     selectedId: string | null = null;
+    collapse: FlowCollapse = emptyCollapse();
+    /** Boxes picked with shift-click, waiting to be collapsed together. */
+    marked: string[] = [];
     connectionTab: ConnectionTab = 'to';
     scale = 1;
     keyOpen = false;
@@ -61,8 +82,116 @@ export class FlowchartViewModel {
     get repo() {
         return this.deps.repo;
     }
+    /** Every group to fold right now: collapsed lanes first, then named groups. */
+    get collapseGroups(): CollapseGroup[] {
+        const flow = this.trace?.flow;
+        if (!flow) return [];
+        const lanes = this.collapse.lanes.map((lane) => ({
+            id: LANE_GROUP + lane,
+            label: flow.lanes?.find((l) => l.id === lane)?.label || lane,
+            members: flow.nodes.filter((n) => n.lane === lane).map((n) => n.id),
+        }));
+        return [...lanes, ...this.collapse.groups];
+    }
+    /** The flow as drawn: the saved flow with the reader's collapsed groups folded in. */
+    get displayFlow(): Flow | null {
+        const flow = this.trace?.flow;
+        if (!flow) return null;
+        return this.collapseGroups.length ? (collapseGraph(flow, this.collapseGroups) as Flow) : flow;
+    }
+    get collapsedCount() {
+        return this.displayFlow?.nodes.filter((n) => n.collapsed).length || 0;
+    }
+    /** Suggested chunks not yet folded. */
+    get openChunks() {
+        const shown = new Set(this.displayFlow?.nodes.map((n) => n.id));
+        return (this.trace?.flow?.chunks || []).filter((c) => c.nodes.every((id) => shown.has(id)));
+    }
     get layout() {
-        return this.trace?.flow ? fitCaptions(layoutFlow(this.trace.flow, { lanes: !this.compact })) : null;
+        const flow = this.displayFlow;
+        return flow ? fitCaptions(layoutFlow(flow, { lanes: !this.compact })) : null;
+    }
+    private get collapseKey() {
+        const t = this.trace;
+        return t ? `${this.repo.namespace}flow-collapse:${t._doc || t.key || t.title}` : '';
+    }
+    private saveCollapse() {
+        if (this.collapseKey) this.deps.services.storage.set(this.collapseKey, this.collapse);
+        // A selected box that was just folded away hands the selection to its group.
+        const shown = this.displayFlow?.nodes || [];
+        if (this.selectedId && !shown.some((n) => n.id === this.selectedId))
+            this.select(shown.find((n) => n.members?.includes(this.selectedId!))?.id || null);
+        this.marked = this.marked.filter((id) => shown.some((n) => n.id === id));
+    }
+    /** A lane needs two or more boxes to be worth folding. */
+    laneFoldable(id: string) {
+        return (this.trace?.flow?.nodes.filter((n) => n.lane === id).length || 0) >= 2;
+    }
+    isLaneCollapsed(id: string) {
+        return this.collapse.lanes.includes(id);
+    }
+    toggleLane(id: string) {
+        const lanes = this.isLaneCollapsed(id) ? this.collapse.lanes.filter((l) => l !== id) : [...this.collapse.lanes, id];
+        this.collapse = { ...this.collapse, lanes };
+        this.saveCollapse();
+    }
+    /** Shift-click: add or remove a box from the pending group. Collapsed boxes can't be nested. */
+    mark(id: string) {
+        const node = this.displayFlow?.nodes.find((n) => n.id === id);
+        if (!node || node.collapsed) return;
+        this.marked = this.marked.includes(id) ? this.marked.filter((m) => m !== id) : [...this.marked, id];
+    }
+    clearMarks() {
+        this.marked = [];
+    }
+    collapseMarked(label = '') {
+        if (this.marked.length < 2) return;
+        const taken = new Set(this.collapse.groups.map((g) => g.id));
+        let n = this.collapse.groups.length + 1;
+        while (taken.has(`s${n}`)) n++;
+        const members = this.trace?.flow?.nodes.map((node) => node.id).filter((id) => this.marked.includes(id)) || [];
+        this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: `s${n}`, label: label.trim(), members }] };
+        this.marked = [];
+        this.saveCollapse();
+        this.select(`c:s${n}`);
+    }
+    collapseChunk(id: string) {
+        const chunk = this.trace?.flow?.chunks?.find((c) => c.id === id);
+        if (!chunk || this.collapse.groups.some((g) => g.id === 'chunk:' + id)) return;
+        this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: 'chunk:' + id, label: chunk.label, members: chunk.nodes }] };
+        this.saveCollapse();
+    }
+    collapseSuggested() {
+        this.openChunks.forEach((c) => this.collapseChunk(c.id));
+    }
+    /** Unfold one collapsed box (by its drawn id), optionally selecting one of its steps. */
+    expand(collapsedId: string, select: string | null = null) {
+        const id = collapsedId.replace(/^c:/, '');
+        this.collapse = id.startsWith(LANE_GROUP)
+            ? { ...this.collapse, lanes: this.collapse.lanes.filter((l) => l !== id.slice(LANE_GROUP.length)) }
+            : { ...this.collapse, groups: this.collapse.groups.filter((g) => g.id !== id) };
+        this.saveCollapse();
+        if (select) this.select(select);
+        else if (this.selectedId === collapsedId) this.select(null);
+    }
+    expandAll() {
+        this.collapse = emptyCollapse();
+        this.saveCollapse();
+    }
+    renameGroup(collapsedId: string, label: string) {
+        const id = collapsedId.replace(/^c:/, '');
+        this.collapse = { ...this.collapse, groups: this.collapse.groups.map((g) => (g.id === id ? { ...g, label } : g)) };
+        if (this.collapseKey) this.deps.services.storage.set(this.collapseKey, this.collapse);
+    }
+    /** True for named groups the reader made or accepted; lanes keep their lane name. */
+    canRename(collapsedId: string) {
+        return !collapsedId.startsWith('c:' + LANE_GROUP);
+    }
+    /** Hidden steps of a collapsed box, in flow order. */
+    members(collapsedId: string) {
+        const node = this.displayFlow?.nodes.find((n) => n.id === collapsedId);
+        const ids = new Set(node?.members || []);
+        return (this.trace?.flow?.nodes || []).filter((n) => ids.has(n.id));
     }
     /** What DiagramSvg keeps bright: the hovered node, else the selected one, with its links and neighbours. */
     get highlight() {
@@ -89,7 +218,7 @@ export class FlowchartViewModel {
         return this.layout ? renderFlowSvg(this.layout, { title: this.trace?.title }) : '';
     }
     get selected() {
-        return this.trace?.flow?.nodes.find((node) => node.id === this.selectedId) || null;
+        return this.displayFlow?.nodes.find((node) => node.id === this.selectedId) || null;
     }
     get references() {
         const step = this.selected?.step;
@@ -127,7 +256,7 @@ export class FlowchartViewModel {
         return status ? { status, rationale: change?.rationale || '' } : null;
     }
     nodeLabel(id: string) {
-        return this.trace?.flow?.nodes.find((node) => node.id === id)?.label || id;
+        return this.displayFlow?.nodes.find((node) => node.id === id)?.label || id;
     }
     setConnectionTab(tab: ConnectionTab) {
         this.connectionTab = tab;
@@ -144,6 +273,8 @@ export class FlowchartViewModel {
         this.trace = trace ? (isObservable(trace) ? trace : observable(trace)) : null;
         this.copied = false;
         this.selectedId = null;
+        this.marked = [];
+        this.collapse = this.collapseKey ? readCollapse(this.deps.services.storage.get(this.collapseKey, null)) : emptyCollapse();
         this.focus.reset();
         this.status = '';
         this.error = false;
@@ -253,7 +384,7 @@ export class FlowchartViewModel {
         if (!this.trace?.flow || this.disposed) return;
         const revision = this.revision;
         try {
-            await this.deps.services.browser.copy(flowToMermaid(this.trace.flow, this.trace.title));
+            await this.deps.services.browser.copy(flowToMermaid(this.displayFlow || this.trace.flow, this.trace.title));
             if (this.disposed || revision !== this.revision) return;
             runInAction(() => {
                 this.copied = true;

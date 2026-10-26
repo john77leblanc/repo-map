@@ -17,10 +17,18 @@
 .fc .change-new .fs,.fc .fe.change-new{stroke:var(--sync);stroke-dasharray:8 4;stroke-width:2}
 .fc .change-modified .fs,.fc .fe.change-modified{stroke:var(--event);stroke-width:3}
 .fc .change-removed .fs,.fc .fe.change-removed{stroke:var(--muted);stroke-dasharray:2 4}
-.fc .change-removed>text{text-decoration:line-through;fill:var(--muted)}`;
+.fc .change-removed>text{text-decoration:line-through;fill:var(--muted)}
+.fc .t-collapsed .fs{fill:var(--soft);stroke:var(--ink);stroke-width:1.6}
+.fc .fs-stack{fill:var(--panel);stroke:var(--muted);stroke-width:1}`;
 export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fe-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke}
 .fc .fn:hover .fs{stroke-width:2.2}
+.fc .fn.mk .fs{stroke:var(--sync);stroke-width:2.6;stroke-dasharray:6 3}
+.diagram-lane-title .lane-fold{margin-left:.5em;font-size:.75em;padding:0 .4em}
+.flow-select-bar{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;padding:.35em .75em;border-bottom:1px solid var(--line)}
+.flow-members{margin:.25em 0 .75em;padding-left:1.2em}
+.flow-members li{margin:.15em 0}
+#fl-expand{margin-bottom:.9em}
 .diagram-with-lanes .execution-lane text{visibility:hidden}
 .diagram-lane-headings{position:sticky;top:0;z-index:2;min-width:100%;box-sizing:border-box;padding-inline:12px;background:var(--bg);border-bottom:1px solid var(--line)}
 .diagram-lane-heading-row{position:relative;margin:0 auto}

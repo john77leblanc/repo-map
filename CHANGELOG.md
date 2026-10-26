@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Collapse parts of a flowchart into one box. Each lane heading has **Collapse** / **Expand**; shift-click (or Shift+Enter) steps and choose **Collapse selection** to group any steps. For flowcharts over 15 boxes, the AI tool also suggests sub-processes (`flow.chunks`), applied with **Collapse suggested**. A collapsed box is drawn as a card stack with its step count, keeps merged connections, and opens a side panel listing its hidden steps, a name field and **Expand**. **Expand all** restores the full chart. Collapse choices are remembered per trace in your browser; Mermaid and SVG exports follow the displayed chart. Shared pure helper: `lib/collapse.mjs` (`collapseGraph`).
+
 - Keep saved-trace cards compact: the title stays on one line and the prompt on three, cut off with "..." (hover for the full text). This applies to running trace jobs too. Proposal traces show a **Proposal** tag, or **Plan** once an implementation plan exists.
 
 - Move the implementation plan button to the top of a proposal trace's sidebar, under **Edit** / **Delete**, as a full-width primary button. It reads **Create implementation plan** or **View implementation plan**, depending on whether a plan exists. Closing the plan modal no longer cancels generation: the button shows a spinner and **Creating implementation plan…** until it finishes. **Stop** still cancels.

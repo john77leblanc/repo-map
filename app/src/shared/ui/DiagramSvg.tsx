@@ -18,6 +18,13 @@ interface DiagramViewModel {
     hoverNode?(id: string | null): void;
     /** Pointer entering (layout edge index) or leaving (null) a path or its caption. Hover only, no click. */
     hoverEdge?(index: number | null): void;
+    /** Shift-click: add a node to (or drop it from) a multi-selection. */
+    mark?(id: string): void;
+    marked?: string[];
+    /** Lane heading fold buttons, when the diagram supports collapsing lanes. */
+    toggleLane?(id: string): void;
+    isLaneCollapsed?(id: string): boolean;
+    laneFoldable?(id: string): boolean;
 }
 
 const nodeId = (target: EventTarget | null) =>
@@ -101,6 +108,11 @@ const DiagramSvg = observer(function DiagramSvg({
         if (box.left < view.left || box.right > view.right || box.top < view.top || box.bottom > view.bottom)
             node.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     }, [vm.selectedId]);
+    const marked = vm.marked;
+    useLayoutEffect(() => {
+        const set = new Set(marked || []);
+        host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) => node.classList.toggle('mk', set.has(node.dataset.id || '')));
+    }, [svg, marked]);
     const highlight = vm.highlight;
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');
@@ -149,7 +161,15 @@ const DiagramSvg = observer(function DiagramSvg({
                                 height: 48 * headerScale,
                                 fontSize: 14 * headerScale,
                             }}>
-                                {lane.label}
+                                <span className="lane-name">{lane.label}</span>
+                                {vm.toggleLane && lane.id && (vm.isLaneCollapsed?.(lane.id) || vm.laneFoldable?.(lane.id)) && (
+                                    <button className="btn sm lane-fold" type="button" data-lane={lane.id}
+                                        aria-pressed={!!vm.isLaneCollapsed?.(lane.id)}
+                                        title={vm.isLaneCollapsed?.(lane.id) ? `Expand ${lane.label}` : `Collapse ${lane.label} into one box`}
+                                        onClick={() => vm.toggleLane?.(lane.id)}>
+                                        {vm.isLaneCollapsed?.(lane.id) ? 'Expand' : 'Collapse'}
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -171,6 +191,7 @@ const DiagramSvg = observer(function DiagramSvg({
                     // Paths and captions are hover-only; clicking them keeps the current selection.
                     if (edgeIndex(event.target) !== null) return;
                     const node = (event.target as Element).closest<SVGElement>('.fn');
+                    if (node?.dataset.id && event.shiftKey && vm.mark) return vm.mark(node.dataset.id);
                     if (node?.dataset.id && vm.pick) return vm.pick(node.dataset.id);
                     vm.select(
                         node?.dataset.id && node.dataset.id !== vm.selectedId
@@ -183,7 +204,8 @@ const DiagramSvg = observer(function DiagramSvg({
                     const node = (event.target as Element).closest<SVGElement>('.fn');
                     if (node?.dataset.id) {
                         event.preventDefault();
-                        vm.select(node.dataset.id);
+                        if (event.shiftKey && vm.mark) vm.mark(node.dataset.id);
+                        else vm.select(node.dataset.id);
                     }
                 }}
             />

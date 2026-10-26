@@ -170,4 +170,59 @@ describe('FlowchartViewModel', () => {
         expect(svg).not.toContain('var(--');
         vm.dispose();
     });
+    it('collapses lanes, shift-selected steps and suggested chunks, and remembers them per trace', () => {
+        const { vm, trace, services } = fixture();
+        trace.flow = {
+            lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }],
+            nodes: [
+                { id: 's', type: 'start', label: 'Open', lane: 'web' },
+                { id: 'a', type: 'process', label: 'Send', lane: 'web' },
+                { id: 'b', type: 'process', label: 'Save', lane: 'api' },
+                { id: 'c', type: 'process', label: 'Reply', lane: 'api' },
+                { id: 'e', type: 'end', label: 'Done', lane: 'web' },
+            ],
+            edges: [{ from: 's', to: 'a' }, { from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'e' }],
+            chunks: [{ id: 'k1', label: 'Kick off', nodes: ['s', 'a'] }],
+        };
+        trace._doc = 'checkout.json';
+        vm.setTrace(trace);
+        expect(vm.laneFoldable('api')).toBe(true);
+        vm.select('b');
+        vm.toggleLane('api');
+        expect(vm.displayFlow?.nodes.map((n) => n.id)).toEqual(['s', 'a', 'c:lane:api', 'e']);
+        expect(vm.selectedId).toBe('c:lane:api');
+        expect(vm.selected?.collapsed).toBe(true);
+        expect(vm.canRename('c:lane:api')).toBe(false);
+        expect(vm.members('c:lane:api').map((m) => m.label)).toEqual(['Save', 'Reply']);
+        expect(vm.openChunks).toHaveLength(1);
+        vm.collapseSuggested();
+        expect(vm.openChunks).toHaveLength(0);
+        expect(vm.collapsedCount).toBe(2);
+        const key = vm.repo.namespace + 'flow-collapse:checkout.json';
+        expect(services.storage.set).toHaveBeenLastCalledWith(key, {
+            lanes: ['api'], groups: [{ id: 'chunk:k1', label: 'Kick off', members: ['s', 'a'] }],
+        });
+        vm.expand('c:lane:api', 'c');
+        expect(vm.selectedId).toBe('c');
+        vm.expandAll();
+        vm.collapseChunk('k1');
+        vm.mark('b');
+        vm.mark('zz');
+        vm.mark('c:chunk:k1');
+        vm.mark('e');
+        expect(vm.marked).toEqual(['b', 'e']);
+        vm.collapseMarked();
+        expect(vm.selectedId).toBe('c:s2');
+        expect(vm.selected?.label).toBe('Save (+1 more)');
+        vm.renameGroup('c:s2', 'Wrap up');
+        expect(vm.selected?.label).toBe('Wrap up');
+        vi.mocked(services.storage.get).mockImplementation((k: string, fallback: unknown) =>
+            k === key ? { lanes: ['web'], groups: [] } : fallback);
+        const next = new FlowchartViewModel(vm.deps);
+        next.setTrace(trace);
+        expect(next.collapsedCount).toBe(1);
+        expect(next.displayFlow?.nodes.find((n) => n.collapsed)?.members).toEqual(['s', 'a', 'e']);
+        vm.dispose();
+        next.dispose();
+    });
 });

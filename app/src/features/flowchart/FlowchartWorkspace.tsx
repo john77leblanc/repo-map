@@ -24,7 +24,65 @@ const FLOW_KIND: Record<string, string> = {
     process: 'System does',
     decision: 'Decision',
     error: 'Failure',
+    collapsed: 'Collapsed group',
 };
+
+/** Folding controls: shift-click selection, AI-suggested chunks, and Expand all. */
+const FlowCollapseBar = observer(function FlowCollapseBar({ vm }: { vm: FlowchartViewModel }) {
+    const chunks = vm.openChunks;
+    return (
+        <div className="flow-select-bar" id="fl-collapse" aria-label="Collapse steps">
+            {vm.marked.length > 0 ? (
+                <>
+                    <span>{vm.marked.length} selected</span>
+                    <button className="btn sm primary" id="fl-collapse-sel" type="button"
+                        disabled={vm.marked.length < 2} onClick={() => vm.collapseMarked()}>
+                        Collapse selection
+                    </button>
+                    <button className="btn sm" type="button" onClick={vm.clearMarks}>Clear</button>
+                </>
+            ) : (
+                <span className="hint">Shift-click steps to collapse them into one box.</span>
+            )}
+            {chunks.length > 0 && (
+                <button className="btn sm" id="fl-collapse-suggested" type="button" onClick={vm.collapseSuggested}
+                    title={chunks.map((c) => c.label).join(', ')}>
+                    Collapse suggested ({chunks.length})
+                </button>
+            )}
+            {vm.collapsedCount > 0 && (
+                <button className="btn sm" id="fl-expand-all" type="button" onClick={vm.expandAll}>Expand all</button>
+            )}
+        </div>
+    );
+});
+
+/** Side-panel body for a collapsed box: its name, hidden steps and Expand. */
+const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: { vm: FlowchartViewModel; id: string; label: string }) {
+    const members = vm.members(id);
+    return (
+        <>
+            {vm.canRename(id) ? (
+                <label className="ft">
+                    Name{' '}
+                    <input type="text" aria-label="Group name" defaultValue={label} key={id}
+                        onBlur={(event) => vm.renameGroup(id, event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') vm.renameGroup(id, event.currentTarget.value); }} />
+                </label>
+            ) : <h3>{label}</h3>}
+            <h4>{members.length} hidden steps</h4>
+            <ol className="flow-members">
+                {members.map((m) => (
+                    <li key={m.id}>
+                        <button className="btn sm" type="button" data-member={m.id}
+                            onClick={() => vm.expand(id, m.id)}>{m.label}</button>
+                    </li>
+                ))}
+            </ol>
+            <button className="btn primary sm" id="fl-expand" type="button" onClick={() => vm.expand(id)}>Expand</button>
+        </>
+    );
+});
 /** Edges arriving at (From) and leaving (To) the selected node. Clicking one moves the selection. */
 const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: FlowchartViewModel; id: string }) {
     const conns = vm.connections;
@@ -85,7 +143,7 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                 <p className="ft">{FLOW_KIND[node.type] || 'Step'}</p>
                 <button className="btn sm" id="fl-side-close" type="button" onClick={close}>Close</button>
             </div>
-            <h3>{node.label}</h3>
+            {node.collapsed ? <CollapsedDetails vm={vm} id={node.id} label={node.label} /> : <h3>{node.label}</h3>}
             {vm.selectedLane && <p className="ft">Executes in: {vm.selectedLane}</p>}
             {node.detail && <p className="fd">{node.detail}</p>}
             {node.inferred && <p className="fwarn">Inferred. Check this step before relying on it.</p>}
@@ -152,6 +210,13 @@ function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean 
                     </svg>
                     inferred
                 </span>
+                <span>
+                    <svg viewBox="0 0 22 14" aria-hidden="true">
+                        <rect className="lg" x="5" y="1" width="16" height="9" rx="2" />
+                        <rect className="lg" x="1" y="4" width="16" height="9" rx="2" />
+                    </svg>
+                    collapsed group
+                </span>
             </div>
             <p data-proposal-key className="proposal-legend" hidden={!proposal}>
                 Proposed changes: <span className="key-change">New</span>{' '}
@@ -208,6 +273,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             run: () => { if (vm.trace) void vm.generate(vm.trace); } }}
                     />
                     <FlowchartLegend open={vm.keyOpen} proposal={vm.trace.intent === 'proposal'} />
+                    {hasFlow && <FlowCollapseBar vm={vm} />}
                     {!hasFlow && (
                         <p id="flow-missing" className="hint">
                             The supporting walkthrough was kept. Draw the flowchart to complete this

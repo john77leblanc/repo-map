@@ -14,7 +14,7 @@ describe('FlowchartWorkspace', () => {
             <FlowchartWorkspace vm={vm} CodeReference={Reference} />
         );
         const legend = container.querySelector('#flowchart-key')!;
-        expect(legend.querySelectorAll('svg')).toHaveLength(6);
+        expect(legend.querySelectorAll('svg')).toHaveLength(7);
         expect(legend.hasAttribute('hidden')).toBe(true);
         fireEvent.click(screen.getByRole('button', { name: 'Diagram key' }));
         expect(legend.hasAttribute('hidden')).toBe(false);

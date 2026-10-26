@@ -191,7 +191,7 @@ for (const colorScheme of ['light', 'dark'] as const) test(`lane headings stay o
     const headings = canvas.locator('.diagram-lane-title');
     const band = canvas.getByRole('group', { name: 'Execution lanes' });
     const backgrounds = canvas.locator('.execution-lane rect');
-    await expect(headings).toHaveText(['Frontend', 'Backend', 'Payment worker']);
+    await expect(headings.locator('.lane-name')).toHaveText(['Frontend', 'Backend', 'Payment worker']);
     await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
     await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
     const aligned = async () => {
@@ -246,4 +246,35 @@ for (const colorScheme of ['light', 'dark'] as const) test(`lane headings stay o
     await page.getByLabel('Flowchart layout').selectOption('lanes');
     await expect(headings).toHaveCount(3);
     await aligned();
+});
+
+test('flowchart lanes and shift-selected steps collapse into one box and expand again', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
+    await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
+    const canvas = page.locator('#fl-canvas');
+    await canvas.locator('.lane-fold[data-lane="web"]').click();
+    const lane = canvas.locator('.fn[data-id="c:lane:web"]');
+    await expect(lane).toBeVisible();
+    await expect(canvas.locator('.fn[data-id="start"]')).toHaveCount(0);
+    await expect(canvas.locator('.lane-fold[data-lane="web"]')).toHaveText('Expand');
+    await lane.click();
+    await page.screenshot({ path: testInfo.outputPath('collapsed-lane.png') });
+    const side = page.locator('#fl-side');
+    await expect(side.getByRole('heading', { name: '2 hidden steps' })).toBeVisible();
+    await side.locator('[data-member="done"]').click();
+    await expect(canvas.locator('.fn[data-id="done"]')).toHaveClass(/sel/);
+    await canvas.locator('.fn[data-id="start"]').click({ modifiers: ['Shift'] });
+    await canvas.locator('.fn[data-id="done"]').click({ modifiers: ['Shift'] });
+    await expect(canvas.locator('.fn.mk')).toHaveCount(2);
+    await page.locator('#fl-collapse-sel').click();
+    await expect(canvas.locator('.fn[data-id="c:s1"]')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Group name' }).fill('Shopper screens');
+    await page.getByRole('textbox', { name: 'Group name' }).press('Enter');
+    await page.reload();
+    await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
+    await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
+    await expect(canvas.locator('.fn[data-id="c:s1"]')).toContainText('Shopper screens');
+    await page.locator('#fl-expand-all').click();
+    await expect(canvas.locator('.fn[data-id="start"]')).toBeVisible();
 });

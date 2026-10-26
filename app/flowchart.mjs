@@ -42,8 +42,14 @@ function wrap(text, maxChars) {
     return lines.length ? lines : [''];
 }
 
-function sizeNode(n) {
+/** Box text: change badge, label, and the step count of a collapsed group. */
+function nodeText(n) {
     const label = CHANGE_LABELS[n.status] ? `[${CHANGE_LABELS[n.status]}] ${n.label}` : n.label;
+    return n.collapsed ? `${label} · ${n.members.length} steps` : label;
+}
+
+function sizeNode(n) {
+    const label = nodeText(n);
     if (n.type === 'decision') {
         const lines = wrap(label, 16);
         const tw = Math.max(...lines.map((l) => l.length)) * FONT_W;
@@ -510,6 +516,11 @@ function shapeOf(n) {
         const k = 11;
         return `<polygon class="fs" points="${r1(x + k)},${r1(y)} ${r1(x + w)},${r1(y)} ${r1(x + w - k)},${r1(y + h)} ${r1(x)},${r1(y + h)}"/>`;
     }
+    if (n.collapsed) {
+        // A card stack: two backs offset down-right (clear of incoming arrows), then the box itself.
+        return [8, 4].map((o) => `<rect class="fs-stack" x="${r1(x + o)}" y="${r1(y + o)}" width="${r1(w)}" height="${r1(h)}" rx="6"/>`).join('')
+            + `<rect class="fs" x="${r1(x)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="6"/>`;
+    }
     const rx = n.type === 'start' || n.type === 'end' ? h / 2 : 6;
     return `<rect class="fs" x="${r1(x)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(rx)}"/>`;
 }
@@ -528,7 +539,7 @@ function renderFlowSvg(layout, { title = '' } = {}) {
     });
     parts.push('</g>');
     layout.nodes.forEach((n) => {
-        const label = `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
+        const label = n.collapsed ? `Collapsed: ${nodeText(n)}` : `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
         parts.push(`<g class="fn t-${n.type}${n.context ? ' context' : ''}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
         parts.push(shapeOf(n));
         const top = n.cy - ((n.lines.length - 1) * LINE_H) / 2 + 4.5;
