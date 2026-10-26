@@ -4,12 +4,13 @@ import { CodeReference } from '../../shared/ui/CodeReference';
 import { ProgressLine } from '../../shared/ui/ProgressLine';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
 
-/** Switch between this repo's map and the workspace (every linked repo in one map). `disabled` on views it doesn't affect. */
+/** Switch between this repo's map and the workspace (every linked repo in one map). `disabled` on views it doesn't affect; locked while a workspace trace is open. */
 export const ScopeSwitch = observer(function ScopeSwitch({ vm, disabled = false }: { vm: ArchitectureViewModel; disabled?: boolean }) {
     if (!vm.workspace?.linked) return null;
+    const title = disabled ? 'Applies to the Architecture view' : vm.scopeLocked ? 'This trace spans linked repos' : undefined;
+    disabled ||= vm.scopeLocked;
     return (
-        <div className="seg" role="group" aria-label="Map scope" aria-disabled={disabled || undefined}
-            title={disabled ? 'Applies to the Architecture view' : undefined}>
+        <div className="seg" role="group" aria-label="Map scope" aria-disabled={disabled || undefined} title={title}>
             <button className="btn" id="arch-scope-repo" type="button" disabled={disabled} aria-pressed={vm.scope === 'repo'} onClick={() => vm.setScope('repo')}>
                 This repo
             </button>

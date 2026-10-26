@@ -88,7 +88,11 @@ export class ArchitectureViewModel {
     /** The scope actually shown: workspace only when another repo is linked. A workspace trace always shows the workspace. */
     get scope(): MapScope {
         if (!this.workspace?.linked) return 'repo';
-        return this.scopeChoice === 'workspace' || this.trace?.scope === 'workspace' ? 'workspace' : 'repo';
+        return this.scopeChoice === 'workspace' || this.scopeLocked ? 'workspace' : 'repo';
+    }
+    /** A workspace trace needs the workspace map, so the scope can't switch while one is open. */
+    get scopeLocked() {
+        return this.trace?.scope === 'workspace';
     }
     setScope(scope: MapScope) {
         if (this.scopeChoice === scope) return;

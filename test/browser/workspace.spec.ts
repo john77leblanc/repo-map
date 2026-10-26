@@ -126,6 +126,10 @@ test('a workspace trace follows the order into the linked API, in repo bands tha
     await expect(page.locator('.node[data-id="api:orders-route"]')).toHaveClass(/trn/);
     await expect(page.locator('.node[data-id="api:orders-route"] .stepn')).toHaveText('2');
     const steps = page.locator('ol.steps > li');
+    // the trace needs the workspace map, so the scope switch is locked to it
+    await expect(page.locator('#arch-scope-ws')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#arch-scope-repo')).toBeDisabled();
+    await expect(page.getByRole('group', { name: 'Map scope' })).toHaveAttribute('title', 'This trace spans linked repos');
     await expect(steps.nth(1)).toContainText('orders route (Shop API)');
     await expect(steps.nth(2)).toContainText('worker (from gone, not linked)');
     await expect(page.locator('#trace-unlinked')).toContainText('gone');
