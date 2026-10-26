@@ -364,8 +364,14 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .flow-change{margin:0 0 12px}.flow-change h4.new{color:var(--sync)}.flow-change h4.modified{color:var(--event)}.flow-change h4.removed{text-decoration:line-through}.flow-change p{margin:0}
 .trace-open{display:block;width:100%;padding:0;border:0;background:transparent;color:var(--ink);text-align:left;font:inherit;cursor:pointer}
 .trace-open:focus-visible{outline:2px solid var(--http);outline-offset:6px}
-.trace-card-title{display:block;font-family:var(--f-head);font-size:15px;font-weight:600;margin-bottom:6px}
-.trace-open .trace-prompt{display:block;margin:0}
+.trace-card-title{display:block;font-family:var(--f-head);font-size:15px;font-weight:600;margin-bottom:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trace-card-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+.trace-card-head .trace-card-title{flex:1;margin-bottom:0}
+.trace-badge{flex:none;font-size:11px;line-height:1;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--soft);color:var(--muted)}
+.trace-open .trace-prompt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;margin:0}
+.trace-plan-btn{width:100%;margin:-6px 0 18px}
+.trace-plan-btn.busy::before{content:"";display:inline-block;box-sizing:border-box;width:11px;height:11px;margin-right:7px;vertical-align:-1px;border:1.6px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rm-spin .8s linear infinite}
+@media (prefers-reduced-motion: reduce){.trace-plan-btn.busy::before{border-right-color:currentColor;animation:rm-pulse 1.4s ease-in-out infinite}}
 .side-bar #side-toggle{margin-left:auto}
 .key-title{font-size:12px;font-weight:500;margin:0 0 8px;color:var(--muted)}
 .flegend{position:static;padding:12px 24px;border-bottom:1px solid var(--line);background:var(--bg)}

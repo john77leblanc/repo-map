@@ -26,7 +26,7 @@ it('generates on demand, caches, and retains plan on failed regeneration', async
     expect(vm.busy).toBe(false);
     vm.dispose();
 });
-it('aborts on close, ignores late completion, and permits retry', async () => {
+it('keeps generating after close and reopening resumes the same request', async () => {
     const { repo, services } = fixture();
     const saveTrace = vi.fn(async () => {});
     let resolve!: (v: unknown) => void;
@@ -40,6 +40,31 @@ it('aborts on close, ignores late completion, and permits retry', async () => {
     const t = normalizeTrace({ ...raw, intent: 'proposal' }, repo.map);
     const pending = vm.open(t);
     vm.close();
+    expect(vm.isOpen).toBe(false);
+    expect(vm.isGenerating(t)).toBe(true);
+    await vm.open(t);
+    expect(vm.isOpen).toBe(true);
+    expect(services.api.stream).toHaveBeenCalledOnce();
+    resolve({ plan });
+    await pending;
+    expect(t.plan?.tasks[0].title).toBe('Validate');
+    expect(vm.isGenerating(t)).toBe(false);
+    vm.dispose();
+});
+it('aborts on stop, ignores late completion, and permits retry', async () => {
+    const { repo, services } = fixture();
+    const saveTrace = vi.fn(async () => {});
+    let resolve!: (v: unknown) => void;
+    vi.mocked(services.api.stream).mockImplementation(
+        () =>
+            new Promise((r) => {
+                resolve = r;
+            }) as never
+    );
+    const vm = new PlansViewModel({ repo, services, getPick: () => ({}), saveTrace });
+    const t = normalizeTrace({ ...raw, intent: 'proposal' }, repo.map);
+    const pending = vm.open(t);
+    vm.stop();
     resolve({ plan });
     await pending;
     expect(t.plan).toBeNull();
@@ -75,8 +100,9 @@ it('keeps the replacement plan generation active when a canceled request returns
     const oldRequest = vm.open(oldTrace);
     const oldSignal = vi.mocked(services.api.stream).mock.calls[0][2];
     vm.close();
-    expect(oldSignal.aborted).toBe(true);
+    expect(oldSignal.aborted).toBe(false);
     const newRequest = vm.open(newTrace);
+    expect(oldSignal.aborted).toBe(true);
     resolveOld({ plan });
     await oldRequest;
     expect(oldTrace.plan).toBeNull();

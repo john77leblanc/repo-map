@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep saved-trace cards compact: the title stays on one line and the prompt on three, cut off with "..." (hover for the full text). This applies to running trace jobs too. Proposal traces show a **Proposal** tag, or **Plan** once an implementation plan exists.
+
+- Move the implementation plan button to the top of a proposal trace's sidebar, under **Edit** / **Delete**, as a full-width primary button. It reads **Create implementation plan** or **View implementation plan**, depending on whether a plan exists. Closing the plan modal no longer cancels generation: the button shows a spinner and **Creating implementation plan…** until it finishes. **Stop** still cancels.
+
 - Open architecture card details in a panel on the right of the map instead of a centred overlay, matching the flowchart and sitemap. The selected card and its wires stay visible, there is no shade, and hovering a **From** / **To** connection highlights that card. Close with **Close** or Escape.
 
 - Give the main highlighted node in flowcharts and sitemaps a second accent ring outside its outline, separated by a small gap. Neighbours stay bright with a plain outline. Hovering a sidebar row (journey step, **From** / **To** connection) makes the node it names the main one, so it is easy to find; the selected node keeps its accent ring. Hovering a connector in the diagram highlights both ends equally.

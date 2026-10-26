@@ -17,6 +17,7 @@ export interface TraceDependencies {
     onClear(): void;
     onReveal(nodeId: string): void;
     onOpenPlan(trace: Trace): void;
+    isPlanBusy?(trace: Trace): boolean;
     onRequestFlow(trace: Trace): void | Promise<void>;
     sitemap?: SitemapViewModel;
 }
@@ -274,6 +275,9 @@ export class TraceViewModel {
     }
     openPlan(trace: Trace) {
         this.deps.onOpenPlan(trace);
+    }
+    get planBusy() {
+        return !!this.selected && !!this.deps.isPlanBusy?.(this.selected);
     }
     async openSavedOutput(item: Trace, output: Workspace) {
         if (this.editing) return;

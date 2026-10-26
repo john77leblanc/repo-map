@@ -52,7 +52,15 @@ export class PlansViewModel {
     get plan() {
         return this.trace?.plan;
     }
+    isGenerating(trace: Trace) {
+        return this.busy && this.trace === trace;
+    }
     async open(trace: Trace) {
+        // Reopening a plan that is still generating just shows it again.
+        if (this.isGenerating(trace)) {
+            this.isOpen = true;
+            return;
+        }
         this.stop();
         this.trace = trace;
         this.isOpen = true;
@@ -60,9 +68,9 @@ export class PlansViewModel {
         this.error = false;
         if (!trace.plan) await this.generatePlan();
     }
+    // Closing hides the modal; generation keeps running until Stop.
     close() {
         this.isOpen = false;
-        this.stop();
     }
     stop() {
         this.controller?.abort();

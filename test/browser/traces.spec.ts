@@ -70,9 +70,10 @@ test('proposal cards and cached plans are disposable and travel with a trace', a
     const proposal = { ...trace, intent: 'proposal', title: 'Coupons', proposal: { rationale: 'Validate coupon codes.', assumptions: [], questions: [], nodes: [{ id: 'proposal:coupons', title: 'Coupons', group: 'g-pages', kind: 'service', status: 'new', rationale: 'Validate coupons' }], edges: [{ from: 'checkout-page', to: 'proposal:coupons', type: 'sync', status: 'new' }] }, plan: { summary: 'Add coupons', tasks: [{ title: 'Validate', detail: 'Check expiry', files: ['new: coupons.mjs'] }], interfaces: [], tests: [], risks: [], questions: [] } };
     await page.route('**/api/traces', route => route.fulfill({ json: { traces: [proposal] } }));
     await page.goto('/');
+    await expect(page.locator('.trace-card .trace-badge')).toHaveText('Plan');
     await page.locator('.trace-open').click();
     await expect(page.locator('.node.change-new')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Implementation plan', exact: true }).click();
+    await page.getByRole('button', { name: 'View implementation plan', exact: true }).click();
     await expect(page.locator('#plan-dialog')).toBeVisible();
     await expect(page.locator('#plan-body')).toContainText('Check expiry');
     await page.keyboard.press('Escape');

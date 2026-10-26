@@ -189,8 +189,8 @@ const TraceJobCard = observer(function TraceJobCard({ vm, job }: TraceViewProps 
     return (
         <li className="ti trace-card trace-job" data-job-id={job.id}>
             <button className="trace-open" type="button" aria-busy={job.busy} onClick={() => void vm.openJob(job)}>
-                <span className="trace-card-title">{job.title || <span className="trace-title-skeleton">Preparing title...</span>}</span>
-                <span className="trace-prompt">{job.prompt}</span>
+                <span className="trace-card-title" title={job.title || undefined}>{job.title || <span className="trace-title-skeleton">Preparing title...</span>}</span>
+                <span className="trace-prompt" title={job.prompt}>{job.prompt}</span>
                 <span className={'status' + (job.busy ? ' busy' : '') + (job.error ? ' err' : '')}>
                     {job.state === 'running' ? 'Agent working' : job.state === 'saving' ? 'Saving trace...' : job.status}
                 </span>
@@ -226,8 +226,13 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
                                 )
                             }
                         >
-                            <span className="trace-card-title">{trace.title}</span>
-                            <span className="trace-prompt">
+                            <span className="trace-card-head">
+                                <span className="trace-card-title" title={trace.title}>{trace.title}</span>
+                                {trace.intent === 'proposal' && (
+                                    <span className="trace-badge">{trace.plan ? 'Plan' : 'Proposal'}</span>
+                                )}
+                            </span>
+                            <span className="trace-prompt" title={trace.prompt || undefined}>
                                 {trace.prompt || 'No prompt saved.'}
                             </span>
                             {trace === vm.temp && (
@@ -347,9 +352,6 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                                 </div>
                             )
                     )}
-                    <button className="btn" type="button" onClick={() => vm.openPlan(t)}>
-                        Implementation plan
-                    </button>
                 </section>
             )}
             {vm.workspace === 'architecture' && (
@@ -429,6 +431,15 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
             {vm.editing ? <TraceComposer vm={vm} inline /> : <>
                 <p id="trace-prompt">{vm.selected?.prompt || 'No prompt saved.'}</p>
                 {vm.selected && <TracePromptActions key={vm.selected._doc || vm.selected.title} vm={vm} trace={vm.selected} />}
+                {vm.selected?.intent === 'proposal' && (
+                    <button className={'btn primary trace-plan-btn' + (vm.planBusy ? ' busy' : '')} id="trace-plan" type="button"
+                        aria-busy={vm.planBusy}
+                        onClick={() => vm.selected && vm.openPlan(vm.selected)}>
+                        {vm.planBusy
+                            ? 'Creating implementation plan…'
+                            : vm.selected.plan ? 'View implementation plan' : 'Create implementation plan'}
+                    </button>
+                )}
             </>}
             <div hidden={!!vm.editing}>
             <hr />

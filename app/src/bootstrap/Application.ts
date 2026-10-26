@@ -63,6 +63,7 @@ export class Application {
             onOpenPlan: (trace) => {
                 void this.plans.open(trace);
             },
+            isPlanBusy: (trace) => this.plans.isGenerating(trace),
             onRequestFlow: (trace) => {
                 this.traces.select(trace, 'flowchart');
                 return this.flowchart.generate(this.traces.selected!);
