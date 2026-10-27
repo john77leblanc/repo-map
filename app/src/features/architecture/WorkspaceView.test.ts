@@ -56,6 +56,29 @@ describe('workspace view', () => {
         expect(vm.scope).toBe('repo');
         expect(vm.map.nodes).toHaveLength(2);
     });
+
+    it('treats a link turned off as not linked', () => {
+        const { vm, workspace, view } = workspaceFixture();
+        runInAction(() => {
+            workspace.view = { ...view, repos: [view.repos[0], { ...view.repos[1], off: true }] };
+        });
+        vm.setScope('workspace');
+        expect(workspace.linked).toBe(false);
+        expect(vm.scope).toBe('repo');
+        expect(workspace.activeRepos.map((r) => r.name)).toEqual(['home']);
+        expect(freshnessBadges(workspace.repos[1])).toEqual([expect.objectContaining({ text: 'off' })]);
+    });
+
+    it('setOff saves the choice and takes the server view', async () => {
+        const { workspace, view, services } = workspaceFixture();
+        const offView = { ...view, repos: [view.repos[0], { ...view.repos[1], off: true }] };
+        const request = vi.fn(async () => offView);
+        services.api.request = request as typeof services.api.request;
+        expect(await workspace.setOff('api', true)).toBe(true);
+        expect(request).toHaveBeenCalledWith('/api/workspace/off', { method: 'PUT', body: JSON.stringify({ name: 'api', off: true }) });
+        expect(workspace.repos[1].off).toBe(true);
+        expect(workspace.saving).toBe(false);
+    });
     it('collapses a repo, remembers it, and expands it to open one of its cards', () => {
         const { vm, make, stored } = workspaceFixture();
         vm.setScope('workspace');

@@ -94,6 +94,30 @@ test('settings list linked repos and refuse a bad link name', async ({ page }) =
     await expect(section.locator('[data-link]')).toHaveCount(1);
 });
 
+test('a linked repo can be left out of the workspace from Settings', async ({ page }) => {
+    // the e2e server is shared by parallel tests, so answer the toggle here instead of changing it
+    let sent: unknown;
+    const view = await (await page.request.get('/api/workspace', { headers: { 'x-map': '1' } })).json();
+    await page.route('**/api/workspace/off', async (route) => {
+        sent = route.request().postDataJSON();
+        view.repos = view.repos.map((r: { name: string }) => (r.name === 'api' ? { name: 'api', title: 'api', source: 'dir', readable: false, dir: '../shop-api', off: true } : r));
+        await route.fulfill({ json: view });
+    });
+    await page.goto('/');
+    await expect(page.locator('#arch-scope-ws')).toBeVisible();
+    await page.locator('#tab-map').click();
+    const section = page.locator('#linked-repos');
+    await section.locator('summary').click();
+    const toggle = section.locator('[data-link-on="api"]');
+    await expect(toggle).toBeChecked();
+    await toggle.click(); // checked state follows the server's answer
+    await expect(toggle).not.toBeChecked();
+    await expect(section.locator('[data-link="api"]')).toHaveClass(/off/);
+    await expect(section.locator('[data-link="api"] .fresh')).toHaveText('off');
+    expect(sent).toEqual({ name: 'api', off: true });
+    await expect(page.locator('#arch-scope-ws')).toHaveCount(0);
+});
+
 const crossTrace = {
     key: 'workspace-trace-1234', title: 'Placing an order', prompt: 'How is an order placed?', intent: 'description', summary: 'Checkout posts the order to the API.',
     gaps: '', scope: 'workspace', repos: ['home', 'api', 'gone'],

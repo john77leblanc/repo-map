@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, loadMap } from '../lib/config.mjs';
 import { proposedSeams } from '../lib/seams.mjs';
 import { startServer } from '../lib/server.mjs';
-import { checkSnapshot, exportSnapshot, importSnapshot, loadWorkspace, publicRemote, readWorkspaceLines, remoteStatus, workspaceView } from '../lib/workspace.mjs';
+import { checkSnapshot, exportSnapshot, fetchRepo, importSnapshot, loadWorkspace, readableLinks, saveOff, publicRemote, readWorkspaceLines, remoteStatus, workspaceView } from '../lib/workspace.mjs';
 import { collapseRepos, mergeMaps, normalizeWorkspace, repoOf } from '../lib/workspace-map.mjs';
 
 const EXAMPLES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'examples');
@@ -107,6 +107,35 @@ test('a broken link reports why instead of failing the workspace', async (t) => 
     assert.match(view.repos[1].error, /No \.repo-map\/config\.json/);
     assert.match(view.repos[2].error, /points at this repo/);
     assert.equal(view.map.repos.length, 1);
+});
+
+test('a link turned off stays in workspace.json but is left out of the map, reads and AI context', async (t) => {
+    const { shop } = copyExamples(t);
+    const localFile = path.join(shop, '.repo-map', 'local.json');
+    writeFileSync(localFile, JSON.stringify({ provider: 'none' }));
+    writeFileSync(path.join(shop, '.repo-map', 'workspace.json'), JSON.stringify({
+        links: [{ name: 'api', dir: '../shop-api' }],
+        seams: [{ from: 'payments-client', to: 'api:orders-route', type: 'http', via: 'ai', why: 'kept' }],
+    }));
+    await saveOff(shop, { name: 'api', off: true });
+    const local = JSON.parse(readFileSync(localFile, 'utf8'));
+    assert.deepEqual(local, { provider: 'none', workspace: { off: ['api'] } }, 'other local settings kept');
+    assert.equal((await loadConfig(shop)).ai.workspace, undefined, 'not read as an AI setting');
+
+    const view = await workspaceView(shop);
+    assert.deepEqual(view.repos[1], { name: 'api', title: 'api', source: 'dir', readable: false, dir: '../shop-api', off: true });
+    assert.deepEqual(view.map.repos.map((r) => r.name), ['home']);
+    assert.equal(view.workspace.seams.length, 1, 'seams kept');
+    assert.equal(view.map.seams.length, 0);
+    assert.deepEqual(await readableLinks(shop), []);
+    await assert.rejects(readWorkspaceLines(shop, await loadConfig(shop), 'api:src/routes/orders.js'), (err) => err.status === 404 || err.status === 400);
+    await assert.rejects(fetchRepo(shop, 'api'), (err) => err.status === 409);
+
+    await saveOff(shop, { name: 'api', off: false });
+    assert.deepEqual(JSON.parse(readFileSync(localFile, 'utf8')), { provider: 'none' });
+    const back = await workspaceView(shop);
+    assert.equal(back.repos[1].title, 'Shop API');
+    assert.ok(back.map.seams.some((s) => s.via === 'ai' && s.why === 'kept'), 'saved seam comes back');
 });
 
 test('linked files are readable through a name prefix, with the same exclusions', async (t) => {
@@ -226,6 +255,21 @@ test('workspace API: view, edit, read linked files and find seams with an AI too
     assert.ok(after.map.edges.some((e) => e.seam === 'ai' && e.from === 'payments-client'));
     assert.equal((await fetch(`${base}/api/workspace`, { method: 'PUT', headers: H, body: '{"links":"x"}' })).status, 400);
     assert.equal((await fetch(`${base}/api/workspace/fetch`, { method: 'POST', headers: H, body: '{"name":"nope"}' })).status, 404);
+
+    // off for this person only: workspace.json is untouched
+    const wsFile = path.join(shop, '.repo-map', 'workspace.json');
+    const wsBefore = readFileSync(wsFile, 'utf8');
+    const putOff = (body) => fetch(`${base}/api/workspace/off`, { method: 'PUT', headers: H, body: JSON.stringify(body) });
+    assert.equal((await putOff({ name: 'nope', off: true })).status, 404);
+    assert.equal((await putOff({ name: 'api', off: 'yes' })).status, 400);
+    const off = await (await putOff({ name: 'api', off: true })).json();
+    assert.equal(off.repos[1].off, true);
+    assert.equal(off.map.repos.length, 1);
+    assert.equal(readFileSync(wsFile, 'utf8'), wsBefore);
+    assert.ok([400, 404].includes((await fetch(`${base}/api/file?path=${encodeURIComponent('api:src/routes/orders.js')}`, { headers: H })).status));
+    // removing the link forgets it was off
+    await fetch(`${base}/api/workspace`, { method: 'PUT', headers: H, body: '{"links":[]}' });
+    assert.equal(JSON.parse(readFileSync(path.join(shop, '.repo-map', 'local.json'), 'utf8')).workspace, undefined);
 });
 
 test('workspace trace: merged map in the prompt, linked repos readable, prefixed refs checked', async (t) => {

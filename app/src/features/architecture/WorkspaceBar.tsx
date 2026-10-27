@@ -30,7 +30,7 @@ export const WorkspaceBar = observer(function WorkspaceBar({ vm }: { vm: Archite
         <section className="ws-bar" id="workspace-bar" aria-label="Workspace">
             <div className="ws-row">
                 <ul className="ws-repos">
-                    {ws.repos.map((r) => (
+                    {ws.activeRepos.map((r) => (
                         <li key={r.name} data-repo={r.name}>
                             <b>{r.title}</b>
                             {freshnessBadges(r).map((b) => (

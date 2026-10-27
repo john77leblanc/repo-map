@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Settings → Linked repos** has an **Include** checkbox per link. Unticked, the repo is left out of the workspace for you only: its cards, seams, `<name>:` file reads, Find seams and workspace-trace context, and Refresh. The link stays in `workspace.json` for the team, and stored seams return when it is turned back on. Saved in `.repo-map/local.json` `workspace.off` via `PUT /api/workspace/off`; removing a link clears its entry. With every link off, the map hides **This repo / Workspace**.
+
 ## 0.16.0
 
 - Architecture card details are reorganized. The title row with **Close** stays pinned while the panel scrolls. The trace step comes first and shows one visit at a time ("Trace step 2 of 5"), with **‹ Prev | Next ›** to walk the whole trace card by card; clicking a card visited more than once opens its next visit. The rest sits in one box of collapsible rows styled like the sitemap journey: **About** (open: description, facts, contracts, path), **Related documents** with a count (collapsed, hidden when empty) and **Connections** with a count (collapsed: links to other repos, then From / To). Open rows stay open as you move between cards.

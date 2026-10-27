@@ -152,6 +152,7 @@ The keys of `kinds` and `edgeTypes` are fixed; their labels are yours. A backend
 ```
 
 - **links**: `name` (2-31 lowercase letters, digits or dashes) prefixes the linked repo's ids: `api:orders-route`. A `dir` link is another checkout with its own `.repo-map/`, read live, relative to this repo. A `snapshot` link is a map copied in with **Settings → Linked repos → Import snapshot** from a file made by `repo-map export` in that repo; it has no code access.
+- **Turning a link off** (untick **Include** in **Settings → Linked repos**) leaves that repo out of the workspace for you only: no cards, seams, file reads, AI context or Refresh. It stays in `workspace.json`, and its stored seams come back when you turn it on. The choice is saved in `.repo-map/local.json` as `"workspace": { "off": ["api"] }` (git-ignored); removing a link clears it.
 - **seams** are connections between repos. Most are found for free by matching one card's `consumes` against another repo's `provides` (these are never stored). **Find seams** asks the map's AI tool for the rest: it can read files in linked folders, and must cite code for each connection. You accept or dismiss each one; accepted seams are stored here with `"via": "ai"`.
 - When a seam explains a placeholder card (an `external` card such as "Orders API" calling into the linked repo, or "Storefront" calling it), the placeholder is replaced by the real card.
 

@@ -359,7 +359,7 @@ The sidebar's **Settings** button opens a dedicated panel for map maintenance an
 - **Agents**:
   - **Map agent**: the tool, model and effort that draw and update the map, link its docs and find seams between linked repos, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
   - **Trace agent**: the tool, model and effort used for process architecture and flowcharts. Remembered in your browser for this repo and used for new traces and flowchart redraws. **Use in every repo** also saves it as your default trace tool (`~/.config/repo-map/ai.json`).
-- **Linked repos**: other repos shown beside this one in the workspace view: link a folder, import a snapshot, or remove a link.
+- **Linked repos**: other repos shown beside this one in the workspace view: link a folder, import a snapshot, or remove a link. Untick **Include** to leave a linked repo out of your workspace without removing it for the team (saved in `.repo-map/local.json`).
 
 ### Creating and exploring traces
 

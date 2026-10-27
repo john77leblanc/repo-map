@@ -80,6 +80,8 @@ export interface WorkspaceRepo {
     dir?: string;
     snapshot?: { file: string; remote?: string; commit?: string; exportedAt?: string };
     error?: string;
+    /** Turned off by this person: kept in workspace.json, left out of the workspace. */
+    off?: boolean;
     freshness?: Partial<CheckoutFreshness> & Partial<SnapshotFreshness>;
 }
 export interface WorkspaceView {

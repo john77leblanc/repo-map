@@ -16,12 +16,18 @@ export const LinkedRepos = observer(function LinkedRepos({ model }: { model: Wor
             <p className="hint">
                 Maps of other repos to show beside this one, joined where one calls another. Saved for the team in{' '}
                 <code>.repo-map/workspace.json</code>. A folder is read live; a snapshot (from <code>repo-map export</code>) is a copy of
-                a map whose code isn’t on this machine.
+                a map whose code isn’t on this machine. Untick <b>Include</b> to leave a repo out of the workspace for you only;
+                it stays linked for everyone else.
             </p>
             {linked.length ? (
                 <ul className="link-list">
                     {linked.map((r) => (
-                        <li key={r.name} data-link={r.name}>
+                        <li key={r.name} data-link={r.name} className={r.off ? 'off' : undefined}>
+                            <label className="link-on" title="Show this repo in the workspace. Only affects you.">
+                                <input type="checkbox" data-link-on={r.name} checked={!r.off} disabled={model.saving}
+                                    onChange={(e) => void model.setOff(r.name, !e.target.checked)} />
+                                Include
+                            </label>
                             <b>{r.title}</b> <code>{r.name}</code>{' '}
                             <span className="hint">{r.source === 'dir' ? r.dir : 'snapshot'}</span>{' '}
                             {freshnessBadges(r).map((b) => (

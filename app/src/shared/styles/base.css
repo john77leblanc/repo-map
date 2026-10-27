@@ -560,6 +560,8 @@ dialog.modal>.fhead{flex:none}
 .link-list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
 .link-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .link-list li .btn{margin-left:auto}
+.link-list li.off>b,.link-list li.off>code,.link-list li.off>.hint{opacity:.55}
+.link-on{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
 .link-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin:6px 0}
 .link-form label{display:grid;gap:2px;font-size:12px;color:var(--muted)}
 .file-btn{position:relative;overflow:hidden;display:inline-block}

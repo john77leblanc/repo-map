@@ -14,6 +14,7 @@ export interface Badge {
 
 /** Short freshness badges for one repo: current, map stale, behind main N, snapshot old. */
 export function freshnessBadges(repo: WorkspaceRepo): Badge[] {
+    if (repo.off) return [{ text: 'off', tone: 'muted', title: 'Left out of the workspace, for you only.' }];
     if (repo.error) return [{ text: 'unavailable', tone: 'warn', title: repo.error }];
     const f = repo.freshness || {};
     if (f.snapshot) {
@@ -58,9 +59,13 @@ export class WorkspaceModel {
     get repos(): WorkspaceRepo[] {
         return this.view?.repos || [];
     }
-    /** Is at least one other repo linked and readable? */
+    /** Repos in the workspace: home plus links that are on. */
+    get activeRepos(): WorkspaceRepo[] {
+        return this.repos.filter((r) => !r.off);
+    }
+    /** Is at least one other repo linked, on and readable? */
     get linked() {
-        return this.repos.some((r) => r.name !== 'home' && !r.error);
+        return this.activeRepos.some((r) => r.name !== 'home' && !r.error);
     }
     get titles(): Record<string, string> {
         return Object.fromEntries(this.repos.map((r) => [r.name, r.title]));
@@ -106,6 +111,27 @@ export class WorkspaceModel {
     addLink(name: string, dir: string) {
         const links = this.workspace.links.filter((l) => l.name !== name);
         return this.save({ links: [...links, { name: name.trim(), dir: dir.trim() }] });
+    }
+    /** Leave a linked repo out of the workspace (or bring it back), for this person only. Its seams are kept. */
+    async setOff(name: string, off: boolean) {
+        this.saving = true;
+        try {
+            const view = await this.services.api.request<WorkspaceView>('/api/workspace/off', { method: 'PUT', body: JSON.stringify({ name, off }) });
+            runInAction(() => {
+                this.view = view;
+                this.error = '';
+            });
+            return true;
+        } catch (e) {
+            runInAction(() => {
+                this.error = message(e);
+            });
+            return false;
+        } finally {
+            runInAction(() => {
+                this.saving = false;
+            });
+        }
     }
     /** Unlink a repo, with the seams that pointed into it. */
     removeLink(name: string) {
