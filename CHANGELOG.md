@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.0
 
 - Settings has three collapsible sections, collapsed when it opens: **Map** (repository details, freshness and map jobs), **Agents** (Map agent and Trace agent together) and **Linked repos**. Settings opens on **Map** when the map needs attention, and **Generate** on a missing map architecture opens it there too (`shared/ui/SettingsSection.tsx`, `shell.openSettings(section)`). **Trace agent** gains **Use in every repo**, which saves the pick as your default trace tool in `~/.config/repo-map/ai.json`.
 - Map search moves to the side panel. The architecture toolbar ends with a right-aligned **Search** button (also `/` or Ctrl/Cmd+K). Results list every matching card by column, then group, with the repo tag in the workspace view and a snippet when only the description matched; an empty query lists every card. Arrow keys and Enter pick a result, as does a click; the card's details replace the results, and **← Results** (or Escape) goes back. Close ends the search and clears the highlight.
