@@ -77,6 +77,8 @@ export class ArchitectureViewModel {
     scopeChoice: MapScope = 'repo';
     /** `repo:<name>` ids folded into one card each (workspace view). */
     collapsedRepos: string[] = [];
+    /** With a trace open, draw only its cards and path (remembered per browser). */
+    traceOnly = true;
     constructor(readonly deps: ArchitectureDependencies) {
         makeAutoObservable(this, { deps: false, trace: observableRef }, { autoBind: true });
         this.groups = deps.services.storage.get<Record<string, boolean>>(
@@ -87,6 +89,52 @@ export class ArchitectureViewModel {
         this.scopeChoice = storage.get<MapScope>(deps.repo.namespace + 'map-scope', 'repo') === 'workspace' ? 'workspace' : 'repo';
         const folded = storage.get<unknown>(deps.repo.namespace + 'repo-collapse', []);
         this.collapsedRepos = Array.isArray(folded) ? folded.filter((x): x is string => typeof x === 'string') : [];
+        this.traceOnly = storage.get<boolean>(deps.repo.namespace + 'trace-only', true) !== false;
+    }
+    setTraceOnly(on: boolean) {
+        this.traceOnly = on;
+        this.deps.services.storage.set(this.repo.namespace + 'trace-only', on);
+    }
+    /** Card id drawn for a map id: itself, or the folded repo card holding it. */
+    get aliases() {
+        return new Map(this.map.nodes.flatMap((n) => (n.members || []).map((m) => [m, n.id] as const)));
+    }
+    private drawn(id: string) {
+        return this.aliases.get(id) ?? id;
+    }
+    /** Cards the trace touches: its steps and the proposal's cards and wire ends. */
+    get traceIds(): Set<string> {
+        const t = this.trace;
+        if (!t) return new Set();
+        const ids = [
+            ...t.steps.map((s) => s.id),
+            ...(t.proposal?.nodes || []).map((n) => n.id),
+            ...(t.proposal?.edges || []).flatMap((e) => [e.from, e.to]),
+        ].map(this.drawn);
+        return new Set(ids.filter((id) => this.nodes.has(id)));
+    }
+    /** The trace-only filter is in effect (a trace with cards on this map). */
+    get filtering() {
+        return this.traceOnly && this.traceIds.size > 0;
+    }
+    /** The map as drawn: with the filter, only traced cards (plus an opened card), their groups and the trace's path. */
+    get shown(): RepoMap {
+        const map = this.map;
+        if (!this.filtering) return map;
+        const keep = new Set(this.traceIds);
+        if (this.selected) keep.add(this.selected);
+        const nodes = map.nodes.filter((n) => keep.has(n.id));
+        const groups = new Set(nodes.map((n) => n.group));
+        return {
+            ...map,
+            nodes,
+            groups: map.groups.filter((g) => groups.has(g.id)),
+            edges: map.edges.filter((e) => this.pairs.has(e.from + '|' + e.to)),
+        };
+    }
+    /** Columns drawn: all of them, or only those holding a shown group while filtering. */
+    colShown(col: number) {
+        return !this.filtering || this.shown.groups.some((g) => g.col === col);
     }
     get workspace() {
         return this.deps.workspace;
@@ -207,21 +255,16 @@ export class ArchitectureViewModel {
             : null;
     }
     get pairs() {
+        const pair = (from: string, to: string) => this.drawn(from) + '|' + this.drawn(to);
         return new Set([
-            ...(this.trace?.edges || []).map((e) => e.join('|')),
-            ...(this.trace?.proposal?.edges || []).map((e) => e.from + '|' + e.to),
+            ...(this.trace?.edges || []).map((e) => pair(e[0], e[1])),
+            ...(this.trace?.proposal?.edges || []).map((e) => pair(e.from, e.to)),
         ]);
     }
     get relevant(): Set<string> | null {
         const active = this.active;
-        if (active) return neighborhood(this.map.edges.filter((e) => !this.hidden[e.type]), active).nodes;
-        return this.trace
-            ? new Set([
-                  ...this.trace.steps.map((s) => s.id),
-                  ...(this.trace.proposal?.nodes || []).map((n) => n.id),
-                  ...(this.trace.proposal?.edges || []).flatMap((e) => [e.from, e.to]),
-              ])
-            : null;
+        if (active) return neighborhood(this.shown.edges.filter((e) => !this.hidden[e.type]), active).nodes;
+        return this.trace ? this.traceIds : null;
     }
     isOpen(id: string) {
         return this.groups[id] ?? !!this.map.groups.find((g) => g.id === id)?.open;
@@ -377,7 +420,7 @@ export class ArchitectureViewModel {
             this.snapshot = null;
         }
         if (trace) {
-            const ids = new Set(trace.steps.map((s) => s.id));
+            const ids = this.traceIds;
             this.groups = Object.fromEntries(
                 this.map.groups.map((g) => [
                     g.id,

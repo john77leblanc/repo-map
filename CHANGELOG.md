@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Trace only** on the architecture view. With a trace open, **Show** → **Trace only** (default) hides every card, group and column the trace doesn't touch and draws only the trace's own path; **Whole map** brings back the full, dimmed map. Opening a hidden card (from search or connections) shows it beside the trace until it is closed. The choice is remembered per browser. Traced cards inside a folded linked repo now count as its repo card.
+
 - **Closer look** at a flowchart box: **Look closer** in the step panel asks the trace AI tool for an explanation and 2-12 smaller steps inside that box, with code references (`POST /api/flow/expand`, `expandPrompt`, `RESPONSE_SCHEMAS.expand`). It is shown in the panel with a mini drawing; **Show in chart** draws the steps in place, with arrows rewired to the matching entry and exit steps (`lib/flow-expand.mjs`). These steps are tinted purple inside a dashed, titled frame; boxes with a closer look that isn't drawn get a **+** badge; the diagram key explains both. One level only. Saved on the trace as `expansions` (and in trace codes); which ones are drawn is remembered per trace in the browser. Included in Mermaid (a subgraph per closer look) and SVG exports; dropped on **Redraw**.
 
 - **Settings → Linked repos** has an **Include** checkbox per link. Unticked, the repo is left out of the workspace for you only: its cards, seams, `<name>:` file reads, Find seams and workspace-trace context, and Refresh. The link stays in `workspace.json` for the team, and stored seams return when it is turned back on. Saved in `.repo-map/local.json` `workspace.off` via `PUT /api/workspace/off`; removing a link clears its entry. With every link off, the map hides **This repo / Workspace**.

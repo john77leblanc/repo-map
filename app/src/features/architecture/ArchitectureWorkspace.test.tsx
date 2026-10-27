@@ -62,6 +62,7 @@ describe('ArchitectureWorkspace', () => {
     it('restores trace highlighting after hover exits', () => {
         const { vm, trace } = fixture();
         vm.setTrace(trace);
+        vm.setTraceOnly(false);
         const { container } = render(<ArchitectureWorkspace vm={vm} />);
         const header = container.querySelector('summary')!;
         fireEvent.mouseOver(header);
@@ -70,6 +71,15 @@ describe('ArchitectureWorkspace', () => {
         expect(vm.hover).toBe(null);
         expect(vm.active).toBe(null);
         expect([...vm.relevant!]).toEqual(['two']);
+    });
+    it('hides cards outside the trace until Show is set to Whole map', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace(trace);
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
+        expect(container.querySelector('.node[data-id="one"]')).toBe(null);
+        expect(container.querySelector('.node[data-id="two"]')).not.toBe(null);
+        fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'all' } });
+        expect(container.querySelector('.node[data-id="one"]')).not.toBe(null);
     });
     it('opens a side panel only on selection and navigates connections', () => {
         const { vm } = fixture();

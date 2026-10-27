@@ -16,7 +16,7 @@ export function useArchitectureWires(
         height: 0,
         wires: [],
     });
-    const signature = JSON.stringify([vm.map, vm.groups, vm.hidden, vm.keyOpen]);
+    const signature = JSON.stringify([vm.shown, vm.groups, vm.hidden, vm.keyOpen]);
     useLayoutEffect(() => {
         const root = board.current;
         if (!root) return;
@@ -43,7 +43,7 @@ export function useArchitectureWires(
                 if (!keys.has(el)) keys.set(el, keys.size);
                 return keys.get(el);
             };
-            for (const e of vm.map.edges) {
+            for (const e of vm.shown.edges) {
                 if (vm.hidden[e.type]) continue;
                 const a = anchor(e.from),
                     b = anchor(e.to);

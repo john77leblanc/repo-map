@@ -132,6 +132,33 @@ describe('ArchitectureViewModel', () => {
         vm.toggleGroups();
         expect(vm.allOpen).toBe(true);
     });
+    it('draws only the traced cards and path while Trace only is on, plus an opened card', () => {
+        const { vm, repo, trace, services } = fixture();
+        repo.map.groups.push({ id: 'c', col: 1, title: 'Gamma' });
+        repo.map.nodes.push({ id: 'three', title: 'Three', group: 'c', kind: 'service' });
+        repo.map.edges.push({ from: 'two', to: 'three', type: 'http' }, { from: 'two', to: 'one', type: 'event' });
+        expect(vm.filtering).toBe(false);
+        vm.setTrace({ ...trace, steps: [{ id: 'one', note: '' }, { id: 'two', note: '' }] });
+        expect(vm.filtering).toBe(true);
+        expect(vm.shown.nodes.map((n) => n.id)).toEqual(['one', 'two']);
+        expect(vm.shown.groups.map((g) => g.id)).toEqual(['a', 'b']);
+        // path only: two -> one is a map edge between traced cards but not on the trace's path
+        expect(vm.shown.edges).toEqual([{ from: 'one', to: 'two', type: 'http' }]);
+        expect([vm.colShown(0), vm.colShown(1)]).toEqual([true, false]);
+        // opening a hidden card adds it until it closes; the filter stays on
+        vm.inspect('three');
+        expect(vm.shown.nodes.map((n) => n.id)).toEqual(['one', 'two', 'three']);
+        expect(vm.colShown(1)).toBe(true);
+        expect(vm.traceOnly).toBe(true);
+        vm.dismiss();
+        expect(vm.shown.nodes).toHaveLength(2);
+        vm.setTraceOnly(false);
+        expect(vm.shown).toBe(vm.map);
+        expect(services.storage.set).toHaveBeenCalledWith(repo.namespace + 'trace-only', false);
+        vm.setTraceOnly(true);
+        vm.setTrace(null);
+        expect(vm.shown).toBe(vm.map);
+    });
     it('ignores navigation and trace updates after disposal', () => {
         const { vm, trace } = fixture();
         vm.dispose();

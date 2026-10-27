@@ -109,6 +109,20 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             </svg>
                             {vm.allOpen ? 'Collapse all' : 'Expand all'}
                         </button>
+                        {vm.trace && (
+                            <label className="arch-show">
+                                Show{' '}
+                                <select
+                                    id="arch-trace-only"
+                                    aria-label="Show"
+                                    value={vm.traceOnly ? 'trace' : 'all'}
+                                    onChange={(e) => vm.setTraceOnly(e.target.value === 'trace')}
+                                >
+                                    <option value="trace">Trace only</option>
+                                    <option value="all">Whole map</option>
+                                </select>
+                            </label>
+                        )}
                         <KeyToggle id="architecture-key-toggle" controls="architecture-key" open={vm.keyOpen} onToggle={vm.toggleKey} />
                         <button
                             className="btn search-toggle"
@@ -224,13 +238,13 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             {geometry.wires.map((w, i) => wire(w, i))}
                         </svg>
                         <div className="cols" id="cols" onMouseLeave={() => vm.setHover(null)}>
-                            {vm.repo.bootstrap?.config.columns.map((c, ci) => (
+                            {vm.repo.bootstrap?.config.columns.map((c, ci) => vm.colShown(ci) && (
                                 <div className="col" key={ci}>
                                     <div className="colh">
                                         {c.title}
                                         <small>{c.subtitle}</small>
                                     </div>
-                                    {vm.map.groups
+                                    {vm.shown.groups
                                         .filter((g) => g.col === ci)
                                         .map((g) => (
                                             <details
@@ -238,14 +252,14 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                 className={
                                                     'grp' +
                                                     (vm.groupDim(g.id) ? ' dimg' : '') +
-                                                    (vm.map.nodes.some(
+                                                    (vm.shown.nodes.some(
                                                         (n) =>
                                                             n.group === g.id && vm.step(n.id) >= 0
                                                     )
                                                         ? ' trg'
                                                         : '') +
                                                     (!vm.isOpen(g.id) &&
-                                                    vm.map.nodes.some(
+                                                    vm.shown.nodes.some(
                                                         (n) =>
                                                             n.group === g.id &&
                                                             vm.relevant?.has(n.id) &&
@@ -273,7 +287,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                     <span>{g.title}</span>
                                                     <span className="gc">
                                                         {
-                                                            vm.map.nodes.filter(
+                                                            vm.shown.nodes.filter(
                                                                 (n) => n.group === g.id
                                                             ).length
                                                         }
@@ -281,7 +295,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                 </summary>
                                                 <div className="gl">
                                                     {g.note && <p className="gnote">{g.note}</p>}
-                                                    {vm.map.nodes
+                                                    {vm.shown.nodes
                                                         .filter((n) => n.group === g.id)
                                                         .map((n) => (
                                                             <div

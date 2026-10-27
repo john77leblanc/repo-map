@@ -570,6 +570,7 @@ dialog.modal>.fhead{flex:none}
 .file-btn:focus-within{outline:2px solid var(--http);outline-offset:1px}
 .seams .cl{flex-wrap:wrap}
 #architecture-workspace .canvas-controls,#architecture-workspace .canvas-controls>.controls{flex:1}
+.arch-show{display:inline-flex;align-items:center;gap:6px;font-size:13px}.arch-show select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:4px}
 .search-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:6px}.search-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none}.search-toggle[aria-expanded="true"]{background:var(--soft);border-color:var(--http)}
 .arch-search-side{display:flex;flex-direction:column;overflow:hidden}
 .arch-search{display:block;margin:6px 0 10px;flex:none}.arch-search input{width:100%;box-sizing:border-box}

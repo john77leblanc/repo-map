@@ -311,3 +311,23 @@ test('trace step in card details walks the trace with Prev and Next', async ({ p
     await expect(panel.locator('.arch-step')).toContainText('Checks out.');
     await expect(panel.getByRole('button', { name: 'Next trace step' })).toBeDisabled();
 });
+
+test('a trace shows only its cards by default; Whole map brings the rest back', async ({ page }) => {
+    await page.route('**/api/traces', route => route.fulfill({ json: { traces: [proposalTrace] } }));
+    await openMap(page);
+    await expect(page.locator('.node[data-id="shopper"]')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Add product page under src\/pages/ }).click();
+    await expect(page.locator('.node[data-id="cart-page"] .nh')).toBeVisible();
+    await expect(page.locator('.node[data-id="cart-store"] .nh')).toBeVisible();
+    await expect(page.locator('.node[data-id="shopper"]')).toHaveCount(0);
+    // a card opened from search joins the trace's cards until it's closed
+    await page.locator('#arch-search-toggle').click();
+    await page.locator('#q').fill('shopper');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.node[data-id="shopper"] .nh')).toBeVisible();
+    await expect(page.locator('#arch-trace-only')).toHaveValue('trace');
+    await page.locator('#arch-details [data-close]').click();
+    await expect(page.locator('.node[data-id="shopper"]')).toHaveCount(0);
+    await page.getByLabel('Show').selectOption('all');
+    await expect(page.locator('.node[data-id="shopper"]')).toHaveCount(1);
+});
