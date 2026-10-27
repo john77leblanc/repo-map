@@ -230,7 +230,24 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 900, height: 700 
     });
 }
 
+/** A proposal with labelled new wires, so the test doesn't depend on saved (git-ignored) traces. */
+const proposalTrace = {
+    key: 'proposal-product-page', intent: 'proposal', title: 'Add product page under src/pages',
+    prompt: 'Where would a product page go?', summary: 'A product page between the cart and checkout.',
+    steps: [{ id: 'cart-page', note: 'Links to a product.' }, { id: 'checkout-page', note: 'Checks out.' }],
+    edges: [['cart-page', 'checkout-page']], refs: [], outputs: { architecture: true, flowchart: false },
+    proposal: {
+        rationale: 'Shoppers need a page per product.', assumptions: [], questions: [],
+        nodes: [{ id: 'proposal:product-page', title: 'Product page', group: 'g-pages', kind: 'service', status: 'new', rationale: 'Shows one product.' }],
+        edges: [
+            { from: 'cart-page', to: 'proposal:product-page', type: 'sync', status: 'new', label: 'opens a product' },
+            { from: 'proposal:product-page', to: 'cart-store', type: 'sync', status: 'new', label: 'adds to cart' },
+        ],
+    },
+};
+
 test('proposal labels target unique base wire IDs while focus overlays have no IDs', async ({ page }) => {
+    await page.route('**/api/traces', route => route.fulfill({ json: { traces: [proposalTrace] } }));
     await openMap(page);
     await page.getByRole('button', { name: /^Add product page under src\/pages/ }).click();
     const proposed = page.locator('.node[data-id="proposal:product-page"] .nh');
