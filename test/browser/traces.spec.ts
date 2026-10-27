@@ -45,6 +45,7 @@ test('saved trace switches outputs, selects flow details, exports and restores t
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
     expect(Number(await page.locator('#fl-svgbox svg').getAttribute('width'))).toBeLessThan(Number(initial));
     const download = page.waitForEvent('download');
+    await page.locator('#fl-export').click();
     await page.getByRole('button', { name: 'Download SVG' }).click();
     expect((await download).suggestedFilename()).toContain('.svg');
     await page.getByRole('button', { name: 'Back to all traces' }).click();

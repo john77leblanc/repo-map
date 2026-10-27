@@ -27,32 +27,31 @@ const FLOW_KIND: Record<string, string> = {
     collapsed: 'Collapsed group',
 };
 
-/** Folding controls: select mode, AI-suggested chunks, and Expand all. The selection itself is in the side panel. */
-const FlowCollapseBar = observer(function FlowCollapseBar({ vm }: { vm: FlowchartViewModel }) {
-    const chunks = vm.openChunks;
+/** Folding controls for the toolbar: select mode and Expand all. The selection itself is in the side panel. */
+const FlowCollapseControls = observer(function FlowCollapseControls({ vm }: { vm: FlowchartViewModel }) {
     return (
-        <div className="flow-select-bar" id="fl-collapse" aria-label="Collapse steps">
-            <span className="hint">Shift-click steps, or use Select steps, to collapse them into one box.</span>
-            <button className="btn sm" id="fl-select-mode" type="button" aria-pressed={vm.selecting} onClick={vm.toggleSelecting}
-                title="While on, clicking a step adds it to the selection">
+        <>
+            <button className="btn" id="fl-select-mode" type="button" aria-pressed={vm.selecting} onClick={vm.toggleSelecting}
+                title="Pick steps to collapse into one box. Shift-click a step also adds it.">
                 Select steps
             </button>
-            {chunks.length > 0 && (
-                <button className="btn sm" id="fl-collapse-suggested" type="button" onClick={vm.collapseSuggested}
-                    title={chunks.map((c) => c.label).join(', ')}>
-                    Collapse suggested ({chunks.length})
-                </button>
-            )}
             {vm.collapsedCount > 0 && (
-                <button className="btn sm" id="fl-expand-all" type="button" onClick={vm.expandAll}>Expand all</button>
+                <button className="btn" id="fl-expand-all" type="button" onClick={vm.expandAll}>Expand all</button>
             )}
-        </div>
+        </>
     );
 });
 
 /** Side-panel body for a collapsed box: its name, hidden steps and Expand. */
 const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: { vm: FlowchartViewModel; id: string; label: string }) {
     const members = vm.members(id);
+    // The clicked button goes away with the box, so keyboard focus moves to the selected step once it is drawn.
+    const expand = (event: { currentTarget: HTMLElement }, step: string | null = null) => {
+        const main = event.currentTarget.closest('.fmain');
+        const selected = vm.expand(id, step);
+        if (selected) requestAnimationFrame(() =>
+            main?.querySelector<SVGElement>(`.fn[data-id="${CSS.escape(selected)}"]`)?.focus());
+    };
     return (
         <>
             {vm.canRename(id) ? (
@@ -64,11 +63,11 @@ const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: {
                 {members.map((m) => (
                     <li key={m.id}>
                         <button className="btn sm" type="button" data-member={m.id}
-                            onClick={() => vm.expand(id, m.id)}>{m.label}</button>
+                            onClick={(event) => expand(event, m.id)}>{m.label}</button>
                     </li>
                 ))}
             </ol>
-            <button className="btn primary sm" id="fl-expand" type="button" onClick={() => vm.expand(id)}>Expand</button>
+            <button className="btn primary sm" id="fl-expand" type="button" onClick={(event) => expand(event)}>Expand</button>
         </>
     );
 });
@@ -271,6 +270,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                                 <option value="compact">Compact</option>
                             </select>
                         </label>}
+                        tools={hasFlow && <FlowCollapseControls vm={vm} />}
                         diagramKey={{ id: 'flowchart-key', open: vm.keyOpen, toggle: vm.toggleKey }}
                         status={vm.status} busy={vm.busy} error={vm.error} copied={vm.copied}
                         onZoom={vm.zoom} onFit={() => {
@@ -283,7 +283,6 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             run: () => { if (vm.trace) void vm.generate(vm.trace); } }}
                     />
                     <FlowchartLegend open={vm.keyOpen} proposal={vm.trace.intent === 'proposal'} />
-                    {hasFlow && <FlowCollapseBar vm={vm} />}
                     {!hasFlow && (
                         <p id="flow-missing" className="hint">
                             The supporting walkthrough was kept. Draw the flowchart to complete this

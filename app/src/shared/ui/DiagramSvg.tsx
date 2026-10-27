@@ -35,18 +35,30 @@ interface DiagramViewModel {
     repoFoldable?(id: string): boolean;
 }
 
-/** The right-aligned fold icon button on lane and repo headings. */
-function FoldButton({ label, collapsed, onClick, data }: { label: string; collapsed: boolean; onClick: () => void; data: Record<string, string> }) {
+/** Lane heading geometry in screen pixels, independent of zoom. */
+const HEAD_PAD = 6;
+const REPO_ROW = 24;
+const LANE_ROW = 30;
+
+/**
+ * The right-aligned fold icon button on lane and repo headings. Lanes use vertical
+ * chevrons (steps fold into one box); repos use a dropdown chevron that turns when folded.
+ */
+function FoldButton({ label, collapsed, onClick, data, repo = false }: {
+    label: string; collapsed: boolean; onClick: () => void; data: Record<string, string>; repo?: boolean;
+}) {
     return (
-        <button className="btn sm lane-fold" type="button" {...data}
+        <button className={'btn sm lane-fold' + (repo ? ' repo-fold' : '')} type="button" {...data}
             aria-pressed={collapsed}
             aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
             title={collapsed ? `Expand ${label}` : `Collapse ${label} into one box`}
             onClick={onClick}>
             <svg viewBox="0 0 16 16" aria-hidden="true">
-                {collapsed
-                    ? <path d="M5 2.5 8 5.5 11 2.5M5 13.5 8 10.5 11 13.5" />
-                    : <path d="M5 5.5 8 2.5 11 5.5M5 10.5 8 13.5 11 10.5" />}
+                {repo
+                    ? <path d="M4 6 8 10 12 6" />
+                    : collapsed
+                        ? <path d="M5 2.5 8 5.5 11 2.5M5 13.5 8 10.5 11 13.5" />
+                        : <path d="M5 5.5 8 2.5 11 5.5M5 10.5 8 13.5 11 10.5" />}
             </svg>
         </button>
     );
@@ -73,9 +85,15 @@ const DiagramSvg = observer(function DiagramSvg({
     const lanes = layout?.lanes || [];
     const scaledWidth = layout ? Math.round(layout.width * vm.scale) : 0;
     const headerScale = layout?.width ? scaledWidth / layout.width : 1;
-    const bands: { id: string; label: string; x: number; w: number }[] = layout?.repoBands || [];
+    const bands: { id: string; label: string; lanes: string[]; x: number; w: number }[] = layout?.repoBands || [];
     const laneTop = layout?.laneTop || 0;
-    const headerHeight = (56 + laneTop) * headerScale;
+    // Heading rows keep a fixed height at any zoom; only their x and width follow the diagram.
+    const headerHeight = HEAD_PAD + (bands.length ? REPO_ROW : 0) + LANE_ROW;
+    // The SVG reserves room above the first box for headings; that room sits under this header.
+    const reserved = (56 + laneTop) * headerScale;
+    const repoFolds = (id: string) => !!vm.toggleRepoBand && !!(vm.isRepoCollapsed?.(id) || vm.repoFoldable?.(id));
+    // A repo with one lane folds from its repo row only; a lane button would do the same thing.
+    const repoOwned = new Set(bands.filter((band) => band.lanes.length === 1 && repoFolds(band.id)).flatMap((band) => band.lanes));
     const fitted = useRef<string | null>(null);
     useLayoutEffect(() => {
         if (!host.current) return;
@@ -202,34 +220,36 @@ const DiagramSvg = observer(function DiagramSvg({
                 <div className="diagram-lane-headings" style={{
                     width: scaledWidth + 24,
                     height: headerHeight,
-                    marginBottom: -headerHeight,
+                    marginBottom: -reserved,
                 }} role="group" aria-label="Execution lanes">
                     <div className="diagram-lane-heading-row" style={{ width: scaledWidth }}>
                         {bands.map((band) => (
-                            <div key={'repo:' + band.id} className="diagram-lane-title diagram-repo-title" data-repo-band={band.id} style={{
-                                left: (band.x - 4) * headerScale,
-                                width: (band.w + 8) * headerScale,
-                                top: 2 * headerScale,
-                                height: (laneTop - 2) * headerScale,
-                                fontSize: 13 * headerScale,
-                            }}>
-                                <span className="lane-name">{band.label}</span>
-                                {vm.toggleRepoBand && (vm.isRepoCollapsed?.(band.id) || vm.repoFoldable?.(band.id)) && (
-                                    <FoldButton label={band.label} collapsed={!!vm.isRepoCollapsed?.(band.id)}
-                                        data={{ 'data-repo-band-fold': band.id }} onClick={() => vm.toggleRepoBand?.(band.id)} />
-                                )}
+                            <div key={'repo:' + band.id} className="diagram-repo-title" data-repo-band={band.id}
+                                title={band.label} style={{
+                                    left: (band.x - 4) * headerScale,
+                                    width: (band.w + 8) * headerScale,
+                                    top: HEAD_PAD,
+                                    height: headerHeight - HEAD_PAD,
+                                }}>
+                                <div className="repo-row" style={{ height: REPO_ROW }}>
+                                    <span className="lane-name">{band.label}</span>
+                                    {repoFolds(band.id) && (
+                                        <FoldButton repo label={band.label} collapsed={!!vm.isRepoCollapsed?.(band.id)}
+                                            data={{ 'data-repo-band-fold': band.id }} onClick={() => vm.toggleRepoBand?.(band.id)} />
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {lanes.map((lane) => (
-                            <div key={lane.id} className="diagram-lane-title" style={{
-                                left: lane.x * headerScale,
-                                width: lane.w * headerScale,
-                                top: (8 + laneTop) * headerScale,
-                                height: 48 * headerScale,
-                                fontSize: 14 * headerScale,
-                            }}>
+                            <div key={lane.id} className={'diagram-lane-title' + (bands.length ? ' in-band' : '')}
+                                title={lane.label} style={{
+                                    left: lane.x * headerScale,
+                                    width: lane.w * headerScale,
+                                    top: headerHeight - LANE_ROW,
+                                    height: LANE_ROW,
+                                }}>
                                 <span className="lane-name">{lane.label}</span>
-                                {vm.toggleLane && lane.id && (vm.isLaneCollapsed?.(lane.id) || vm.laneFoldable?.(lane.id)) && (
+                                {vm.toggleLane && lane.id && !repoOwned.has(lane.id) && (vm.isLaneCollapsed?.(lane.id) || vm.laneFoldable?.(lane.id)) && (
                                     <FoldButton label={lane.label} collapsed={!!vm.isLaneCollapsed?.(lane.id)}
                                         data={{ 'data-lane': lane.id }} onClick={() => vm.toggleLane?.(lane.id)} />
                                 )}

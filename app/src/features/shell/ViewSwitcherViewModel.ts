@@ -109,7 +109,7 @@ export class ViewSwitcherViewModel {
                     title,
                     error: settings.jobError ? settings.jobStatus : undefined,
                     action: generate(() => {
-                        shell.openSettings();
+                        shell.openSettings('map');
                         settings.redraw();
                     }, settings.jobsDisabled),
                 };

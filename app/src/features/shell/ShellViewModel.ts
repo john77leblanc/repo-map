@@ -2,11 +2,14 @@
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Workspace } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
+import type { SettingsSectionId } from '../settings/SettingsViewModel';
 export interface ShellDeps {
     repo: RepositoryModel;
     services: Services;
     onWorkspaceChange?: (workspace: Workspace | 'sitemap') => void;
     onLayoutChange?: () => void;
+    /** Expand a Settings section when Settings opens on it. */
+    onOpenSettings?: (section: SettingsSectionId) => void;
 }
 export class ShellViewModel {
     width = 300;
@@ -87,7 +90,9 @@ export class ShellViewModel {
         this.deps.onWorkspaceChange?.(workspace);
         this.deps.onLayoutChange?.();
     }
-    openSettings() {
+    /** Open Settings, optionally expanded and scrolled to one section. */
+    openSettings(section?: SettingsSectionId) {
+        if (section) this.deps.onOpenSettings?.(section);
         this.settingsOpen = true;
     }
     closeSettings() {

@@ -40,6 +40,23 @@ describe('shell', () => {
         });
         vm.dispose();
     });
+    it('opens Settings on a section, and on Map when the map needs attention', () => {
+        const onOpenSettings = vi.fn();
+        const vm = new ShellViewModel({ ...fixture(), onOpenSettings });
+        vm.openSettings('agents');
+        expect(onOpenSettings).toHaveBeenCalledWith('agents');
+        expect(vm.settingsOpen).toBe(true);
+        vm.closeSettings();
+        render(
+            <ShellView vm={vm} selectedTrace={false} needsAttention onBack={vi.fn()} sidebar={null} settings={null}>
+                <div />
+            </ShellView>
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Settings: map needs attention' }));
+        expect(onOpenSettings).toHaveBeenLastCalledWith('map');
+        expect(vm.settingsOpen).toBe(true);
+        cleanup();
+    });
     it('composes slots and switches settings/back controls for selected traces', () => {
         const vm = new ShellViewModel(fixture()),
             back = vi.fn();

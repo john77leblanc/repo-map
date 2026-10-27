@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { freshnessBadges, type WorkspaceModel } from '../../models/WorkspaceModel';
 import { validLinkName } from '../../../../lib/workspace-map.mjs';
 
-/** Settings → Linked repos: other repos whose maps join this one in the workspace view. */
+/** Settings → Linked repos body: other repos whose maps join this one in the workspace view. */
 export const LinkedRepos = observer(function LinkedRepos({ model }: { model: WorkspaceModel }) {
     const [name, setName] = useState('');
     const [dir, setDir] = useState('');
@@ -12,8 +12,7 @@ export const LinkedRepos = observer(function LinkedRepos({ model }: { model: Wor
     const nameOk = validLinkName(name) && !linked.some((r) => r.name === name);
     const snapOk = validLinkName(snapName);
     return (
-        <section aria-labelledby="links-title" id="linked-repos">
-            <h2 id="links-title">Linked repos</h2>
+        <div className="linked-repos">
             <p className="hint">
                 Maps of other repos to show beside this one, joined where one calls another. Saved for the team in{' '}
                 <code>.repo-map/workspace.json</code>. A folder is read live; a snapshot (from <code>repo-map export</code>) is a copy of
@@ -96,6 +95,6 @@ export const LinkedRepos = observer(function LinkedRepos({ model }: { model: Wor
                     {model.error}
                 </p>
             )}
-        </section>
+        </div>
     );
 });

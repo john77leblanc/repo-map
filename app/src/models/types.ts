@@ -141,8 +141,6 @@ export interface Flow {
     lanes?: { id: string; label: string; repo?: string }[];
     /** Repos whose lanes are drawn inside one band each (workspace traces). */
     repos?: { id: string; label: string }[];
-    /** AI-suggested sub-processes the reader may collapse. */
-    chunks?: { id: string; label: string; nodes: string[] }[];
     nodes: FlowNode[];
     edges: {
         from: string;

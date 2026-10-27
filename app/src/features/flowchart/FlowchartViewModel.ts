@@ -122,6 +122,14 @@ export class FlowchartViewModel {
             const lane = this.repoBands.find((b) => b.id === n.id.slice(2 + REPO_GROUP.length))?.lanes[0];
             return lane ? { ...n, lane } : n;
         });
+        // That lane's heading then stands for all of them ("2 lanes").
+        const folded = this.repoBands.filter((b) => this.isRepoCollapsed(b.id) && b.lanes.length > 1);
+        if (folded.length && out.lanes) {
+            out.lanes = out.lanes.map((lane) => {
+                const band = folded.find((b) => b.lanes[0] === lane.id);
+                return band ? { ...lane, label: `${band.lanes.length} lanes` } : lane;
+            });
+        }
         return out;
     }
     /** Repo bands of a workspace trace's flowchart. */
@@ -142,11 +150,6 @@ export class FlowchartViewModel {
     }
     get collapsedCount() {
         return this.displayFlow?.nodes.filter((n) => n.collapsed).length || 0;
-    }
-    /** Suggested chunks not yet folded. */
-    get openChunks() {
-        const shown = new Set(this.displayFlow?.nodes.map((n) => n.id));
-        return (this.trace?.flow?.chunks || []).filter((c) => c.nodes.every((id) => shown.has(id)));
     }
     get layout() {
         const flow = this.displayFlow;
@@ -223,17 +226,13 @@ export class FlowchartViewModel {
         this.saveCollapse();
         this.select(`c:s${n}`);
     }
-    collapseChunk(id: string) {
-        const chunk = this.trace?.flow?.chunks?.find((c) => c.id === id);
-        if (!chunk || this.collapse.groups.some((g) => g.id === 'chunk:' + id)) return;
-        this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: 'chunk:' + id, label: chunk.label, members: chunk.nodes }] };
-        this.saveCollapse();
-    }
-    collapseSuggested() {
-        this.openChunks.forEach((c) => this.collapseChunk(c.id));
-    }
-    /** Unfold one collapsed box (by its drawn id), optionally selecting one of its steps. */
-    expand(collapsedId: string, select: string | null = null) {
+    /**
+     * Unfold one collapsed box (by its drawn id), optionally selecting one of its steps.
+     * Unfolding the open box selects its first step, so the selection doesn't vanish.
+     * Returns the step selected, if any.
+     */
+    expand(collapsedId: string, select: string | null = null): string | null {
+        if (!select && this.selectedId === collapsedId) select = this.members(collapsedId)[0]?.id || null;
         const id = collapsedId.replace(/^c:/, '');
         this.collapse = id.startsWith(LANE_GROUP)
             ? { ...this.collapse, lanes: this.collapse.lanes.filter((l) => l !== id.slice(LANE_GROUP.length)) }
@@ -241,8 +240,11 @@ export class FlowchartViewModel {
                 ? { ...this.collapse, repos: (this.collapse.repos || []).filter((r) => r !== id.slice(REPO_GROUP.length)) }
                 : { ...this.collapse, groups: this.collapse.groups.filter((g) => g.id !== id) };
         this.saveCollapse();
+        // The step may still sit inside another folded box (a collapsed repo wins overlaps).
+        if (select && !this.displayFlow?.nodes.some((n) => n.id === select)) select = null;
         if (select) this.select(select);
         else if (this.selectedId === collapsedId) this.select(null);
+        return select;
     }
     expandAll() {
         this.collapse = emptyCollapse();

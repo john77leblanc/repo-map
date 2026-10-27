@@ -33,6 +33,8 @@ export interface MapStatus {
     };
 }
 export type JobKind = 'update' | 'generate' | 'docs';
+/** The collapsible Settings groups. */
+export type SettingsSectionId = 'map' | 'agents' | 'links';
 export interface SettingsDeps {
     repo: RepositoryModel;
     services: Services;
@@ -104,6 +106,13 @@ export class SettingsViewModel {
     busy = false;
     redrawArmed = false;
     dismissed = '';
+    /** Settings groups that are expanded; all start collapsed. */
+    openSections = new Set<SettingsSectionId>();
+    /** Section the view should scroll to once, set by reveal(). */
+    revealed: SettingsSectionId | null = null;
+    traceDefaultStatus = '';
+    traceDefaultError = false;
+    savingDefault = false;
     private disposed = false;
     private catalogCtl?: AbortController;
     private statusCtl?: AbortController;
@@ -131,6 +140,21 @@ export class SettingsViewModel {
             revision: 'reading ' + (info?.branch || 'detached HEAD') + (info?.sha ? ' @ ' + info.sha.slice(0, 9) : '') +
                 (info?.dirty ? ' (uncommitted changes)' : ''),
         };
+    }
+    isOpen(id: SettingsSectionId) {
+        return this.openSections.has(id);
+    }
+    setOpen(id: SettingsSectionId, open: boolean) {
+        if (open) this.openSections.add(id);
+        else this.openSections.delete(id);
+    }
+    /** Expand a section and ask the view to scroll it into sight. */
+    reveal(id: SettingsSectionId) {
+        this.openSections.add(id);
+        this.revealed = id;
+    }
+    clearRevealed() {
+        this.revealed = null;
     }
     get available() {
         return !!this.data && !this.data.off && this.data.agents.some((a) => a.available);
@@ -252,6 +276,32 @@ export class SettingsViewModel {
             body: JSON.stringify(this.tracePick || {}),
         });
         await this.loadCatalog(true);
+    }
+    /** Settings → Trace agent: save the current pick as the default for every repo. */
+    async useTraceEverywhere() {
+        const pick = this.currentPick();
+        if (!pick.agent || this.savingDefault || this.disposed) return;
+        this.savingDefault = true;
+        this.traceDefaultError = false;
+        this.traceDefaultStatus = 'Saving…';
+        try {
+            await this.saveTraceDefault(pick);
+            if (!this.disposed)
+                runInAction(() => {
+                    this.traceDefaultStatus = 'Default for every repo: ' + this.choiceLabel(pick) + '.';
+                });
+        } catch (e) {
+            if (!this.disposed)
+                runInAction(() => {
+                    this.traceDefaultError = true;
+                    this.traceDefaultStatus = 'Couldn’t save: ' + message(e);
+                });
+        } finally {
+            if (!this.disposed)
+                runInAction(() => {
+                    this.savingDefault = false;
+                });
+        }
     }
     async setMapPick(pick: AgentPick | null) {
         if (this.disposed) return;

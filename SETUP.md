@@ -67,7 +67,7 @@ npx repo-map ai none                                    # map only, no tracing
 npx repo-map ai claude --model opus --effort high --for generate   # optional: a stronger model just for drawing the map
 ```
 
-You can change the tool, model and effort for new traces in **Settings / Trace agent**.
+You can change the tool, model and effort for new traces in **Settings / Agents / Trace agent**.
 
 Then:
 
@@ -199,7 +199,7 @@ With `"provider": "auto"` (the default), repo-map uses the first one that's read
 
 ### Choosing per trace, and a different tool for the map
 
-The setting above is only the **default**. In the browser, **Settings / Trace agent** lists every tool repo-map found on your machine, with its models and effort levels. This choice is remembered in that browser for new traces and flowchart redraws. **Custom model...** takes any model id the tool accepts. The refresh button beside **Create trace**, or the one in Settings, looks for tools again, for example after you start Ollama.
+The setting above is only the **default**. In the browser, **Settings / Agents / Trace agent** lists every tool repo-map found on your machine, with its models and effort levels. This choice is remembered in that browser for new traces and flowchart redraws. **Custom model...** takes any model id the tool accepts. The refresh button beside **Create trace**, or the one in Settings, looks for tools again, for example after you start Ollama.
 
 Drawing and updating the map reads much more code than a trace, so it can use its own tool, model and effort. Onboarding offers this (untick **Use the same for the map**); to change it later:
 
@@ -353,15 +353,13 @@ On the map, **Workspace** shows both repos. Connections whose `consumes`/`provid
 
 ### Settings
 
-The sidebar's **Settings** button opens a dedicated panel for map maintenance and AI preferences:
+The sidebar's **Settings** button opens a dedicated panel for map maintenance and AI preferences. It has three collapsible sections, all collapsed when it opens; click a title (or focus it and press Enter) to expand it. When the map needs attention, Settings opens with **Map** expanded.
 
-- **Status**: up to date or not, the files that changed, and whether documents changed since the docs were linked.
-- **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
-- **Map agent**: the tool, model and effort that draw and update the map, link its docs and find seams between linked repos, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
-
+- **Map**: the repository name, counts and Git revision; up to date or not, the files that changed, and whether documents changed since the docs were linked. **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
+- **Agents**:
+  - **Map agent**: the tool, model and effort that draw and update the map, link its docs and find seams between linked repos, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
+  - **Trace agent**: the tool, model and effort used for process architecture and flowcharts. Remembered in your browser for this repo and used for new traces and flowchart redraws. **Use in every repo** also saves it as your default trace tool (`~/.config/repo-map/ai.json`).
 - **Linked repos**: other repos shown beside this one in the workspace view: link a folder, import a snapshot, or remove a link.
-
-**Trace agent** sets the tool, model and effort used for process architecture and flowcharts. This preference is remembered in your browser for this repo and used for new traces and flowchart redraws.
 
 ### Creating and exploring traces
 
@@ -373,7 +371,7 @@ After reviewing placement and rationale, select **Create implementation plan** u
 
 Classification uses the selected provider and a designated small model when it appears in that provider's model list (Claude `haiku`, Gemini Flash variants, designated Codex small models, or supported API nano/mini models). Otherwise it uses the selected trace model. It never switches providers. To choose another classification model, add `"ai": { "classify": { "model": "your-small-model", "effort": "low" } }` to `.repo-map/config.json`, or put `"classify": { "model": "your-small-model" }` beside the other AI settings in `.repo-map/local.json`. Use an effort supported by that model, or omit it. No classifier setting is required. Classification is limited to one turn and at most 30 seconds; on failure or invalid output, the main agent classifies and answers in one request. Available usage totals include both requests.
 
-Each saved trace is one question with linked outputs. The sidebar home shows the map title above New trace and the saved trace list. Repository identity, component counts, and Git revision are shown under Settings / Repository. Selecting one replaces the library with its title, prompt, and expanded walkthrough and actions; the view row above the canvas switches its outputs. **Back to all traces** returns to the library and whole map. Missing outputs keep a dashed tab whose view offers **Generate**; **Edit** also selects missing outputs and regenerates the same trace. Deleting a trace removes both outputs. Old traces and import codes keep working. Failed saves remain visible with **Retry saving** until you reload.
+Each saved trace is one question with linked outputs. The sidebar home shows the map title above New trace and the saved trace list. Repository identity, component counts, and Git revision are shown under Settings / Map. Selecting one replaces the library with its title, prompt, and expanded walkthrough and actions; the view row above the canvas switches its outputs. **Back to all traces** returns to the library and whole map. Missing outputs keep a dashed tab whose view offers **Generate**; **Edit** also selects missing outputs and regenerates the same trace. Deleting a trace removes both outputs. Old traces and import codes keep working. Failed saves remain visible with **Retry saving** until you reload.
 
 Click an architecture card or flowchart box for explanations, code references and linked documentation. Flowchart details appear in the selected trace sidebar, without architecture step numbers, step labels or the architecture walkthrough. Relevant code and documentation remain accessible. Switch outputs with the view row above the canvas. **Back to all traces** returns to the library and whole map without deleting saved data. Trace information stays beside the diagram so it does not shift vertically. Flowchart zoom, Fit, Mermaid and SVG export, redraw, progress and Stop controls sit above the diagram key. Its canvas fills the available height; process details remain in the sidebar. Settings and Back to all traces share the top sidebar control slot.
 
@@ -387,7 +385,7 @@ Use the application selector for repositories with multiple applications. Select
 
 Open **More > Show info** for commit freshness, uncommitted changes, snapshot details, and analysis notes. Empty results show their explanation automatically. **More > Show/Hide details** toggles the screen inspector; selecting a screen reopens it. Journey notes expand for the selected step. **More > Refresh status** reloads the saved artifact; **Regenerate** performs another AI analysis. Escape or an outside click closes More.
 
-Sitemaps use the flowchart toolbar layout, with **Diagram key**, **Copy Mermaid**, and **Download SVG**. Exports follow the application selection and **Show** scope, including journey numbers and proposed changes. SVG downloads include their own styling, theme colors, and dimmed context. Filenames use the trace or repository name followed by `-sitemap.svg`, falling back to `sitemap.svg`. Export controls are disabled when no diagram exists and work without an AI connection.
+Sitemaps use the flowchart toolbar layout, with **Diagram key** and an **Export** menu (**Copy Mermaid**, **Download SVG**). Exports follow the application selection and **Show** scope, including journey numbers and proposed changes. SVG downloads include their own styling, theme colors, and dimmed context. Filenames use the trace or repository name followed by `-sitemap.svg`, falling back to `sitemap.svg`. Export controls are disabled when no diagram exists and work without an AI connection.
 
 New flowcharts use **Execution lanes** when multiple execution participants are known. Same-lane retries stay inside their lane; cross-lane returns route outside the columns. Existing lane-enabled charts use this layout automatically. Lane headings stay visible on an opaque band as you scroll down the chart, so lane borders and arrows cannot show through the header. Switch to **Compact** if the diagram is too wide; the preference is browser-local per repository. Unknown ownership is shown as **Unassigned**, and does not mean the behavior itself was inferred. Older saved traces remain compact until explicitly redrawn. SVG export reflects the chosen layout; Mermaid uses participant subgraphs.
 

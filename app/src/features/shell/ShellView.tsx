@@ -89,7 +89,7 @@ export const ShellView = observer(function ShellView({
                                 hidden={selectedTrace || vm.collapsed}
                                 aria-label={settingsLabel}
                                 title={settingsLabel}
-                                onClick={vm.openSettings}
+                                onClick={() => vm.openSettings(needsAttention ? 'map' : undefined)}
                             >
                                 Settings
                                 <span

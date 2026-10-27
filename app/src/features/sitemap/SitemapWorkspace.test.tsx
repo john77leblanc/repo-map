@@ -95,8 +95,7 @@ describe('Sitemap', () => {
         expect(screen.getByText('No user-facing screens found')).toBeTruthy();
         expect(screen.getByText(/working tree has uncommitted/)).toBeTruthy();
         expect(vm.layout).toBeNull();
-        expect((screen.getByRole('button', { name: 'Copy Mermaid' }) as HTMLButtonElement).disabled).toBe(true);
-        expect((screen.getByRole('button', { name: 'Download SVG' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled).toBe(true);
         vm.dispose();
     });
     it('keeps the generation button disabled alongside Stop while generating', async () => {

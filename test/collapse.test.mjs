@@ -74,20 +74,7 @@ test('collapsed boxes lay out and render as a card stack', () => {
     assert.match(svg, /Backend · 2 steps/);
 });
 
-test('normalizeFlow keeps valid suggested chunks only', () => {
-    const flow = normalizeFlow({
-        ...FLOW,
-        chunks: [
-            { label: 'Backend check', nodes: ['b', 'c', 'missing'] },
-            { label: 'Overlap', nodes: ['c', 'ok'] },              // c taken, one left
-            { label: '', nodes: ['s', 'a'] },                       // no label
-            { label: 'Everything', nodes: FLOW.nodes.map((n) => n.id) },
-            { label: 'Outcomes', nodes: ['ok', 'no'] },
-        ],
-    });
-    assert.deepEqual(flow.chunks, [
-        { id: 'k1', label: 'Backend check', nodes: ['b', 'c'] },
-        { id: 'k2', label: 'Outcomes', nodes: ['ok', 'no'] },
-    ]);
-    assert.equal(normalizeFlow(FLOW).chunks, undefined);
+test('normalizeFlow drops chunks from older flowcharts', () => {
+    const flow = normalizeFlow({ ...FLOW, chunks: [{ label: 'Backend check', nodes: ['b', 'c'] }] });
+    assert.equal(flow.chunks, undefined);
 });

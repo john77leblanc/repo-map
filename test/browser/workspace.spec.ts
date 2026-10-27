@@ -79,6 +79,7 @@ test('settings list linked repos and refuse a bad link name', async ({ page }) =
     await page.goto('/');
     await page.locator('#tab-map').click();
     const section = page.locator('#linked-repos');
+    await section.locator('summary').click();
     await expect(section.locator('[data-link="api"]')).toContainText('Shop API');
     await expect(section.locator('[data-link="api"]')).toContainText('../shop-api');
     await page.locator('#link-name').fill('home');
@@ -125,11 +126,11 @@ test('a workspace trace follows the order into the linked API, in repo bands tha
     // the workspace map is shown for a workspace trace, and the placeholder step is the API's real route
     await expect(page.locator('.node[data-id="api:orders-route"]')).toHaveClass(/trn/);
     await expect(page.locator('.node[data-id="api:orders-route"] .stepn')).toHaveText('2');
-    const steps = page.locator('ol.steps > li');
     // the trace needs the workspace map, so the scope switch is locked to it
     await expect(page.locator('#arch-scope-ws')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#arch-scope-repo')).toBeDisabled();
     await expect(page.getByRole('group', { name: 'Map scope' })).toHaveAttribute('title', 'This trace spans linked repos');
+    const steps = page.locator('ol.steps > li');
     await expect(steps.nth(1)).toContainText('orders route (Shop API)');
     await expect(steps.nth(2)).toContainText('worker (from gone, not linked)');
     await expect(page.locator('#trace-unlinked')).toContainText('gone');

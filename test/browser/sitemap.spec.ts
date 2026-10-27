@@ -81,10 +81,12 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await page.getByRole('button', { name: 'Diagram key', exact: true }).click();
     await expect(page.locator('#sitemap-key')).toBeVisible();
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.locator('#sitemap-export').click();
     await page.getByRole('button', { name: 'Copy Mermaid', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('flowchart TD');
     const downloadEvent = page.waitForEvent('download');
+    await page.locator('#sitemap-export').click();
     await page.getByRole('button', { name: 'Download SVG', exact: true }).click();
     const download = await downloadEvent;
     expect(download.suggestedFilename()).toBe('shop-map-sitemap.svg');
@@ -130,6 +132,7 @@ test('execution lanes toggle, keep selection, export, and persist across reload'
     await expect(page.getByText('Executes in: Backend')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('flow-lanes.png') });
     const downloaded = page.waitForEvent('download');
+    await page.locator('#fl-export').click();
     await page.getByRole('button', { name: 'Download SVG' }).click();
     expect((await downloaded).suggestedFilename()).toBe('checkout-lanes.svg');
     await page.getByLabel('Flowchart layout', { exact: true }).selectOption('compact');
@@ -257,8 +260,8 @@ test('flowchart lanes and shift-selected steps collapse into one box and expand 
     await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     const canvas = page.locator('#fl-canvas');
-    // lane headings are sized by the zoom, so their font size shows it
-    const zoom = () => canvas.locator('.diagram-lane-title').first().evaluate((el) => parseFloat((el as HTMLElement).style.fontSize));
+    // drawn size over the viewBox size is the zoom
+    const zoom = () => canvas.locator('svg.fc').evaluate((el) => (el as SVGSVGElement).width.baseVal.value / (el as SVGSVGElement).viewBox.baseVal.width);
     const before = await zoom();
     await canvas.locator('.lane-fold[data-lane="web"]').click();
     const lane = canvas.locator('.fn[data-id="c:lane:web"]');
@@ -289,6 +292,12 @@ test('flowchart lanes and shift-selected steps collapse into one box and expand 
     await page.getByRole('button', { name: 'Checkout lanes How does checkout work?' }).click();
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     await expect(canvas.locator('.fn[data-id="c:s1"]')).toContainText('Shopper screens');
+    // expanding the open box selects and focuses its first step
+    await canvas.locator('.fn[data-id="c:s1"]').click();
+    await page.locator('#fl-side #fl-expand').click();
+    await expect(canvas.locator('.fn[data-id="start"]')).toHaveClass(/sel/);
+    await expect(canvas.locator('.fn[data-id="start"]')).toBeFocused();
+    await canvas.locator('.lane-fold[data-lane="web"]').click();
     await page.locator('#fl-expand-all').click();
     await expect(canvas.locator('.fn[data-id="start"]')).toBeVisible();
     // Select steps: plain clicks add to the selection

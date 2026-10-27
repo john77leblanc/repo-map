@@ -32,22 +32,28 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .flow-member-row{display:flex;align-items:center;gap:.5em}
 .flow-member-row .unmark{margin-left:auto;flex:none}
 .flow-select-actions{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em}
-.flow-select-bar [aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
-.diagram-lane-title .lane-name{overflow:hidden;text-overflow:ellipsis;padding:0 2.2em}
-.diagram-lane-title .lane-fold{position:absolute;right:.4em;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:1.7em;height:1.7em;padding:0;border-radius:5px}
-.diagram-lane-title .lane-fold svg{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.diagram-lane-title .lane-fold[aria-pressed="true"]{background:var(--soft)}
-.flow-select-bar{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;padding:.35em .75em;border-bottom:1px solid var(--line)}
+#fl-select-mode[aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
 .flow-members{margin:.25em 0 .75em;padding-left:1.2em}
 .flow-members li{margin:.15em 0}
 #fl-expand{margin-bottom:.9em}
 .diagram-with-lanes .execution-lane text{visibility:hidden}
 .diagram-lane-headings{position:sticky;top:0;z-index:2;min-width:100%;box-sizing:border-box;padding-inline:12px;background:var(--bg);border-bottom:1px solid var(--line)}
 .diagram-lane-heading-row{position:relative;margin:0 auto}
-.diagram-lane-title.diagram-repo-title{background:var(--soft);border-radius:8px 8px 0 0;font-weight:700;letter-spacing:.01em}
-.fc .repo-band rect{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:5 4}
+.diagram-lane-title,.diagram-repo-title{position:absolute;box-sizing:border-box;border:1px solid var(--line);border-bottom:0;white-space:nowrap}
+.diagram-lane-title,.diagram-repo-title .repo-row{display:flex;align-items:center;justify-content:center;min-width:0}
+.diagram-repo-title .repo-row{position:relative;width:100%}
+.diagram-lane-title{background:var(--panel);color:var(--ink);border-radius:6px 6px 0 0;font-size:12.5px;font-weight:600}
+.diagram-repo-title{background:var(--soft);color:var(--muted);border-radius:8px 8px 0 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.diagram-lane-headings .lane-name{display:block;min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:0 26px;line-height:1.2}
+.diagram-lane-headings .lane-fold{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:20px;height:20px;padding:0;border-radius:5px;font-size:12px}
+.diagram-lane-headings .lane-fold svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.diagram-lane-headings .lane-fold[aria-pressed="true"]{background:var(--soft)}
+.diagram-lane-headings .repo-fold{width:18px;height:18px}
+.diagram-lane-headings .repo-fold svg{transition:transform .15s}
+.diagram-lane-headings .repo-fold[aria-pressed="true"] svg{transform:rotate(-90deg)}
+.fc .repo-band rect{fill:none;stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.diagram-with-lanes .repo-band text{visibility:hidden}
 .fc .repo-band text{font-size:13px;font-weight:700;fill:var(--muted)}
-.diagram-lane-title{position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px 6px 0 0;font-weight:600;white-space:nowrap}
 .fc .fn:focus-visible .fs,.fc .fn.sel .fs{stroke:var(--http);stroke-width:2.6}
 .fc .fe.on{stroke:var(--http);stroke-width:2.2}
 .fc.hovering .fn:not(.hl):not(.mk),.fc.hovering .fe:not(.hl){opacity:.2}

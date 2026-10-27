@@ -1,18 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface DiagramMoreAction {
     label: string;
+    id?: string;
+    title?: string;
     run: () => void;
     disabled?: boolean;
     expanded?: boolean;
     controls?: string;
 }
 
-function DiagramMore({ id, open, setOpen, actions }: {
+/** A small popover of actions behind one button ("More" by default). Closes on pick, Escape, blur or an outside click. */
+function DiagramMore({ id, open, setOpen, actions, label = 'More', triggerId, disabled, panelLabel = 'More diagram actions' }: {
     id: string;
     open: boolean;
     setOpen: (open: boolean) => void;
     actions: DiagramMoreAction[];
+    label?: ReactNode;
+    triggerId?: string;
+    disabled?: boolean;
+    panelLabel?: string;
 }) {
     const root = useRef<HTMLDivElement>(null);
     const trigger = useRef<HTMLButtonElement>(null);
@@ -39,10 +46,10 @@ function DiagramMore({ id, open, setOpen, actions }: {
         <div className="diagram-more" ref={root} onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
         }}>
-            <button className="btn sm" type="button" ref={trigger} aria-expanded={open} aria-controls={id}
-                onClick={() => setOpen(!open)}>More</button>
-            <div className="diagram-more-panel" id={id} hidden={!open} role="group" aria-label="More diagram actions">
-                {actions.map(action => <button key={action.controls || action.label} className="btn sm" type="button"
+            <button className="btn sm" id={triggerId} type="button" ref={trigger} aria-expanded={open} aria-controls={id}
+                disabled={disabled} onClick={() => setOpen(!open)}>{label}</button>
+            <div className="diagram-more-panel" id={id} hidden={!open} role="group" aria-label={panelLabel}>
+                {actions.map(action => <button key={action.controls || action.label} id={action.id} title={action.title} className="btn sm" type="button"
                     disabled={action.disabled} aria-expanded={action.expanded} aria-controls={action.controls}
                     onClick={() => {
                         setOpen(false);

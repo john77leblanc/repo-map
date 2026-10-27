@@ -73,12 +73,11 @@ test('validateMap warns on unreadable contracts; the example map has clean ones'
     assert.ok(errors.some((e) => e.includes('shopper consumes must be a list')));
 });
 
-test('map schemas accept contracts; flow schema accepts chunks', () => {
+test('map schemas accept contracts; flow schema accepts a minimal flow', () => {
     const node = { id: 'a', group: 'g', kind: 'service', path: 'src', desc: 'x', provides: ['http:GET /a'], consumes: [] };
     assert.deepEqual(schemaErrors({ groups: [], nodes: [node], edges: [] }, RESPONSE_SCHEMAS.generate), []);
     assert.deepEqual(schemaErrors({ summary: '', nodes: { update: [{ id: 'a', consumes: ['event:x'] }] } }, RESPONSE_SCHEMAS.update), []);
-    const flow = { nodes: [{ id: 'a', type: 'start', label: 'A' }, { id: 'b', type: 'end', label: 'B' }], edges: [{ from: 'a', to: 'b' }],
-        chunks: [{ label: 'All', nodes: ['a', 'b'] }] };
+    const flow = { nodes: [{ id: 'a', type: 'start', label: 'A' }, { id: 'b', type: 'end', label: 'B' }], edges: [{ from: 'a', to: 'b' }] };
     assert.deepEqual(schemaErrors({ flow }, RESPONSE_SCHEMAS.flow), []);
 });
 

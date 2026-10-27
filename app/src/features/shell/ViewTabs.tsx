@@ -10,7 +10,7 @@ export const ViewTabs = observer(function ViewTabs({ vm, leading }: { vm: ViewSw
     return (
         <div className="view-tabs">
             {leading && <>{leading}<span className="view-divider" aria-hidden="true" /></>}
-            <div className="view-tablist" role="tablist" aria-label="Views">
+            <div className="seg view-tablist" role="tablist" aria-label="Views">
                 {views.map((v, i) => {
                     const selected = vm.current === v.id;
                     return (

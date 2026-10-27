@@ -134,7 +134,7 @@ describe('FlowchartWorkspace', () => {
         vm.setTrace({ ...trace, flow: null, pendingFlow: true });
         const { unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
         expect(
-            (screen.getByRole('button', { name: 'Copy Mermaid' }) as HTMLButtonElement).disabled
+            (screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled
         ).toBe(true);
         expect(screen.getByText(/supporting walkthrough was kept/).id).toBe('flow-missing');
         unmount();

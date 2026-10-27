@@ -46,6 +46,42 @@ const catalog: Catalog = {
 };
 afterEach(() => vi.useRealTimers());
 describe('SettingsViewModel', () => {
+    it('starts with every section collapsed and reveals one on request', () => {
+        const vm = new SettingsViewModel(fixture());
+        expect(['map', 'agents', 'links'].map((id) => vm.isOpen(id as never))).toEqual([false, false, false]);
+        vm.setOpen('links', true);
+        expect(vm.isOpen('links')).toBe(true);
+        vm.setOpen('links', false);
+        expect(vm.isOpen('links')).toBe(false);
+        vm.reveal('agents');
+        expect(vm.isOpen('agents')).toBe(true);
+        expect(vm.revealed).toBe('agents');
+        vm.clearRevealed();
+        expect(vm.revealed).toBe(null);
+        expect(vm.isOpen('agents')).toBe(true);
+        vm.dispose();
+    });
+
+    it('saves the trace pick as the default for every repo and reports failure', async () => {
+        const f = fixture();
+        vi.mocked(f.services.api.get).mockResolvedValue(catalog);
+        const vm = new SettingsViewModel(f);
+        await vm.loadCatalog();
+        await vm.useTraceEverywhere();
+        expect(f.services.api.request).toHaveBeenCalledWith('/api/settings/trace', {
+            method: 'PUT',
+            body: JSON.stringify({ agent: 'codex', model: 'gpt-6.1-sol', effort: 'low' }),
+        });
+        expect(vm.traceDefaultStatus).toBe('Default for every repo: Codex CLI · gpt-6.1-sol · low.');
+        expect(vm.traceDefaultError).toBe(false);
+        vi.mocked(f.services.api.request).mockRejectedValueOnce(new Error('disk full'));
+        await vm.useTraceEverywhere();
+        expect(vm.traceDefaultError).toBe(true);
+        expect(vm.traceDefaultStatus).toBe('Couldn’t save: disk full');
+        expect(vm.savingDefault).toBe(false);
+        vm.dispose();
+    });
+
     it('ignores stale catalog answers when a refresh finishes first', async () => {
         const f = fixture();
         const answers: ((value: Catalog) => void)[] = [];

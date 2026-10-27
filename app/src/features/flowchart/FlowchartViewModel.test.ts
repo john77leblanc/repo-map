@@ -192,17 +192,25 @@ describe('FlowchartViewModel', () => {
         const box = vm.displayFlow?.nodes.find((n) => n.id === 'c:repo:api');
         expect(box?.members).toEqual(['b', 'c']);
         expect(box?.lane).toBe('route');
+        // the lane it is drawn in stands for both of the repo's lanes
+        expect(vm.displayFlow?.lanes?.map((l) => l.label)).toEqual(['Frontend', '2 lanes', 'Worker']);
+        expect(vm.layout?.lanes.map((l: { label: string }) => l.label)).toEqual(['Frontend', '2 lanes']);
         expect(vm.canRename('c:repo:api')).toBe(false);
         expect(vm.layout?.repoBands.map((b: { id: string }) => b.id)).toEqual(['home', 'api']);
-        vm.expand('c:repo:api');
+        expect(vm.expand('c:repo:api')).toBeNull();
         expect(vm.isRepoCollapsed('api')).toBe(false);
+        // expanding the open box selects its first step
+        vm.toggleRepoBand('api');
+        vm.select('c:repo:api');
+        expect(vm.expand('c:repo:api')).toBe('b');
+        expect(vm.selectedId).toBe('b');
         expect(vm.collapsedCount).toBe(0);
         vm.toggleRepoBand('api');
         vm.expandAll();
         expect(vm.collapsedCount).toBe(0);
         vm.dispose();
     });
-    it('collapses lanes, shift-selected steps and suggested chunks, and remembers them per trace', () => {
+    it('collapses lanes and shift-selected steps, and remembers them per trace', () => {
         const { vm, trace, services } = fixture();
         trace.flow = {
             lanes: [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }],
@@ -214,7 +222,6 @@ describe('FlowchartViewModel', () => {
                 { id: 'e', type: 'end', label: 'Done', lane: 'web' },
             ],
             edges: [{ from: 's', to: 'a' }, { from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'e' }],
-            chunks: [{ id: 'k1', label: 'Kick off', nodes: ['s', 'a'] }],
         };
         trace._doc = 'checkout.json';
         vm.setTrace(trace);
@@ -226,22 +233,20 @@ describe('FlowchartViewModel', () => {
         expect(vm.selected?.collapsed).toBe(true);
         expect(vm.canRename('c:lane:api')).toBe(false);
         expect(vm.members('c:lane:api').map((m) => m.label)).toEqual(['Save', 'Reply']);
-        expect(vm.openChunks).toHaveLength(1);
-        vm.collapseSuggested();
-        expect(vm.openChunks).toHaveLength(0);
-        expect(vm.collapsedCount).toBe(2);
+        expect(vm.collapsedCount).toBe(1);
         const key = vm.repo.namespace + 'flow-collapse:checkout.json';
-        expect(services.storage.set).toHaveBeenLastCalledWith(key, {
-            repos: [], lanes: ['api'], groups: [{ id: 'chunk:k1', label: 'Kick off', members: ['s', 'a'] }],
-        });
+        expect(services.storage.set).toHaveBeenLastCalledWith(key, { repos: [], lanes: ['api'], groups: [] });
         vm.expand('c:lane:api', 'c');
         expect(vm.selectedId).toBe('c');
         vm.expandAll();
-        vm.collapseChunk('k1');
+        vm.close();
+        vm.mark('s');
+        vm.mark('a');
+        vm.collapseMarked('Kick off');
         vm.close();
         vm.mark('b');
         vm.mark('zz');
-        vm.mark('c:chunk:k1');
+        vm.mark('c:s1');
         vm.mark('e');
         expect(vm.marked).toEqual(['b', 'e']);
         vm.collapseMarked();

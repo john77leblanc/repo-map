@@ -33,7 +33,7 @@ export class Application {
             getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace) });
         this.shell = new ShellViewModel({ repo, services, onWorkspaceChange: (workspace) => {
             if (workspace === 'sitemap') void this.sitemap.load();
-        } });
+        }, onOpenSettings: (section) => this.settings.reveal(section) });
         this.workspace = new WorkspaceModel(services);
         this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace });
         this.architecture = new ArchitectureViewModel({ repo, services, workspace: this.workspace });
