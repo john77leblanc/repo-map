@@ -19,6 +19,8 @@ export interface FlowchartDeps {
     onNodeSelected?: (id: string | null) => void;
 }
 export type ConnectionTab = 'from' | 'to';
+/** Collapsible sections of the step details panel. */
+export type StepSection = 'about' | 'refs' | 'connections';
 export interface FlowConnection {
     edge: Flow['edges'][number];
     index: number;
@@ -54,6 +56,8 @@ export class FlowchartViewModel {
     marked: string[] = [];
     selecting = false;
     connectionTab: ConnectionTab = 'to';
+    /** Open step sections; kept while moving between steps. */
+    sections: Record<StepSection, boolean> = { about: true, refs: true, connections: false };
     scale = 1;
     keyOpen = false;
     busy = false;
@@ -340,6 +344,9 @@ export class FlowchartViewModel {
     }
     nodeLabel(id: string) {
         return this.displayFlow?.nodes.find((node) => node.id === id)?.label || id;
+    }
+    setSection(name: StepSection, open: boolean) {
+        this.sections[name] = open;
     }
     setConnectionTab(tab: ConnectionTab) {
         this.connectionTab = tab;

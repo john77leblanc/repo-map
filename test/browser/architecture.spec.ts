@@ -289,4 +289,25 @@ test('node details panel stays on screen and scrolls on a short viewport', async
     expect(box!.y + box!.height).toBeLessThanOrEqual(420);
     const scrolled = await panel.evaluate((aside) => { aside.scrollTop = 500; return aside.scrollTop; });
     expect(scrolled).toBe(500);
+    // the title row stays pinned to the top of the panel
+    const head = await panel.locator('.fside-head').boundingBox();
+    const side = await panel.boundingBox();
+    expect(head!.y).toBeCloseTo(side!.y, 0);
+    await expect(panel.getByRole('button', { name: 'Close' })).toBeInViewport();
+});
+
+test('trace step in card details walks the trace with Prev and Next', async ({ page }) => {
+    await page.route('**/api/traces', route => route.fulfill({ json: { traces: [proposalTrace] } }));
+    await openMap(page);
+    await page.getByRole('button', { name: /^Add product page under src\/pages/ }).click();
+    await page.locator('.node[data-id="cart-page"] .nh').click();
+    const panel = page.locator('#arch-details');
+    await expect(panel.locator('.arch-step')).toContainText('1 of 2');
+    await expect(panel.getByRole('button', { name: 'Previous trace step' })).toBeDisabled();
+    await expect(panel.locator('#arch-about-head')).toHaveAttribute('aria-expanded', 'true');
+    await expect(panel.locator('#arch-connections-head')).toHaveAttribute('aria-expanded', 'false');
+    await panel.getByRole('button', { name: 'Next trace step' }).click();
+    await expect(panel).toHaveAttribute('data-id', 'checkout-page');
+    await expect(panel.locator('.arch-step')).toContainText('Checks out.');
+    await expect(panel.getByRole('button', { name: 'Next trace step' })).toBeDisabled();
 });

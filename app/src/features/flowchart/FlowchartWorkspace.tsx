@@ -8,6 +8,7 @@ import { FC_CSS, UI_CSS } from './styles';
 import { DiagramSvg } from '../../shared/ui/DiagramSvg';
 import { DiagramToolbar } from '../../shared/ui/DiagramToolbar';
 import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
+import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 
 export interface FlowchartDetailsProps {
     vm: FlowchartViewModel;
@@ -108,7 +109,7 @@ const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: Flowch
 const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: FlowchartViewModel; id: string }) {
     const conns = vm.connections;
     if (!conns.from.length && !conns.to.length) {
-        return <section className="flow-conn"><h4>Connections</h4><p className="hint">No connections.</p></section>;
+        return <p className="hint">No connections.</p>;
     }
     const tabs: DirectionTab<ConnectionTab>[] = [
         { id: 'from', label: 'From', count: conns.from.length },
@@ -116,7 +117,6 @@ const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: Flow
     ];
     return (
         <section className="flow-conn" aria-label="Connections">
-            <h4>Connections</h4>
             <DirectionTabs idPrefix={'fl-conn-' + id} label="Connection direction" tabs={tabs}
                 active={vm.connectionTab} onChange={vm.setConnectionTab}>
                 {(active) => (
@@ -166,28 +166,41 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                 <button className="btn sm" id="fl-side-close" type="button" onClick={close}>Close</button>
             </div>
             {node.collapsed ? <CollapsedDetails vm={vm} id={node.id} label={node.label} /> : <h3>{node.label}</h3>}
-            {vm.selectedLane && <p className="ft">Executes in: {vm.selectedLane}</p>}
-            {node.detail && <p className="fd">{node.detail}</p>}
-            {node.inferred && <p className="fwarn">Inferred. Check this step before relying on it.</p>}
-            {change && (
-                <section className="flow-change" aria-label="Proposed change">
-                    <h4 className={change.status}>{CHANGE_LABELS[change.status]}</h4>
-                    {change.rationale && <p>{change.rationale}</p>}
-                </section>
-            )}
-            {vm.references.length > 0 && (
-                <div className="refs">
-                    {vm.references.map((reference, index) => (
-                        <CodeReference
-                            key={`${vm.selectedId}:${reference.path}:${reference.start}:${reference.end}:${index}`}
-                            documentation={!!reference.kind}
-                            reference={reference}
-                            repo={vm.repo}
-                        />
-                    ))}
-                </div>
-            )}
-            <FlowConnections vm={vm} id={node.id} />
+            <DisclosureList>
+                {(vm.selectedLane || node.detail || node.inferred || change) && (
+                    <Disclosure id="fl-about" title="About" open={vm.sections.about}
+                        onToggle={(open) => vm.setSection('about', open)}>
+                        {vm.selectedLane && <p className="ft">Executes in: {vm.selectedLane}</p>}
+                        {node.detail && <p className="fd">{node.detail}</p>}
+                        {node.inferred && <p className="fwarn">Inferred. Check this step before relying on it.</p>}
+                        {change && (
+                            <section className="flow-change" aria-label="Proposed change">
+                                <h4 className={change.status}>{CHANGE_LABELS[change.status]}</h4>
+                                {change.rationale && <p>{change.rationale}</p>}
+                            </section>
+                        )}
+                    </Disclosure>
+                )}
+                {vm.references.length > 0 && (
+                    <Disclosure id="fl-refs" title="References" count={vm.references.length}
+                        open={vm.sections.refs} onToggle={(open) => vm.setSection('refs', open)}>
+                        <div className="refs">
+                            {vm.references.map((reference, index) => (
+                                <CodeReference
+                                    key={`${vm.selectedId}:${reference.path}:${reference.start}:${reference.end}:${index}`}
+                                    documentation={!!reference.kind}
+                                    reference={reference}
+                                    repo={vm.repo}
+                                />
+                            ))}
+                        </div>
+                    </Disclosure>
+                )}
+                <Disclosure id="fl-connections" title="Connections" count={vm.connections.from.length + vm.connections.to.length}
+                    open={vm.sections.connections} onToggle={(open) => vm.setSection('connections', open)}>
+                    <FlowConnections vm={vm} id={node.id} />
+                </Disclosure>
+            </DisclosureList>
         </aside>
     );
 });

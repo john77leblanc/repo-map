@@ -18,6 +18,8 @@ export interface ArchitectureDependencies {
 export type MapScope = 'repo' | 'workspace';
 
 export type ConnectionDirection = 'from' | 'to';
+/** Collapsible sections of the card details panel. */
+export type CardSection = 'about' | 'docs' | 'connections';
 /** Description text around a search hit, for results matched only by description. */
 export interface SearchSnippet {
     before: string;
@@ -64,6 +66,10 @@ export class ArchitectureViewModel {
     searchCursor = 0;
     /** Connection tab in card details; kept while moving between cards. */
     connectionTab: ConnectionDirection = 'from';
+    /** Open card sections; kept while moving between cards. */
+    sections: Record<CardSection, boolean> = { about: true, docs: false, connections: false };
+    /** Trace step shown in card details (a card can be visited more than once). */
+    stepAt: number | null = null;
     revealId: string | null = null;
     revealVersion = 0;
     disposed = false;
@@ -156,6 +162,36 @@ export class ArchitectureViewModel {
     }
     setConnectionTab(tab: ConnectionDirection) {
         this.connectionTab = tab;
+    }
+    setSection(name: CardSection, open: boolean) {
+        this.sections[name] = open;
+    }
+    /** Index of the trace step shown for the open card, or -1. */
+    get currentStep() {
+        const steps = this.trace?.steps || [];
+        if (!this.selected) return -1;
+        if (this.stepAt !== null && steps[this.stepAt]?.id === this.selected) return this.stepAt;
+        return steps.findIndex((s) => s.id === this.selected);
+    }
+    get hasPrev() {
+        return this.currentStep > 0;
+    }
+    get hasNext() {
+        const i = this.currentStep;
+        return i >= 0 && i < (this.trace?.steps.length ?? 0) - 1;
+    }
+    /** Open trace step `i` and its card. */
+    goStep(i: number) {
+        const step = this.trace?.steps[i];
+        if (!step || !this.nodes.has(step.id) || this.disposed) return;
+        this.stepAt = i;
+        this.select(step.id);
+    }
+    prevStep() {
+        if (this.hasPrev) this.goStep(this.currentStep - 1);
+    }
+    nextStep() {
+        if (this.hasNext) this.goStep(this.currentStep + 1);
     }
     get inspected() {
         return this.selected ? this.nodes.get(this.selected) : undefined;
@@ -285,6 +321,7 @@ export class ArchitectureViewModel {
     /** Leave the picked card, showing the search results again. */
     backToResults() {
         this.selected = null;
+        this.stepAt = null;
         this.pinned = null;
         this.hover = null;
         this.deps.onInspect?.(null);
@@ -298,8 +335,15 @@ export class ArchitectureViewModel {
     setHover(id: string | null) {
         this.hover = id;
     }
+    /** Open a card; a trace card shows its next visit after the current step, else its first. */
     inspect(id: string) {
         if (!this.nodes.has(id) || this.disposed) return;
+        const visits = (this.trace?.steps || []).flatMap((s, i) => (s.id === id ? [i] : []));
+        const from = this.stepAt ?? -1;
+        this.stepAt = visits.length ? visits.find((i) => i > from) ?? visits[0] : null;
+        this.select(id);
+    }
+    private select(id: string) {
         this.selected = id;
         this.pinned = id;
         this.hover = null;
@@ -316,6 +360,7 @@ export class ArchitectureViewModel {
         this.query = '';
         this.searchCursor = 0;
         this.selected = null;
+        this.stepAt = null;
         this.pinned = null;
         this.hover = null;
         this.deps.onInspect?.(null);

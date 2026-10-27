@@ -7,6 +7,7 @@ import { SitemapLegend } from './SitemapLegend';
 import { SITEMAP_CSS } from './styles';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
+import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { FC_CSS, UI_CSS } from '../flowchart/styles';
 import type { SitemapViewModel, SitemapScope, ConnectionTab } from './SitemapViewModel';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
@@ -131,24 +132,20 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                 <aside className="fside" id="sitemap-details" aria-label="Screen details" aria-live="polite" hidden={!vm.detailsOpen}>
                     {!!vm.output?.steps.length && <section aria-label="Screen journey">
                         <h3>Journey</h3>
-                        <ol className="sitemap-journey">
-                            {vm.output.steps.map((step, index) => {
-                                const open = vm.stepIndex === index;
-                                return <li key={index}>
-                                    <button className="sitemap-step" id={`sitemap-step-head-${index}`} aria-expanded={open}
-                                        aria-controls={`sitemap-step-${index}`} onClick={() => vm.selectStep(index)}
-                                        onMouseEnter={() => vm.hoverScreen(step.screen)} onMouseLeave={() => vm.hoverScreen(null)}
-                                        onFocus={() => vm.hoverScreen(step.screen)} onBlur={() => vm.hoverScreen(null)}>
-                                        Step {index + 1} · {vm.screenLabel(step.screen)}
-                                    </button>
-                                    {open && <div className="sitemap-step-panel" id={`sitemap-step-${index}`} role="region"
-                                        aria-labelledby={`sitemap-step-head-${index}`}>
-                                        <p>{step.note}</p>
-                                        <ScreenDetails vm={vm} id={step.screen} stepRefs={step.refs} />
-                                    </div>}
-                                </li>;
-                            })}
-                        </ol>
+                        <DisclosureList ordered className="sitemap-journey">
+                            {vm.output.steps.map((step, index) => (
+                                <Disclosure key={index} id={`sitemap-step-${index}`} headId={`sitemap-step-head-${index}`}
+                                    title={`Step ${index + 1} · ${vm.screenLabel(step.screen)}`}
+                                    open={vm.stepIndex === index} onToggle={() => vm.selectStep(index)}
+                                    headProps={{
+                                        onMouseEnter: () => vm.hoverScreen(step.screen), onMouseLeave: () => vm.hoverScreen(null),
+                                        onFocus: () => vm.hoverScreen(step.screen), onBlur: () => vm.hoverScreen(null),
+                                    }}>
+                                    <p>{step.note}</p>
+                                    <ScreenDetails vm={vm} id={step.screen} stepRefs={step.refs} />
+                                </Disclosure>
+                            ))}
+                        </DisclosureList>
                     </section>}
                     {vm.selected && !vm.output?.steps.some((step) => step.screen === vm.selectedId) ? <section aria-label="Selected screen">
                         <h3>{vm.screenLabel(vm.selected.id)}</h3>

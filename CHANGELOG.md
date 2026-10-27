@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Architecture card details are reorganized. The title row with **Close** stays pinned while the panel scrolls. The trace step comes first and shows one visit at a time ("Trace step 2 of 5"), with **‹ Prev | Next ›** to walk the whole trace card by card; clicking a card visited more than once opens its next visit. The rest sits in one box of collapsible rows styled like the sitemap journey: **About** (open: description, facts, contracts, path), **Related documents** with a count (collapsed, hidden when empty) and **Connections** with a count (collapsed: links to other repos, then From / To). Open rows stay open as you move between cards.
+- Flowchart step details use the same rows: **About** (lane, detail, inferred warning, proposed change) and **References** open, **Connections** collapsed. The sitemap journey now renders through the same shared component (`shared/ui/Disclosure.tsx`), unchanged in look.
+
 ## 0.15.0
 
 - Settings has three collapsible sections, collapsed when it opens: **Map** (repository details, freshness and map jobs), **Agents** (Map agent and Trace agent together) and **Linked repos**. Settings opens on **Map** when the map needs attention, and **Generate** on a missing map architecture opens it there too (`shared/ui/SettingsSection.tsx`, `shell.openSettings(section)`). **Trace agent** gains **Use in every repo**, which saves the pick as your default trace tool in `~/.config/repo-map/ai.json`.

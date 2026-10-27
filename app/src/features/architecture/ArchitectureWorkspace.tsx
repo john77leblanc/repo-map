@@ -10,6 +10,7 @@ import { DocumentationReference } from './DocumentationReference';
 import { WorkspaceBar } from './WorkspaceBar';
 import { SearchIcon, SearchPanel } from './SearchPanel';
 import { KeyToggle } from '../../shared/ui/KeyToggle';
+import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 
 export interface ArchitectureWorkspaceProps {
     vm: ArchitectureViewModel;
@@ -452,83 +453,70 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             <CollapsedRepoDetails vm={vm} id={selected.id} />
                         ) : (
                         <div className="arch-details-body">
-                        {vm.repoTitle(selected.repo) && <p className="hint repo-of">From <b>{vm.repoTitle(selected.repo)}</b></p>}
-                        <p className="description">
-                            {selected.desc ||
-                                (selected.status === 'new' ? selected.rationale : '')}
-                        </p>
-                        {selected.status && (
-                            <p className="proposal-note">
-                                {change(selected.status)}: {selected.rationale}
-                                {selected.suggestedPath
-                                    ? ' Suggested path: ' + selected.suggestedPath
-                                    : ''}
+                        <TraceStep vm={vm} id={selected.id} />
+                        <DisclosureList>
+                        <Disclosure id="arch-about" title="About" open={vm.sections.about}
+                            onToggle={(open) => vm.setSection('about', open)}>
+                            {vm.repoTitle(selected.repo) && <p className="hint repo-of">From <b>{vm.repoTitle(selected.repo)}</b></p>}
+                            <p className="description">
+                                {selected.desc ||
+                                    (selected.status === 'new' ? selected.rationale : '')}
                             </p>
-                        )}
-                        <ul className="facts">
-                            {selected.facts?.map((f, i) => (
-                                <li key={i}>{f}</li>
-                            ))}
-                        </ul>
-                        {(['provides', 'consumes'] as const).map((field) => selected[field]?.length ? (
-                            <section key={field} className="contracts" data-contracts={field}>
-                                <h4>{field === 'provides' ? 'Serves to other repos' : 'Calls in other repos'}</h4>
-                                <ul className="facts">
-                                    {selected[field]!.map((key) => <li key={key} title={key}>{contractLabel(key)}</li>)}
-                                </ul>
-                            </section>
-                        ) : null)}
-                        <div className="refs">
-                            {vm.trace?.steps.map((s, i) =>
-                                s.id === selected.id ? (
-                                    <section key={i} className="arch-step">
-                                        <h3>
-                                            <span
-                                                className="arch-step-number"
-                                                aria-label={'Step ' + (i + 1)}
-                                            >
-                                                {i + 1}
-                                            </span>
-                                            <span>Trace step</span>
-                                        </h3>
-                                        <p>{s.note}</p>
-                                        {vm.trace?.refs
-                                            .filter((r) => r.step === selected.id)
-                                            .map((r, j) => (
-                                                <CodeReference
-                                                    key={selected.id + r.path + j}
-                                                    reference={r}
-                                                    repo={vm.repo}
-                                                />
-                                            ))}
-                                    </section>
-                                ) : null
+                            {selected.status && (
+                                <p className="proposal-note">
+                                    {change(selected.status)}: {selected.rationale}
+                                    {selected.suggestedPath
+                                        ? ' Suggested path: ' + selected.suggestedPath
+                                        : ''}
+                                </p>
                             )}
-                            {vm.repo.docs[selected.id]?.map((r, i) => (
-                                <DocumentationReference
-                                    key={selected.id + r.path + i}
-                                    reference={r}
-                                    repo={vm.repo}
-                                />
-                            ))}
-                        </div>
-                        <CardSeams vm={vm} id={selected.id} />
-                        <CardConnections vm={vm} id={selected.id} />
-                        {selected.path && (
-                            <p className="path">
-                                {vm.repo.bootstrap?.repo.ghBase ? (
-                                    <a
-                                        href={`${vm.repo.bootstrap.repo.ghBase}/tree/${vm.repo.bootstrap.repo.ghRef || 'HEAD'}/${selected.path}`}
-                                        target="_blank"
-                                        rel="noopener"
-                                    >
-                                        {selected.path}
-                                    </a>
-                                ) : (
-                                    selected.path
-                                )}
-                            </p>
+                            {!!selected.facts?.length && (
+                                <ul className="facts">
+                                    {selected.facts.map((f, i) => (
+                                        <li key={i}>{f}</li>
+                                    ))}
+                                </ul>
+                            )}
+                            {(['provides', 'consumes'] as const).map((field) => selected[field]?.length ? (
+                                <section key={field} className="contracts" data-contracts={field}>
+                                    <h4>{field === 'provides' ? 'Serves to other repos' : 'Calls in other repos'}</h4>
+                                    <ul className="facts">
+                                        {selected[field]!.map((key) => <li key={key} title={key}>{contractLabel(key)}</li>)}
+                                    </ul>
+                                </section>
+                            ) : null)}
+                            {selected.path && (
+                                <p className="path">
+                                    {vm.repo.bootstrap?.repo.ghBase ? (
+                                        <a
+                                            href={`${vm.repo.bootstrap.repo.ghBase}/tree/${vm.repo.bootstrap.repo.ghRef || 'HEAD'}/${selected.path}`}
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            {selected.path}
+                                        </a>
+                                    ) : (
+                                        selected.path
+                                    )}
+                                </p>
+                            )}
+                        </Disclosure>
+                        {!!vm.repo.docs[selected.id]?.length && (
+                            <Disclosure id="arch-docs" title="Related documents" count={vm.repo.docs[selected.id].length}
+                                open={vm.sections.docs} onToggle={(open) => vm.setSection('docs', open)}>
+                                <div className="refs">
+                                    {vm.repo.docs[selected.id].map((r, i) => (
+                                        <DocumentationReference
+                                            key={selected.id + r.path + i}
+                                            reference={r}
+                                            repo={vm.repo}
+                                        />
+                                    ))}
+                                </div>
+                            </Disclosure>
                         )}
+                        <ConnectionsSection vm={vm} id={selected.id} />
+                        </DisclosureList>
                         </div>
                         )}
                         </>}
@@ -561,9 +549,50 @@ const CollapsedRepoDetails = observer(function CollapsedRepoDetails({ vm, id }: 
                     </li>
                 ))}
             </ul>
+            <DisclosureList><ConnectionsSection vm={vm} id={id} /></DisclosureList>
+        </div>
+    );
+});
+
+/** The open card's trace step, with Prev / Next through the whole trace. */
+const TraceStep = observer(function TraceStep({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
+    const i = vm.currentStep;
+    const step = vm.trace?.steps[i];
+    if (!step) return null;
+    const total = vm.trace!.steps.length;
+    return (
+        <section className="arch-step" aria-label="Trace step">
+            <h3>
+                <span className="arch-step-number" aria-hidden="true">{i + 1}</span>
+                <span>Trace step <span className="arch-step-of">{i + 1} of {total}</span></span>
+                <span className="arch-step-nav">
+                    <button className="link" type="button" id="arch-step-prev" aria-label="Previous trace step"
+                        disabled={!vm.hasPrev} onClick={vm.prevStep}>‹ Prev</button>
+                    <span aria-hidden="true">|</span>
+                    <button className="link" type="button" id="arch-step-next" aria-label="Next trace step"
+                        disabled={!vm.hasNext} onClick={vm.nextStep}>Next ›</button>
+                </span>
+            </h3>
+            <p>{step.note}</p>
+            {vm.trace!.refs
+                .filter((r) => r.step === id)
+                .map((r, j) => (
+                    <CodeReference key={id + r.path + j} reference={r} repo={vm.repo} />
+                ))}
+        </section>
+    );
+});
+
+/** Connections section: links to other repos, then From / To within the map. */
+const ConnectionsSection = observer(function ConnectionsSection({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
+    const conns = vm.connectionsFor(id);
+    const count = conns.from.length + conns.to.length + vm.seamsFor(id).length;
+    return (
+        <Disclosure id="arch-connections" title="Connections" count={count}
+            open={vm.sections.connections} onToggle={(open) => vm.setSection('connections', open)}>
             <CardSeams vm={vm} id={id} />
             <CardConnections vm={vm} id={id} />
-        </div>
+        </Disclosure>
     );
 });
 
@@ -575,7 +604,7 @@ const CardSeams = observer(function CardSeams({ vm, id }: { vm: ArchitectureView
     if (!seams.length) return null;
     return (
         <section className="seams" aria-label="Connections to other repos">
-            <h4>Connections to other repos</h4>
+            <h5>Other repos</h5>
             <ul>
                 {seams.map((e) => {
                     const other = e.from === id ? e.to : e.from;
@@ -606,11 +635,10 @@ const CardSeams = observer(function CardSeams({ vm, id }: { vm: ArchitectureView
 const CardConnections = observer(function CardConnections({ vm, id }: { vm: ArchitectureViewModel; id: string }) {
     const conns = vm.connectionsFor(id);
     if (!conns.from.length && !conns.to.length) {
-        return <div className="conn"><h4>Connections</h4><p className="hint">No connections.</p></div>;
+        return vm.seamsFor(id).length ? null : <p className="hint">No connections.</p>;
     }
     return (
-        <section className="conn" aria-label="Connections">
-            <h4>Connections</h4>
+        <section className="conn" aria-label="Connections in the map">
             <DirectionTabs idPrefix={'arch-conn-' + id} label="Connection direction" active={vm.connectionTab}
                 onChange={vm.setConnectionTab}
                 tabs={[{ id: 'from', label: 'From', count: conns.from.length }, { id: 'to', label: 'To', count: conns.to.length }]}>

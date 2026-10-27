@@ -2,6 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { fixture } from './testFixture';
 
 describe('ArchitectureViewModel', () => {
+    it('steps through the trace, one visit of a repeated card at a time', () => {
+        const { vm, trace } = fixture();
+        vm.setTrace({ ...trace, steps: [{ id: 'one', note: 'a' }, { id: 'two', note: 'b' }, { id: 'one', note: 'c' }] });
+        vm.inspect('one');
+        expect(vm.currentStep).toBe(0);
+        expect(vm.hasPrev).toBe(false);
+        vm.nextStep();
+        expect([vm.selected, vm.currentStep]).toEqual(['two', 1]);
+        vm.inspect('one');
+        expect(vm.currentStep).toBe(2);
+        expect(vm.hasNext).toBe(false);
+        vm.nextStep();
+        expect(vm.currentStep).toBe(2);
+        vm.prevStep();
+        vm.prevStep();
+        expect([vm.selected, vm.currentStep]).toEqual(['one', 0]);
+        vm.setTrace(null);
+        expect(vm.stepAt).toBe(null);
+        vm.inspect('one');
+        expect(vm.currentStep).toBe(-1);
+    });
+    it('keeps open sections while moving between cards', () => {
+        const { vm } = fixture();
+        expect(vm.sections).toEqual({ about: true, docs: false, connections: false });
+        vm.inspect('one');
+        vm.setSection('connections', true);
+        vm.inspect('two');
+        expect(vm.sections.connections).toBe(true);
+    });
     it('restores the original group snapshot across trace switching without persisting trace changes', () => {
         const { vm, trace, services } = fixture();
         vm.setTrace(trace);

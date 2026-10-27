@@ -36,7 +36,8 @@ test('the workspace view joins the linked API where the shop calls it, and switc
     await expect(page.locator('#ws-seam-count')).toHaveText('1 seam');
 
     await page.locator('.node[data-id="orders-client"] .nh').click();
-    const seam = page.locator('#arch-details .seams [data-seam="orders-client>api:orders-route"]');
+    await page.locator('#arch-connections-head').click();
+    const seam =page.locator('#arch-details .seams [data-seam="orders-client>api:orders-route"]');
     await expect(seam).toContainText('orders route (Shop API)');
     await expect(seam).toContainText('matched contract');
     await seam.locator('.cl').click();
@@ -68,6 +69,7 @@ test('a linked repo collapses into one card that keeps its seam, and expands fro
     await expect.poll(() => page.locator('#wires path.w.seam').count()).toBe(1);
     await card.locator('.nh').click();
     await expect(page.locator('#arch-details')).toContainText('5 cards from Shop API are folded into this card');
+    await page.locator('#arch-connections-head').click();
     await expect(page.locator('#arch-details .seams')).toContainText('orders client');
     await page.locator('#arch-details [data-member="api:receipts"]').click();
     await expect(page.locator('.node[data-id="c:repo:api"]')).toHaveCount(0);

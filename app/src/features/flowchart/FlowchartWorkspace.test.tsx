@@ -74,6 +74,9 @@ describe('FlowchartWorkspace', () => {
         expect(screen.getByText('Checkout guide')).toBeTruthy();
         expect(screen.getByText('Agent guide')).toBeTruthy();
         expect(screen.getByText('README.md#L3-L4')).toBeTruthy();
+        expect(side.querySelector('.flow-conn')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: /^Connections/ }));
+        expect(vm.sections.connections).toBe(true);
         expect(screen.getByRole('tab', { name: /To/ }).getAttribute('aria-selected')).toBe('true');
         expect(side.querySelector('.flow-conn li')?.textContent).toBe('Doneyes');
         fireEvent.mouseEnter(side.querySelector('[data-go="b"]')!);
@@ -100,6 +103,7 @@ describe('FlowchartWorkspace', () => {
             edges: [{ ...flow.edges[0], status: 'new' }],
         } });
         act(() => vm.select('a'));
+        vm.setSection('connections', true);
         const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
         const badge = container.querySelector('#fl-side [data-go="b"] .proposal-badge.new');
         expect(badge?.textContent).toBe('New');

@@ -80,6 +80,7 @@ describe('ArchitectureWorkspace', () => {
         const panel = container.querySelector('.arch-stage.details-open > aside#arch-details')!;
         expect(panel).toBeTruthy();
         expect(container.querySelector('dialog, .arch-details-shade')).toBe(null);
+        fireEvent.click(screen.getByRole('button', { name: /^Connections/ }));
         // Hovering a connection makes its card the main (filled) highlight.
         const two = screen.getByRole('button', { name: /Two\s*HTTP/ });
         fireEvent.mouseEnter(two);
@@ -158,6 +159,29 @@ describe('ArchitectureWorkspace', () => {
         act(() => vm.dismiss());
         fireEvent.keyDown(document, { key: '/' });
         expect(vm.searchOpen).toBe(true);
+    });
+    it('orders card details: trace step, About, documents, Connections', () => {
+        const { vm, trace } = fixture();
+        runInAction(() => {
+            vm.deps.repo.docs = { two: [{ path: 'README.md', start: 1, end: 2, title: 'Readme', why: '', kind: 'doc' }] };
+        });
+        vm.setTrace({ ...trace, steps: [{ id: 'one', note: 'first' }, { id: 'two', note: 'second' }] });
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
+        act(() => vm.inspect('two'));
+        const body = container.querySelector('.arch-details-body')!;
+        expect([...body.children].map((el) => el.className)).toEqual(['arch-step', 'disclosure-list']);
+        const rows = [...body.querySelectorAll('.disclosure-head')];
+        expect(rows.map((b) => [b.textContent, b.getAttribute('aria-expanded')])).toEqual([
+            ['About', 'true'], ['Related documents 1', 'false'], ['Connections 1', 'false'],
+        ]);
+        expect(body.querySelector('.arch-step')?.textContent).toContain('2 of 2');
+        expect(container.querySelector('#arch-docs')).toBe(null);
+        fireEvent.click(screen.getByRole('button', { name: 'Related documents 1' }));
+        expect(screen.getByRole('region', { name: 'Related documents 1' }).textContent).toContain('Readme');
+        expect(screen.getByRole('button', { name: 'Next trace step' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Previous trace step' }));
+        expect(vm.selected).toBe('one');
+        expect(container.querySelector('#arch-docs-head')).toBe(null);
     });
     it('lists card contracts in its details panel', () => {
         const { vm } = fixture();

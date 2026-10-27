@@ -5,6 +5,7 @@ import { ProgressLog } from '../../models/ProgressLog';
 import { ProgressLine } from './ProgressLine';
 import { DirectionTabs, shownTab } from './DirectionTabs';
 import { ModalHeader } from './ModalHeader';
+import { Disclosure, DisclosureList } from './Disclosure';
 
 describe('ProgressLog', () => {
     it('records entries with elapsed time, skipping repeats', () => {
@@ -83,5 +84,29 @@ describe('ModalHeader', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         expect(onClose).toHaveBeenCalled();
         expect(screen.getByRole('button', { name: 'Close' })).toHaveAttribute('id', 'x-close');
+    });
+});
+
+describe('Disclosure', () => {
+    it('toggles a row through its header button and shows the body only while open', () => {
+        function Rows() {
+            const [open, setOpen] = useState(false);
+            return (
+                <DisclosureList>
+                    <Disclosure id="d-one" title="Connections" count={3} open={open} onToggle={setOpen}>
+                        <p>Body</p>
+                    </Disclosure>
+                </DisclosureList>
+            );
+        }
+        const { container } = render(<Rows />);
+        const head = screen.getByRole('button', { name: 'Connections 3' });
+        expect(container.querySelector('ul.disclosure-list > li.disclosure')).toBeTruthy();
+        expect(head).toHaveAttribute('aria-expanded', 'false');
+        expect(head).toHaveAttribute('aria-controls', 'd-one');
+        expect(screen.queryByText('Body')).toBeNull();
+        fireEvent.click(head);
+        expect(head).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('region', { name: 'Connections 3' }).textContent).toBe('Body');
     });
 });
