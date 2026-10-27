@@ -131,6 +131,25 @@ export interface FlowNode {
     /** Set on a box standing in for a collapsed group; `members` are the hidden box ids. */
     collapsed?: boolean;
     members?: string[];
+    /** Drawn inside an expanded box: that box's id. */
+    expansion?: string;
+    /** Has a saved closer look that isn't drawn in the chart right now. */
+    expandable?: boolean;
+    /** A sub-box's own code, in a saved expansion. */
+    refs?: CodeRef[];
+}
+/** A closer look at one flowchart box (lib/flow-expand.mjs). */
+export interface FlowExpansion {
+    summary: string;
+    gaps: string;
+    nodes: FlowNode[];
+    edges: Flow['edges'];
+    entry: string;
+    exits: { to: string; from: string }[];
+    /** False when its arrows couldn't all be matched: shown in the side panel only. */
+    inline: boolean;
+    used?: Trace['used'];
+    createdAt?: number;
 }
 /** A group of boxes shown as one box. */
 export interface CollapseGroup {
@@ -144,6 +163,8 @@ export interface Flow {
     /** Repos whose lanes are drawn inside one band each (workspace traces). */
     repos?: { id: string; label: string }[];
     nodes: FlowNode[];
+    /** Boxes drawn open, with their labels (set by expandFlow). */
+    expanded?: { id: string; label: string }[];
     edges: {
         from: string;
         to: string;
@@ -210,6 +231,8 @@ export interface Trace {
     pendingSitemap?: boolean;
     sitemap?: SitemapTrace | null;
     flow?: Flow | null;
+    /** Closer looks at flowchart boxes, by box id. */
+    expansions?: Record<string, FlowExpansion>;
     proposal?: Proposal | null;
     plan?: Plan | null;
     used?: { agent: string; model: string; effort: string; label: string } | null;

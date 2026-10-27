@@ -20,6 +20,8 @@ const flow = { nodes: [{ id: 'start', type: 'start', label: 'Begin' }, { id: 'en
 const sitemapTrace = { applicability: 'none', summary: 'No screens apply', steps: [], navigation: [], gaps: [], changes: { screens: [], navigation: [] } };
 const fixtures = {
     classify: { intent: 'description', title: 'Checkout' }, flow: { flow },
+    expand: { summary: 'Charges the card', gaps: '', nodes: [{ id: 'x1', type: 'process', label: 'Build request', refs: [{ path: 'src/pay.mjs', start: 1, end: 5 }] },
+        { id: 'x2', type: 'decision', label: 'Approved?' }], edges: [{ from: 'x1', to: 'x2' }], entry: 'x1', exits: [{ arrow: 1, from: 'x2' }] },
     plan: { summary: 'Implementation', tasks: [{ title: 'Update checkout', detail: 'Validate orders', files: [] }], interfaces: [], tests: [], risks: [], questions: [] },
     generate: { groups: [{ id: 'shop', col: 0, title: 'Shop' }], nodes: [{ id: 'checkout', group: 'shop', kind: 'service', path: 'src/', desc: 'Checkout' }], edges: [] },
     update: { summary: 'No changes' }, docs: { links: [{ node: 'checkout', path: 'README.md', start: 1, end: 4, title: 'Checkout', why: 'Overview', kind: 'doc' }] },

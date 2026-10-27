@@ -1,4 +1,5 @@
 ﻿import { normalizeFlow } from '../../../lib/flow.mjs';
+import { normalizeExpansions } from '../../../lib/flow-expand.mjs';
 import { normalizePlan, normalizeProposal } from '../../../lib/proposal.mjs';
 import { traceOutputs } from '../../../lib/trace-outputs.mjs';
 import { normalizeSitemapTrace } from '../../../lib/sitemap-trace.mjs';
@@ -137,6 +138,7 @@ function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, works
         pairs,
         refs: cleanRefs(refs.map((r) => (isRecord(r) ? { ...r, step: swap(String(r.step || '')) } : r)), steps) || [],
         flow,
+        ...(flow && raw.expansions ? { expansions: normalizeExpansions(raw.expansions, flow) as Trace['expansions'] } : {}),
         sitemap,
         pendingSitemap: raw.pendingSitemap === true,
         outputs: traceOutputs(raw),
@@ -174,6 +176,7 @@ function plain(trace: Trace): PlainTrace {
     if (trace.proposal) result.proposal = trace.proposal;
     if (trace.plan) result.plan = trace.plan;
     if (trace.flow) result.flow = trace.flow;
+    if (trace.flow && trace.expansions && Object.keys(trace.expansions).length) result.expansions = trace.expansions;
     if (trace.sitemap) result.sitemap = trace.sitemap;
     if (trace.pendingSitemap) result.pendingSitemap = true;
     if (trace.used) result.used = trace.used;

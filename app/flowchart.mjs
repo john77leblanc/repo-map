@@ -455,6 +455,7 @@ function layoutFlow(flow, { lanes = true } = {}) {
         width: Math.ceil(width),
         height: Math.ceil(height),
         nodes: nodes.map(({ idx, ...n }) => n),
+        frames: expansionFrames(flow, nodes),
         edges: routed.sort((a, b) => a.idx - b.idx).map(({ chain, idx, ...e }) => e),
         lanes: laneBounds,
         laneTop,
@@ -464,6 +465,55 @@ function layoutFlow(flow, { lanes = true } = {}) {
             return { id: band.id, label: band.label, lanes: band.lanes, x: x0, w: Math.max(...own.map((lane) => lane.x + lane.w)) - x0 };
         }),
     };
+}
+
+/** Room above an expansion's boxes for its frame title. */
+const FRAME_TOP = 22;
+const FRAME_PAD = 10;
+
+/**
+ * A frame around each expanded box's sub-boxes, titled with the box's label. It
+ * steps in and out row by row (changing width halfway between rows), so boxes
+ * beside the sub-boxes stay outside. Left out when it would still cut through
+ * another box; the sub-boxes keep their tint either way.
+ */
+function expansionFrames(flow, nodes) {
+    const frames = [];
+    for (const { id, label } of flow.expanded || []) {
+        const own = nodes.filter((n) => n.expansion === id);
+        if (!own.length) continue;
+        const rows = [];
+        for (const n of [...own].sort((a, b) => a.cy - b.cy)) {
+            const row = rows.find((r) => Math.abs(r.cy - n.cy) < 1);
+            if (row) row.nodes.push(n);
+            else rows.push({ cy: n.cy, nodes: [n] });
+        }
+        const bands = rows.map((r) => ({
+            x0: Math.min(...r.nodes.map((n) => n.x)) - FRAME_PAD,
+            x1: Math.max(...r.nodes.map((n) => n.x + n.w)) + FRAME_PAD,
+            top: Math.min(...r.nodes.map((n) => n.y)),
+            bottom: Math.max(...r.nodes.map((n) => n.y + n.h)),
+        }));
+        bands.forEach((b, i) => {
+            b.y0 = i ? (bands[i - 1].bottom + b.top) / 2 : b.top - FRAME_TOP;
+            b.y1 = i < bands.length - 1 ? (b.bottom + bands[i + 1].top) / 2 : b.bottom + FRAME_PAD;
+        });
+        const hits = (n, b) => n.x < b.x1 && n.x + n.w > b.x0 && n.y < b.y1 && n.y + n.h > b.y0;
+        if (nodes.some((n) => n.expansion !== id && bands.some((b) => hits(n, b)))) continue;
+        // Down the right side, then up the left.
+        const points = [
+            ...bands.flatMap((b) => [[b.x1, b.y0], [b.x1, b.y1]]),
+            ...[...bands].reverse().flatMap((b) => [[b.x0, b.y1], [b.x0, b.y0]]),
+        ];
+        frames.push({ id, label, points, x: bands[0].x0, y: bands[0].y0, w: bands[0].x1 - bands[0].x0 });
+    }
+    return frames;
+}
+
+/** Where a box's "has a closer look" badge sits: its top-right corner, on the outline. */
+function badgeAt(n) {
+    if (n.type === 'decision') return [n.x + n.w * 0.75, n.y + n.h * 0.25];
+    return [n.x + n.w - (n.type === 'start' || n.type === 'end' ? n.h / 4 : 2), n.y + 2];
 }
 
 function r1(v) {
@@ -555,14 +605,22 @@ function renderFlowSvg(layout, { title = '' } = {}) {
     for (const lane of layout.lanes || []) {
         parts.push(`<g class="execution-lane"><rect x="${r1(lane.x)}" y="${8 + top}" width="${r1(lane.w)}" height="${r1(layout.height - 16 - top)}" rx="6"/><text x="${r1(lane.x + lane.w / 2)}" y="${36 + top}" text-anchor="middle">${escXml(lane.label)}</text></g>`);
     }
+    for (const f of layout.frames || []) {
+        parts.push(`<path class="xp-frame" data-frame="${escXml(f.id)}" d="M${f.points.map(([px, py]) => `${r1(px)},${r1(py)}`).join(' L')} Z"/>`);
+    }
     layout.edges.forEach((e, i) => {
         parts.push(`<path class="fe${e.context ? ' context' : ''}${e.inferred ? ' inf' : ''}${e.back ? ' back' : ''}${CHANGE_LABELS[e.status] ? ` change-${e.status}` : ''}" data-i="${i}" d="${e.d}" marker-end="url(#fc-arrow)"><title>${escXml([CHANGE_LABELS[e.status], e.label].filter(Boolean).join(': '))}</title></path>`);
     });
     parts.push('</g>');
     layout.nodes.forEach((n) => {
-        const label = n.collapsed ? `Collapsed: ${nodeText(n)}` : `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
-        parts.push(`<g class="fn t-${n.type}${n.context ? ' context' : ''}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
+        const text = n.collapsed ? `Collapsed: ${nodeText(n)}` : `${CHANGE_LABELS[n.status] || ''} ${n.label}`.trim();
+        const label = n.expansion ? `${text} (inside an expanded step)` : n.expandable ? `${text} (has a closer look)` : text;
+        parts.push(`<g class="fn t-${n.type}${n.expansion ? ' xp' : ''}${n.context ? ' context' : ''}${n.inferred ? ' inf' : ''}${CHANGE_LABELS[n.status] ? ` change-${n.status}` : ''}" data-id="${escXml(n.id)}" tabindex="0" role="button" aria-label="${escXml(label)}">`);
         parts.push(shapeOf(n));
+        if (n.expandable) {
+            const [bx, by] = badgeAt(n);
+            parts.push(`<g class="xp-badge"><circle cx="${r1(bx)}" cy="${r1(by)}" r="6.5"/><path d="M${r1(bx - 3)},${r1(by)} H${r1(bx + 3)} M${r1(bx)},${r1(by - 3)} V${r1(by + 3)}"/></g>`);
+        }
         const top = n.cy - ((n.lines.length - 1) * LINE_H) / 2 + 4.5;
         parts.push(`<text x="${r1(n.cx)}" y="${r1(top)}" text-anchor="middle">${n.lines.map((l, i) => `<tspan x="${r1(n.cx)}"${i ? ` dy="${LINE_H}"` : ''}>${escXml(l)}</tspan>`).join('')}</text>`);
         parts.push('</g>');
@@ -576,6 +634,13 @@ function renderFlowSvg(layout, { title = '' } = {}) {
         }
         parts.push(`<g class="fl${e.context ? ' context' : ''}" data-i="${i}"><rect x="${r1(box.x)}" y="${r1(box.y - 9)}" width="${r1(box.w)}" height="17" rx="3"/><text x="${r1(box.x + box.w / 2)}" y="${r1(box.y + 3.5)}" text-anchor="middle">${escXml(box.caption)}</text></g>`);
     });
+    // Frame titles sit on a backing like captions, so an arrow into the frame never runs through them.
+    for (const f of layout.frames || []) {
+        const title = `Expanded: ${f.label}`;
+        const fit = Math.max(4, Math.floor((f.w - 16) / 6.1));
+        const text = title.length > fit ? `${title.slice(0, fit - 1)}…` : title;
+        parts.push(`<g class="xp-title" data-frame="${escXml(f.id)}"><rect x="${r1(f.x + 4)}" y="${r1(f.y + 3)}" width="${r1(text.length * 6.1 + 8)}" height="16" rx="3"/><text x="${r1(f.x + 8)}" y="${r1(f.y + 15)}">${escXml(text)}</text><title>${escXml(title)}</title></g>`);
+    }
     parts.push('</g>');
     parts.push('</svg>');
     return parts.join('');

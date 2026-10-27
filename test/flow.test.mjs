@@ -238,6 +238,8 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
             }
             const prompt = JSON.parse(b).messages.at(-1).content;
             const out = prompt.startsWith('Classify') ? { intent: 'description', title: 'Order' }
+                : prompt.startsWith('You are taking a closer look')
+                ? { ...CLOSER, nodes: CLOSER.nodes.map((n) => ({ ...n, type: n.type === 'start' ? 'process' : n.type, refs: [{ path: 'src/nowhere.ts', start: 1, end: 3 }] })) }
                 : prompt.startsWith('You are drawing a flowchart')
                 ? { flow: CHECKOUT }
                 : { intent: 'description', title: 'Order', summary: 's', steps: [{ id: 'shopper', note: 'n', refs: [] }, { id: 'checkout-page', note: 'n', refs: [] }, { id: 'orders-client', note: 'n', refs: [] }], edges: [], gaps: '', flow: CHECKOUT };
@@ -268,6 +270,14 @@ test('server: traces carry flowcharts, /api/flow draws one, PUT keeps createdAt,
     assert.equal(drawn.type, 'result');
     assert.equal(drawn.flow.edges.length, 8);
     assert.equal((await fetch(`${base}/api/flow`, { method: 'POST', headers: H, body: '{}' })).status, 400);
+
+    const expand = (body) => fetch(`${base}/api/flow/expand`, { method: 'POST', headers: H, body: JSON.stringify(body) });
+    const closer = await lastResult(await expand({ trace: withFlow.trace, node: 'p1' }));
+    assert.equal(closer.type, 'result');
+    assert.deepEqual(closer.expansion.exits, [{ to: 'd2', from: 'p1.3' }]);
+    assert.ok(closer.expansion.nodes.every((n) => !n.refs), 'refs to missing files are dropped');
+    assert.equal((await expand({ trace: withFlow.trace, node: 'p1.1' })).status, 400, 'one level only');
+    assert.equal((await expand({ trace: noFlow.trace, node: 'p1' })).status, 400, 'needs a flowchart');
 
     const { key } = await (await fetch(`${base}/api/traces`, { method: 'POST', headers: H, body: JSON.stringify({ ...noFlow.trace, createdAt: 123 }) })).json();
     const outputs = { architecture: false, flowchart: true };
@@ -415,4 +425,82 @@ test('lanes outside every repo sit in a last band, so every lane has one', () =>
     // bands never overlap
     const sorted = [...layout.repoBands].sort((a, b) => a.x - b.x);
     for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i].x >= sorted[i - 1].x + sorted[i - 1].w + 8);
+});
+
+const CLOSER = {
+    summary: 'Charges the card through the payment provider.',
+    gaps: '',
+    nodes: [
+        { id: 'x1', type: 'start', label: 'Build the payment request', refs: [{ path: 'src/pay.ts', start: 3, end: 9, why: 'builds it' }, { path: 'a', start: 1, end: 2 }, { path: 'b', start: 1, end: 2 }] },
+        { id: 'x2', type: 'process', label: 'Send it to the provider', lane: 'nowhere' },
+        { id: 'x3', type: 'decision', label: 'Provider answered in time?' },
+        { id: 'x4', type: 'error', label: 'Record a timeout' },
+    ],
+    edges: [{ from: 'x1', to: 'x2' }, { from: 'x2', to: 'x3' }, { from: 'x3', to: 'x4', label: 'no' }, { from: 'x9', to: 'x1' }],
+    entry: 'x1',
+    exits: [{ arrow: 1, from: 'x3' }],
+};
+
+test('normalizeExpansion numbers sub-boxes under their box and maps arrows out', async () => {
+    const { normalizeExpansion, expandable } = await import('../lib/flow-expand.mjs');
+    const flow = { ...CHECKOUT, lanes: [{ id: 'backend', label: 'Backend' }], nodes: CHECKOUT.nodes.map((n) => (n.id === 'p1' ? { ...n, lane: 'backend' } : n)) };
+    const exp = normalizeExpansion(CLOSER, flow, 'p1');
+    assert.deepEqual(exp.nodes.map((n) => n.id), ['p1.1', 'p1.2', 'p1.3', 'p1.4']);
+    assert.equal(exp.nodes[0].type, 'process', 'only the whole flow has a start');
+    assert.equal(exp.nodes[1].lane, 'backend', 'unknown lanes fall back to the box\'s lane');
+    assert.equal(exp.nodes[0].refs.length, 2);
+    assert.equal(exp.edges.length, 3, 'arrows to unknown boxes are dropped');
+    assert.equal(exp.entry, 'p1.1');
+    assert.deepEqual(exp.exits, [{ to: 'd2', from: 'p1.3' }]);
+    assert.equal(exp.inline, true);
+    // saved form round-trips
+    assert.deepEqual(normalizeExpansion(exp, flow, 'p1'), exp);
+    // one level only, and a known box
+    assert.equal(normalizeExpansion(CLOSER, flow, 'p1.1'), null);
+    assert.equal(normalizeExpansion(CLOSER, flow, 'nope'), null);
+    assert.equal(expandable(flow, 'p1'), true);
+    // a decision's arrows that aren't matched leave it panel-only
+    const d2 = normalizeExpansion({ ...CLOSER, exits: [{ arrow: 1, from: 'x3' }] }, flow, 'd2');
+    assert.equal(d2.inline, false);
+    // one sub-box that leads nowhere takes an unmatched arrow
+    const sink = normalizeExpansion({ ...CLOSER, nodes: CLOSER.nodes.slice(0, 2), edges: [{ from: 'x1', to: 'x2' }], exits: [] }, flow, 'p1');
+    assert.deepEqual(sink.exits, [{ to: 'd2', from: 'p1.2' }]);
+    assert.equal(sink.inline, true);
+});
+
+test('expandFlow draws shown closer looks in place; layout frames and marks them', async () => {
+    const { expandFlow, normalizeExpansions } = await import('../lib/flow-expand.mjs');
+    const expansions = normalizeExpansions({ p1: CLOSER, bogus: CLOSER }, CHECKOUT);
+    assert.deepEqual(Object.keys(expansions), ['p1']);
+    const hidden = expandFlow(CHECKOUT, expansions, []);
+    assert.equal(hidden.nodes.find((n) => n.id === 'p1').expandable, true);
+    const flow = expandFlow(CHECKOUT, expansions, ['p1']);
+    assert.ok(!flow.nodes.some((n) => n.id === 'p1'));
+    assert.ok(flow.nodes.filter((n) => n.expansion === 'p1').every((n) => n.step === 3 && !n.refs));
+    assert.ok(flow.edges.some((e) => e.from === 'd1' && e.to === 'p1.1' && e.label === 'no'), 'arrows in land on the entry');
+    assert.ok(flow.edges.some((e) => e.from === 'a1' && e.to === 'p1.1'), 'loops back land on the entry too');
+    assert.ok(flow.edges.some((e) => e.from === 'p1.3' && e.to === 'd2'), 'arrows out leave from their exit');
+    assert.deepEqual(flow.expanded, [{ id: 'p1', label: 'Charge the card' }]);
+    const layout = layoutFlow(flow);
+    assert.equal(layout.frames.length, 1);
+    const svg = renderFlowSvg(layout);
+    assert.match(svg, /class="xp-frame" data-frame="p1"/);
+    assert.match(svg, /class="xp-title" data-frame="p1"/);
+    assert.match(svg, /Expanded: Charge the card/);
+    assert.equal((svg.match(/class="fn t-\w+ xp/g) || []).length, 4);
+    assert.match(renderFlowSvg(layoutFlow(hidden)), /class="xp-badge"/);
+    const mermaid = flowToMermaid(flow);
+    assert.match(mermaid, /subgraph xp1\["Expanded: Charge the card"\]/);
+    assert.match(mermaid, /class n4,n5,n6,n7 xp/);
+});
+
+test('expandPrompt numbers the arrows out of the box', async () => {
+    const { expandPrompt } = await import('../lib/prompts.mjs');
+    const config = withDefaults({ name: 'Shop' });
+    const trace = { prompt: 'Place an order', steps: [{ id: 'a', note: 'n' }, { id: 'b', note: 'n' }, { id: 'c', note: 'pays' }], refs: [{ step: 'c', path: 'src/pay.ts', start: 1, end: 9 }] };
+    const text = expandPrompt(config, { nodes: [], edges: [] }, trace, CHECKOUT, 'd2');
+    assert.match(text, /^You are taking a closer look/);
+    assert.match(text, /BOX TO LOOK INSIDE: d2/);
+    assert.match(text, /1\. to "Show confirmation" \(yes\)\n2\. to "Shopper edits card details" \(declined\)/);
+    assert.match(expandPrompt(config, { nodes: [], edges: [] }, trace, CHECKOUT, 'p1'), /src\/pay\.ts lines 1-9/);
 });

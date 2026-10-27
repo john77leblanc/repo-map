@@ -105,6 +105,64 @@ const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: Flowch
     );
 });
 
+/**
+ * A box's closer look: the AI's explanation and the smaller steps inside it, with
+ * Show in chart / Fold back. Boxes inside a shown closer look show it too.
+ */
+const CloserLook = observer(function CloserLook({ vm, id }: { vm: FlowchartViewModel; id: string }) {
+    const found = vm.expansionFor(id);
+    const toggle = (open: boolean) => vm.setSection('closer', open);
+    if (!found) {
+        if (!vm.canExpand(id) || !vm.repo.aiAvailable) return null;
+        const running = vm.expandingId === id;
+        return (
+            <Disclosure id="fl-closer" title="Closer look" open={vm.sections.closer} onToggle={toggle}>
+                <p className="hint">Ask the AI tool to split this step into smaller steps and explain it, from the code.</p>
+                <button className="btn sm primary" id="fl-look-closer" type="button" disabled={vm.busy}
+                    onClick={() => void vm.lookCloser(id)}>{running ? 'Looking closer…' : 'Look closer'}</button>
+            </Disclosure>
+        );
+    }
+    const { expansion, label } = found;
+    const box = found.id;
+    const shown = vm.isShown(box);
+    const inside = id !== box;
+    return (
+        <Disclosure id="fl-closer" title="Closer look" count={expansion.nodes.length} open={vm.sections.closer} onToggle={toggle}>
+            {inside && <p className="ft">Inside: {label}</p>}
+            {expansion.summary && <p className="fd">{expansion.summary}</p>}
+            <ol className="flow-members" id="fl-closer-steps">
+                {expansion.nodes.map((n) => (
+                    <li key={n.id} data-sub={n.id}>
+                        {shown ? (
+                            <button className="btn sm" type="button" aria-current={n.id === id ? 'step' : undefined}
+                                onClick={() => vm.select(n.id)}>{n.label}</button>
+                        ) : <span>{n.label}</span>}
+                        {n.status && <span className={'proposal-badge ' + n.status}>{CHANGE_LABELS[n.status]}</span>}
+                    </li>
+                ))}
+            </ol>
+            {!shown && <div className="flow-mini" aria-hidden="true" dangerouslySetInnerHTML={{ __html: vm.miniSvg(box) }} />}
+            {expansion.gaps && <p className="fwarn">Not clear from the code: {expansion.gaps}</p>}
+            {!expansion.inline && <p className="hint">Its arrows couldn't be matched to the chart, so it's shown here only.</p>}
+            <div className="flow-select-actions">
+                {expansion.inline && (
+                    <button className="btn sm primary" id="fl-closer-toggle" type="button" onClick={() => vm.setShown(box, !shown)}>
+                        {shown ? 'Fold back' : 'Show in chart'}
+                    </button>
+                )}
+                {vm.repo.aiAvailable && (
+                    <button className="btn sm" id="fl-closer-redo" type="button" disabled={vm.busy}
+                        onClick={() => void vm.lookCloser(box)}>{vm.expandingId === box ? 'Looking closer…' : 'Look again'}</button>
+                )}
+                <button className="btn sm" id="fl-closer-remove" type="button" disabled={vm.busy}
+                    onClick={() => void vm.removeExpansion(box)}>Delete</button>
+            </div>
+            {expansion.used?.label && <p className="hint">By {expansion.used.label}</p>}
+        </Disclosure>
+    );
+});
+
 /** Edges arriving at (From) and leaving (To) the selected node. Clicking one moves the selection. */
 const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: FlowchartViewModel; id: string }) {
     const conns = vm.connections;
@@ -181,6 +239,7 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                         )}
                     </Disclosure>
                 )}
+                {!node.collapsed && <CloserLook vm={vm} id={node.id} />}
                 {vm.references.length > 0 && (
                     <Disclosure id="fl-refs" title="References" count={vm.references.length}
                         open={vm.sections.refs} onToggle={(open) => vm.setSection('refs', open)}>
@@ -251,6 +310,20 @@ function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean 
                         <rect className="lg" x="1" y="4" width="16" height="9" rx="2" />
                     </svg>
                     collapsed group
+                </span>
+                <span>
+                    <svg viewBox="0 0 22 14" aria-hidden="true">
+                        <rect className="lg" x="1" y="3" width="17" height="10" rx="2" />
+                        <circle className="lg-badge" cx="17" cy="4" r="3.6" />
+                    </svg>
+                    has a closer look
+                </span>
+                <span>
+                    <svg viewBox="0 0 22 14" aria-hidden="true">
+                        <rect className="lg-frame" x="0.5" y="0.5" width="21" height="13" rx="3" />
+                        <rect className="lg xp" x="4" y="4" width="14" height="7" rx="2" />
+                    </svg>
+                    inside a closer look
                 </span>
             </div>
             <p data-proposal-key className="proposal-legend" hidden={!proposal}>

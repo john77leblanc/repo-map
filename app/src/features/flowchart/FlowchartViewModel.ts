@@ -1,6 +1,8 @@
 ﻿import { makeAutoObservable, observable, isObservable, observableRef, runInAction } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { AgentPick, ChangeStatus, CollapseGroup, Flow, Trace, StreamResult } from '../../models/types';
+import type { AgentPick, ChangeStatus, CollapseGroup, Flow, FlowExpansion, Trace, StreamResult } from '../../models/types';
+import { expandFlow, expandable, normalizeExpansion, subRefs } from '../../../../lib/flow-expand.mjs';
+import { plain } from '../../models/trace';
 import { collapseGraph } from '../../../../lib/collapse.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
@@ -20,7 +22,7 @@ export interface FlowchartDeps {
 }
 export type ConnectionTab = 'from' | 'to';
 /** Collapsible sections of the step details panel. */
-export type StepSection = 'about' | 'refs' | 'connections';
+export type StepSection = 'about' | 'closer' | 'refs' | 'connections';
 export interface FlowConnection {
     edge: Flow['edges'][number];
     index: number;
@@ -57,7 +59,7 @@ export class FlowchartViewModel {
     selecting = false;
     connectionTab: ConnectionTab = 'to';
     /** Open step sections; kept while moving between steps. */
-    sections: Record<StepSection, boolean> = { about: true, refs: true, connections: false };
+    sections: Record<StepSection, boolean> = { about: true, closer: true, refs: true, connections: false };
     scale = 1;
     keyOpen = false;
     busy = false;
@@ -65,6 +67,10 @@ export class FlowchartViewModel {
     error = false;
     copied = false;
     compact = false;
+    /** Boxes whose closer look is drawn in the chart. Saved per trace in the browser. */
+    shown: string[] = [];
+    /** The box a closer look is being made for. */
+    expandingId: string | null = null;
     readonly focus = new DiagramFocusModel({ layout: () => this.layout, selected: () => this.selectedId });
     private controller: AbortController | null = null;
     private revision = 0;
@@ -94,7 +100,7 @@ export class FlowchartViewModel {
     }
 /** Every group to fold right now: collapsed repos first (they win any overlap), then lanes, then named groups. */
     get collapseGroups(): CollapseGroup[] {
-        const flow = this.trace?.flow;
+        const flow = this.baseFlow;
         if (!flow) return [];
         const bands = this.repoBands;
         const repos = (this.collapse.repos || []).map((repo) => bands.find((b) => b.id === repo)).filter((b) => !!b).map((band) => ({
@@ -112,11 +118,16 @@ export class FlowchartViewModel {
     /** Boxes in a repo band's lanes (an unassigned box sits in the '' lane). */
     private bandMembers(id: string) {
         const lanes = this.repoBands.find((b) => b.id === id)?.lanes || [];
-        return (this.trace?.flow?.nodes || []).filter((n) => lanes.includes(n.lane && this.trace?.flow?.lanes?.some((l) => l.id === n.lane) ? n.lane : '')).map((n) => n.id);
+        return (this.baseFlow?.nodes || []).filter((n) => lanes.includes(n.lane && this.trace?.flow?.lanes?.some((l) => l.id === n.lane) ? n.lane : '')).map((n) => n.id);
     }
-    /** The flow as drawn: the saved flow with the reader's collapsed groups folded in. */
-    get displayFlow(): Flow | null {
+    /** The saved flow with the shown closer looks drawn in place of their boxes. */
+    get baseFlow(): Flow | null {
         const flow = this.trace?.flow;
+        return flow ? (expandFlow(flow, this.trace?.expansions, this.shown) as Flow) : null;
+    }
+    /** The flow as drawn: the expanded flow with the reader's collapsed groups folded in. */
+    get displayFlow(): Flow | null {
+        const flow = this.baseFlow;
         if (!flow) return null;
         if (!this.collapseGroups.length) return flow;
         const out = collapseGraph(flow, this.collapseGroups) as Flow;
@@ -138,7 +149,7 @@ export class FlowchartViewModel {
     }
     /** Repo bands of a workspace trace's flowchart. */
     get repoBands(): { id: string; label: string; lanes: string[] }[] {
-        return this.trace?.flow ? flowRepos(this.trace.flow) : [];
+        return this.baseFlow ? flowRepos(this.baseFlow) : [];
     }
     isRepoCollapsed(id: string) {
         return !!this.collapse.repos?.includes(id);
@@ -163,6 +174,37 @@ export class FlowchartViewModel {
         const t = this.trace;
         return t ? `${this.repo.namespace}flow-collapse:${t._doc || t.key || t.title}` : '';
     }
+    private get shownKey() {
+        const t = this.trace;
+        return t ? `${this.repo.namespace}flow-shown:${t._doc || t.key || t.title}` : '';
+    }
+    /** The closer look for a box, or for the box a sub-box sits in. */
+    expansionFor(id: string | null | undefined): { id: string; label: string; expansion: FlowExpansion } | null {
+        if (!id || !this.trace?.expansions) return null;
+        const box = id.split('.')[0];
+        const expansion = this.trace.expansions[box];
+        if (!expansion) return null;
+        return { id: box, label: this.trace.flow?.nodes.find((n) => n.id === box)?.label || box, expansion };
+    }
+    /** True for a box of the saved flow that may get a closer look (one level deep only). */
+    canExpand(id: string | null | undefined) {
+        return !!id && !!this.trace?.flow && expandable(this.trace.flow, id);
+    }
+    isShown(id: string) {
+        return this.shown.includes(id);
+    }
+    /** Draw a box's closer look in the chart, or fold it back into its box. */
+    setShown(id: string, show: boolean) {
+        const exp = this.trace?.expansions?.[id];
+        if (!exp || (show && exp.inline === false)) return;
+        const was = this.selectedId;
+        this.shown = show ? [...new Set([...this.shown, id])] : this.shown.filter((s) => s !== id);
+        if (this.shownKey) this.deps.services.storage.set(this.shownKey, this.shown);
+        // Keep the panel on the same closer look: the entry box when opening, the box when folding.
+        if (show && was === id) this.select(exp.entry);
+        else if (!show && was?.startsWith(id + '.')) this.select(id);
+        this.saveCollapse();
+    }
     private saveCollapse() {
         if (this.collapseKey) this.deps.services.storage.set(this.collapseKey, this.collapse);
         // A selected box that was just folded away hands the selection to its group.
@@ -173,7 +215,7 @@ export class FlowchartViewModel {
     }
     /** A lane needs two or more boxes to be worth folding. */
     laneFoldable(id: string) {
-        return (this.trace?.flow?.nodes.filter((n) => n.lane === id).length || 0) >= 2;
+        return (this.baseFlow?.nodes.filter((n) => n.lane === id).length || 0) >= 2;
     }
     isLaneCollapsed(id: string) {
         return this.collapse.lanes.includes(id);
@@ -224,7 +266,7 @@ export class FlowchartViewModel {
         const taken = new Set(this.collapse.groups.map((g) => g.id));
         let n = this.collapse.groups.length + 1;
         while (taken.has(`s${n}`)) n++;
-        const members = this.trace?.flow?.nodes.map((node) => node.id).filter((id) => this.marked.includes(id)) || [];
+        const members = this.baseFlow?.nodes.map((node) => node.id).filter((id) => this.marked.includes(id)) || [];
         this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: `s${n}`, label: label.trim(), members }] };
         this.marked = [];
         this.saveCollapse();
@@ -272,7 +314,7 @@ export class FlowchartViewModel {
     members(collapsedId: string) {
         const node = this.displayFlow?.nodes.find((n) => n.id === collapsedId);
         const ids = new Set(node?.members || []);
-        return (this.trace?.flow?.nodes || []).filter((n) => ids.has(n.id));
+        return (this.baseFlow?.nodes || []).filter((n) => ids.has(n.id));
     }
     /** What DiagramSvg keeps bright: the hovered node, else the selected one, with its links and neighbours. */
     get highlight() {
@@ -301,6 +343,14 @@ export class FlowchartViewModel {
         if (!t?.flow) return '';
         return [t._doc || t.key || t.title, this.compact, t.flow.nodes.length, t.flow.edges.length].join('|');
     }
+    /** A small, read-only drawing of a closer look, for the side panel. */
+    miniSvg(id: string) {
+        const exp = this.trace?.expansions?.[id];
+        if (!exp) return '';
+        const layout = fitCaptions(layoutFlow({ nodes: exp.nodes, edges: exp.edges }, { lanes: false }));
+        // Not part of the chart: no focus stops or buttons in it.
+        return renderFlowSvg(layout, { title: 'Closer look' }).replace(/ tabindex="0" role="button"/g, '');
+    }
     get svg() {
         return this.layout ? renderFlowSvg(this.layout, { title: this.trace?.title }) : '';
     }
@@ -308,6 +358,9 @@ export class FlowchartViewModel {
         return this.displayFlow?.nodes.find((node) => node.id === this.selectedId) || null;
     }
     get references() {
+        // A box inside a closer look has its own code; without any, its box's step code stands in.
+        const own = this.selected?.expansion ? subRefs(this.trace?.expansions, this.selected.id) as Trace['refs'] : [];
+        if (own.length) return own;
         const step = this.selected?.step;
         const id = step ? this.trace?.steps[step - 1]?.id : null;
         return id
@@ -318,7 +371,7 @@ export class FlowchartViewModel {
             : [];
     }
     get inferred(): number {
-        return countInferred(this.trace?.flow);
+        return countInferred(this.baseFlow);
     }
     /** Edges arriving at (from) and leaving (to) the selected node, with their index for edge highlighting. */
     get connections() {
@@ -366,6 +419,8 @@ export class FlowchartViewModel {
         this.marked = [];
         this.selecting = false;
         this.collapse = this.collapseKey ? readCollapse(this.deps.services.storage.get(this.collapseKey, null)) : emptyCollapse();
+        this.shown = this.shownKey ? strings(this.deps.services.storage.get(this.shownKey, [])).filter((id) => !!this.trace?.expansions?.[id]) : [];
+        this.expandingId = null;
         this.focus.reset();
         this.status = '';
         this.error = false;
@@ -410,6 +465,67 @@ export class FlowchartViewModel {
         if (this.disposed || this.busy) return;
         this.setTrace(trace);
         trace = this.trace!;
+        await this.run('/api/flow', { trace }, (result, current) => {
+            const flow = normalizeFlow(result.flow, current.steps.length) as Flow | null;
+            if (!flow) throw new Error('The AI tool ended without a usable flowchart.');
+            // A new drawing has new boxes: the old closer looks no longer fit.
+            const updated = observable<Trace>({ ...current, flow, expansions: undefined, pendingFlow: false,
+                outputs: { ...traceOutputs(current), flowchart: true } });
+            this.shown = [];
+            if (this.shownKey) this.deps.services.storage.set(this.shownKey, []);
+            this.selectedId = null;
+            return updated;
+        });
+    }
+    /** Ask the AI tool for a closer look at one box, saved on the trace. */
+    async lookCloser(id: string) {
+        const trace = this.trace;
+        if (this.disposed || this.busy || !trace?.flow || !this.canExpand(id)) return;
+        this.expandingId = id;
+        await this.run('/api/flow/expand', { trace: plain(trace), node: id }, (result, current) => {
+            const raw = result.expansion as Record<string, unknown> | undefined;
+            const expansion = current.flow && normalizeExpansion({ ...raw, used: result.used, createdAt: Date.now() }, current.flow, id) as FlowExpansion | null;
+            if (!expansion) throw new Error('The AI tool ended without usable steps.');
+            const updated = observable<Trace>({ ...current, expansions: { ...current.expansions, [id]: expansion } });
+            // Drawn open when its arrows fit; a panel-only answer folds an older one back.
+            this.shown = expansion.inline ? [...new Set([...this.shown, id])] : this.shown.filter((s) => s !== id);
+            if (this.shownKey) this.deps.services.storage.set(this.shownKey, this.shown);
+            // The panel stays on this closer look: its first step when drawn open, else the box.
+            if (this.selectedId === id || this.selectedId?.startsWith(id + '.')) this.select(expansion.inline ? expansion.entry : id);
+            return updated;
+        });
+        runInAction(() => {
+            this.expandingId = null;
+        });
+    }
+    /** Delete a box's closer look from the trace. */
+    async removeExpansion(id: string) {
+        const trace = this.trace;
+        if (this.busy || !trace?.expansions?.[id]) return;
+        const expansions = { ...trace.expansions };
+        delete expansions[id];
+        if (this.selectedId?.startsWith(id + '.')) this.select(id);
+        this.shown = this.shown.filter((s) => s !== id);
+        if (this.shownKey) this.deps.services.storage.set(this.shownKey, this.shown);
+        const updated = observable<Trace>({ ...trace, expansions: Object.keys(expansions).length ? expansions : undefined });
+        this.trace = updated;
+        this.saveCollapse();
+        try {
+            await this.deps.saveTrace(updated);
+            this.deps.onTraceUpdated(updated);
+        } catch (error) {
+            runInAction(() => {
+                this.error = true;
+                this.status = error instanceof Error ? error.message : String(error);
+            });
+        }
+    }
+    /**
+     * Stream one AI job for this trace, with progress in the toolbar. `apply` turns the
+     * result into the updated trace (inside an action); it's then shown and saved.
+     */
+    private async run(path: string, body: Record<string, unknown>, apply: (result: StreamResult, trace: Trace) => Trace) {
+        const trace = this.trace!;
         const controller = new AbortController();
         const revision = ++this.revision;
         const current = () =>
@@ -428,8 +544,8 @@ export class FlowchartViewModel {
         const timer = setInterval(tick, 1000);
         try {
             const result = await this.deps.services.api.stream<StreamResult>(
-                '/api/flow',
-                { trace, ...this.deps.getPick() },
+                path,
+                { ...body, ...this.deps.getPick() },
                 controller.signal,
                 (text) => {
                     progress = text;
@@ -437,19 +553,12 @@ export class FlowchartViewModel {
                 }
             );
             if (!current()) return;
-            const flow = normalizeFlow(result.flow, trace.steps.length) as Flow | null;
-            if (!flow) throw new Error('The AI tool ended without a usable flowchart.');
-            const updated = observable<Trace>({
-                ...trace,
-                flow,
-                pendingFlow: false,
-                outputs: { ...traceOutputs(trace), flowchart: true },
-            });
-            runInAction(() => {
-                this.trace = updated;
-                this.selectedId = null;
+            const updated = runInAction(() => {
+                const next = apply(result, trace);
+                this.trace = next;
                 this.focus.reset();
                 this.status = '';
+                return next;
             });
             await this.deps.saveTrace(updated);
             if (current())

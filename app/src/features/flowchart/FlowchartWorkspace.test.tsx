@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest';
+﻿import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { FlowchartWorkspace } from './FlowchartWorkspace';
 import { CodeReference } from '../../shared/ui/CodeReference';
@@ -39,6 +39,35 @@ describe('FlowchartWorkspace', () => {
         unmount();
         vm.dispose();
     });
+    it('offers a closer look for a box, then shows it with Show in chart / Fold back', async () => {
+        const { vm, trace, services } = fixture();
+        Object.defineProperty(vm.repo, 'aiAvailable', { get: () => true });
+        vi.mocked(services.api.stream).mockResolvedValueOnce({ expansion: {
+            summary: 'Checks the cart.', gaps: '',
+            nodes: [{ id: 'x1', type: 'process', label: 'Load the cart' }, { id: 'x2', type: 'decision', label: 'Signed in?' }],
+            edges: [{ from: 'x1', to: 'x2' }], entry: 'x1', exits: [{ arrow: 1, from: 'x2' }],
+        } });
+        vm.setTrace(trace);
+        const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
+        act(() => vm.select('b'));
+        expect(screen.queryByRole('button', { name: 'Look closer' })).toBeTruthy();
+        act(() => vm.select('a'));
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Look closer' })));
+        // drawn in place: the panel follows the closer look's first step
+        expect(vm.selectedId).toBe('a.1');
+        expect(screen.getByText('Inside: Ready?')).toBeTruthy();
+        expect(screen.getByText('Checks the cart.')).toBeTruthy();
+        expect(container.querySelector('.fc .xp-frame')).toBeTruthy();
+        expect(container.querySelector('.fc .xp-title')?.textContent).toContain('Expanded: Ready?');
+        expect(container.querySelectorAll('.fc .fn.xp')).toHaveLength(2);
+        fireEvent.click(screen.getByRole('button', { name: 'Fold back' }));
+        expect(vm.selectedId).toBe('a');
+        expect(container.querySelector('.fc .xp-badge')).toBeTruthy();
+        expect(container.querySelector('.flow-mini svg')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Show in chart' })).toBeTruthy();
+        unmount();
+        vm.dispose();
+    });
     it('renders all legend symbols and shows change labels only for proposals', () => {
         const { vm, trace } = fixture();
         vm.setTrace(trace);
@@ -46,7 +75,7 @@ describe('FlowchartWorkspace', () => {
             <FlowchartWorkspace vm={vm} CodeReference={Reference} />
         );
         const legend = container.querySelector('#flowchart-key')!;
-        expect(legend.querySelectorAll('svg')).toHaveLength(7);
+        expect(legend.querySelectorAll('svg')).toHaveLength(9);
         expect(legend.hasAttribute('hidden')).toBe(true);
         fireEvent.click(screen.getByRole('button', { name: 'Diagram key' }));
         expect(legend.hasAttribute('hidden')).toBe(false);

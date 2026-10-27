@@ -19,7 +19,13 @@
 .fc .change-removed .fs,.fc .fe.change-removed{stroke:var(--muted);stroke-dasharray:2 4}
 .fc .change-removed>text{text-decoration:line-through;fill:var(--muted)}
 .fc .t-collapsed .fs{fill:var(--soft);stroke:var(--ink);stroke-width:1.6}
-.fc .fs-stack{fill:var(--panel);stroke:var(--muted);stroke-width:1}`;
+.fc .fs-stack{fill:var(--panel);stroke:var(--muted);stroke-width:1}
+.fc .xp .fs{fill:color-mix(in srgb,var(--ext) 22%,var(--panel))}
+.fc .xp-frame{fill:color-mix(in srgb,var(--ext) 4%,transparent);stroke:var(--ext);stroke-width:1.3;stroke-dasharray:6 4;stroke-linejoin:round}
+.fc .xp-title rect{fill:var(--bg)}
+.fc .xp-title text{fill:var(--ext);font-size:11px;font-weight:600}
+.fc .xp-badge circle{fill:var(--ext);stroke:var(--panel);stroke-width:1.5}
+.fc .xp-badge path{fill:none;stroke:var(--panel);stroke-width:1.6;stroke-linecap:round}`;
 export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fe-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke}
 .fc .fn:hover .fs{stroke-width:2.2}
@@ -68,4 +74,9 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fl.hl text{fill:var(--ink)}
 .flegend .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}
 .flegend .lg.act{stroke:var(--sync)} .flegend .lg.dec{stroke:var(--event)} .flegend .lg.err{stroke:var(--err)} .flegend .lg.inf{stroke-dasharray:3 2}
+.flegend .lg.xp{fill:color-mix(in srgb,var(--ext) 22%,var(--panel))} .flegend .lg-badge{fill:var(--ext)} .flegend .lg-frame{fill:none;stroke:var(--ext);stroke-dasharray:3 2}
+.fc.hovering .xp-frame,.fc.hovering .xp-title{opacity:.35}
+.flow-mini{margin:.5em 0;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.flow-mini svg{display:block;width:100%;height:auto;max-height:280px;pointer-events:none}
+.flow-members [aria-current="step"]{border-color:var(--http)}
 `;
