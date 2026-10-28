@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
 
 - **Trace only** on the architecture view. With a trace open, **Show** → **Trace only** (default) hides every card, group and column the trace doesn't touch and draws only the trace's own path; **Whole map** brings back the full, dimmed map. Opening a hidden card (from search or connections) shows it beside the trace until it is closed. The choice is remembered per browser. Traced cards inside a folded linked repo now count as its repo card.
 
