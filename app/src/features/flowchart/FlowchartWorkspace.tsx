@@ -9,6 +9,9 @@ import { DiagramSvg } from '../../shared/ui/DiagramSvg';
 import { DiagramToolbar } from '../../shared/ui/DiagramToolbar';
 import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
+import { SidePanel } from '../../shared/ui/SidePanel';
+import { FlowShape } from './FlowShape';
+import { ConnectionRow } from './ConnectionRow';
 
 export interface FlowchartDetailsProps {
     vm: FlowchartViewModel;
@@ -16,6 +19,8 @@ export interface FlowchartDetailsProps {
         reference: CodeRef;
         repo: RepositoryModel;
         documentation?: boolean;
+        list?: CodeRef[];
+        index?: number;
     }>;
 }
 const FLOW_KIND: Record<string, string> = {
@@ -45,6 +50,7 @@ const FlowCollapseControls = observer(function FlowCollapseControls({ vm }: { vm
 
 /** Side-panel body for a collapsed box: its name, hidden steps and Expand. */
 const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: { vm: FlowchartViewModel; id: string; label: string }) {
+    // The title is in the panel header; a renameable group adds its name field.
     const members = vm.members(id);
     // The clicked button goes away with the box, so keyboard focus moves to the selected step once it is drawn.
     const expand = (event: { currentTarget: HTMLElement }, step: string | null = null) => {
@@ -55,10 +61,10 @@ const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: {
     };
     return (
         <>
-            {vm.canRename(id) ? (
+            {vm.canRename(id) && (
                 <input className="fside-input" type="text" aria-label="Group name" value={vm.groupLabel(id)}
                     placeholder={label} maxLength={80} onChange={(event) => vm.renameGroup(id, event.target.value)} />
-            ) : <h3>{label}</h3>}
+            )}
             <h4>{members.length} hidden steps</h4>
             <ol className="flow-members">
                 {members.map((m) => (
@@ -76,14 +82,8 @@ const CollapsedDetails = observer(function CollapsedDetails({ vm, id, label }: {
 const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: FlowchartViewModel }) {
     const nodes = vm.markedNodes;
     return (
-        <aside className="fside" id="fl-side" aria-label="Selected steps" aria-live="polite"
-            onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); vm.clearMarks(); } }}>
-            <div className="fside-head">
-                <p className="ft">Selection</p>
-                <button className="btn sm" id="fl-side-close" type="button" onClick={vm.clearMarks}>Close</button>
-            </div>
-            <hr className="fside-rule" />
-            <h3>{nodes.length} step{nodes.length === 1 ? '' : 's'} selected</h3>
+        <SidePanel id="fl-side" aria-label="Selected steps" aria-live="polite" closeId="fl-side-close" onClose={vm.clearMarks}
+            title={`${nodes.length} step${nodes.length === 1 ? '' : 's'} selected`}>
             <ol className="flow-members" id="fl-selection">
                 {nodes.map((n) => (
                     <li key={n.id} data-marked={n.id}>
@@ -101,7 +101,7 @@ const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: Flowch
                     onClick={() => vm.collapseMarked()}>Collapse</button>
                 <button className="btn sm" id="fl-clear-sel" type="button" onClick={vm.clearMarks}>Clear</button>
             </div>
-        </aside>
+        </SidePanel>
     );
 });
 
@@ -109,39 +109,49 @@ const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: Flowch
  * A box's closer look: the AI's explanation and the smaller steps inside it, with
  * Show in chart / Fold back. Boxes inside a shown closer look show it too.
  */
+/** A closer-look job's progress and Stop, beside its button. */
+const CloserStatus = observer(function CloserStatus({ vm, box }: { vm: FlowchartViewModel; box: string }) {
+    const running = vm.busy && vm.expandingId === box;
+    const status = vm.closerStatus(box);
+    return (
+        <>
+            {running && <button className="btn sm" id="fl-closer-stop" type="button" onClick={() => vm.stop()}>Stop</button>}
+            <span className={'status' + (running ? ' busy' : vm.error ? ' err' : '')} id="fl-closer-status"
+                role="status" aria-live="polite">{status}</span>
+        </>
+    );
+});
+
 const CloserLook = observer(function CloserLook({ vm, id }: { vm: FlowchartViewModel; id: string }) {
     const found = vm.expansionFor(id);
-    const toggle = (open: boolean) => vm.setSection('closer', open);
     if (!found) {
         if (!vm.canExpand(id) || !vm.repo.aiAvailable) return null;
         const running = vm.expandingId === id;
         return (
-            <Disclosure id="fl-closer" title="Closer look" open={vm.sections.closer} onToggle={toggle}>
-                <p className="hint">Ask the AI tool to split this step into smaller steps and explain it, from the code.</p>
-                <button className="btn sm primary" id="fl-look-closer" type="button" disabled={vm.busy}
-                    onClick={() => void vm.lookCloser(id)}>{running ? 'Looking closer…' : 'Look closer'}</button>
-            </Disclosure>
+            <>
+                <hr className="fside-rule" />
+                <section className="flow-closer" id="fl-closer" aria-label="Closer look">
+                    <h4>Closer look</h4>
+                    <p className="hint">Ask the AI tool to split this step into smaller steps and explain it, from the code.</p>
+                    <div className="flow-select-actions">
+                        <button className="btn sm primary" id="fl-look-closer" type="button" disabled={vm.busy}
+                            onClick={() => void vm.lookCloser(id)}>{running ? 'Looking closer…' : 'Look closer'}</button>
+                        <CloserStatus vm={vm} box={id} />
+                    </div>
+                </section>
+            </>
         );
     }
-    const { expansion, label } = found;
+    const { expansion } = found;
     const box = found.id;
     const shown = vm.isShown(box);
-    const inside = id !== box;
     return (
-        <Disclosure id="fl-closer" title="Closer look" count={expansion.nodes.length} open={vm.sections.closer} onToggle={toggle}>
-            {inside && <p className="ft">Inside: {label}</p>}
+        <>
+        <hr className="fside-rule" />
+        <section className="flow-closer" id="fl-closer" aria-label="Closer look">
+            <h4>Closer look <span className="disclosure-count">
+                {expansion.nodes.length} step{expansion.nodes.length === 1 ? '' : 's'}</span></h4>
             {expansion.summary && <p className="fd">{expansion.summary}</p>}
-            <ol className="flow-members" id="fl-closer-steps">
-                {expansion.nodes.map((n) => (
-                    <li key={n.id} data-sub={n.id}>
-                        {shown ? (
-                            <button className="btn sm" type="button" aria-current={n.id === id ? 'step' : undefined}
-                                onClick={() => vm.select(n.id)}>{n.label}</button>
-                        ) : <span>{n.label}</span>}
-                        {n.status && <span className={'proposal-badge ' + n.status}>{CHANGE_LABELS[n.status]}</span>}
-                    </li>
-                ))}
-            </ol>
             {!shown && <div className="flow-mini" aria-hidden="true" dangerouslySetInnerHTML={{ __html: vm.miniSvg(box) }} />}
             {expansion.gaps && <p className="fwarn">Not clear from the code: {expansion.gaps}</p>}
             {!expansion.inline && <p className="hint">Its arrows couldn't be matched to the chart, so it's shown here only.</p>}
@@ -157,9 +167,11 @@ const CloserLook = observer(function CloserLook({ vm, id }: { vm: FlowchartViewM
                 )}
                 <button className="btn sm" id="fl-closer-remove" type="button" disabled={vm.busy}
                     onClick={() => void vm.removeExpansion(box)}>Delete</button>
+                <CloserStatus vm={vm} box={box} />
             </div>
             {expansion.used?.label && <p className="hint">By {expansion.used.label}</p>}
-        </Disclosure>
+        </section>
+        </>
     );
 });
 
@@ -179,20 +191,17 @@ const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: Flow
                 active={vm.connectionTab} onChange={vm.setConnectionTab}>
                 {(active) => (
                     <ul>
-                        {conns[active].map(({ edge, index, other }) => (
-                            <li key={active + index}>
-                                <button className="btn sm" type="button" data-go={other}
-                                    onClick={() => { vm.hoverConnection(null); vm.select(other); }}
-                                    onMouseEnter={() => vm.hoverConnection(index, other)} onMouseLeave={() => vm.hoverConnection(null)}
-                                    onFocus={() => vm.hoverConnection(index, other)} onBlur={() => vm.hoverConnection(null)}>
-                                    {vm.nodeLabel(other)}
-                                    {edge.status && <span className={'proposal-badge ' + edge.status}>{CHANGE_LABELS[edge.status]}</span>}
-                                </button>
-                                {(edge.label || edge.inferred) && <span className="hint">
-                                    {[edge.label, edge.inferred && 'inferred'].filter(Boolean).join(' · ')}
-                                </span>}
-                            </li>
-                        ))}
+                        {conns[active].map(({ edge, index, other }) => {
+                            const target = vm.nodeShape(other);
+                            return (
+                                <li key={active + index}>
+                                    <ConnectionRow go={other} title={vm.nodeLabel(other)} shape={target} status={target.status}
+                                        arrow={edge}
+                                        onClick={() => { vm.hoverConnection(null); vm.select(other); }}
+                                        onHover={(on) => vm.hoverConnection(on ? index : null, on ? other : null)} />
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </DirectionTabs>
@@ -209,7 +218,10 @@ export const FlowchartDetails = observer(function FlowchartDetails({
     const node = vm.selected;
     if (!node) return null;
     const change = vm.selectedChange;
-    const close = (event: { currentTarget: HTMLElement }) => {
+    // A step drawn inside a shown closer look names the box it's inside.
+    const found = node.collapsed ? null : vm.expansionFor(node.id);
+    const parent = found && found.id !== node.id ? found : null;
+    const close =(event: { currentTarget: HTMLElement }) => {
         const id = node.id;
         const main = event.currentTarget.closest('.fmain');
         vm.close();
@@ -217,13 +229,10 @@ export const FlowchartDetails = observer(function FlowchartDetails({
         main?.querySelector<SVGElement>(`.fn[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
     };
     return (
-        <aside className="fside" id="fl-side" aria-label="Step details" aria-live="polite"
-            onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(event); } }}>
-            <div className="fside-head">
-                <p className="ft">{FLOW_KIND[node.type] || 'Step'}</p>
-                <button className="btn sm" id="fl-side-close" type="button" onClick={close}>Close</button>
-            </div>
-            {node.collapsed ? <CollapsedDetails vm={vm} id={node.id} label={node.label} /> : <h3>{node.label}</h3>}
+        <SidePanel id="fl-side" aria-label="Step details" aria-live="polite" closeId="fl-side-close" title={node.label} onClose={close}
+            status={change?.status} kind={'Step' + (FLOW_KIND[node.type] ? ' — ' + FLOW_KIND[node.type] : '')}>
+            {node.collapsed && <CollapsedDetails vm={vm} id={node.id} label={node.label} />}
+            {parent && <p className="ft fside-inside">Inside: {parent.label}</p>}
             <DisclosureList>
                 {(vm.selectedLane || node.detail || node.inferred || change) && (
                     <Disclosure id="fl-about" title="About" open={vm.sections.about}
@@ -239,7 +248,6 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                         )}
                     </Disclosure>
                 )}
-                {!node.collapsed && <CloserLook vm={vm} id={node.id} />}
                 {vm.references.length > 0 && (
                     <Disclosure id="fl-refs" title="References" count={vm.references.length}
                         open={vm.sections.refs} onToggle={(open) => vm.setSection('refs', open)}>
@@ -250,6 +258,8 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                                     documentation={!!reference.kind}
                                     reference={reference}
                                     repo={vm.repo}
+                                    list={vm.references}
+                                    index={index}
                                 />
                             ))}
                         </div>
@@ -260,7 +270,8 @@ export const FlowchartDetails = observer(function FlowchartDetails({
                     <FlowConnections vm={vm} id={node.id} />
                 </Disclosure>
             </DisclosureList>
-        </aside>
+            {!node.collapsed && <CloserLook vm={vm} id={node.id} />}
+        </SidePanel>
     );
 });
 
@@ -268,49 +279,13 @@ function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean 
     return (
         <section className="flegend" id="flowchart-key" aria-label="Diagram key" hidden={!open}>
             <div>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <rect className="lg" x="1" y="2" width="20" height="10" rx="5" />
-                    </svg>
-                    start / end
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <polygon className="lg act" points="5,2 21,2 17,12 1,12" />
-                    </svg>
-                    person does
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <rect className="lg" x="1" y="2" width="20" height="10" rx="2" />
-                    </svg>
-                    system does
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <polygon className="lg dec" points="11,0 22,7 11,14 0,7" />
-                    </svg>
-                    decision
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <rect className="lg err" x="1" y="2" width="20" height="10" rx="2" />
-                    </svg>
-                    failure
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <rect className="lg inf" x="1" y="2" width="20" height="10" rx="2" />
-                    </svg>
-                    inferred
-                </span>
-                <span>
-                    <svg viewBox="0 0 22 14" aria-hidden="true">
-                        <rect className="lg" x="5" y="1" width="16" height="9" rx="2" />
-                        <rect className="lg" x="1" y="4" width="16" height="9" rx="2" />
-                    </svg>
-                    collapsed group
-                </span>
+                <span><FlowShape type="start" />start / end</span>
+                <span><FlowShape type="action" />person does</span>
+                <span><FlowShape type="process" />system does</span>
+                <span><FlowShape type="decision" />decision</span>
+                <span><FlowShape type="error" />failure</span>
+                <span><FlowShape type="process" inferred />inferred</span>
+                <span><FlowShape type="collapsed" />collapsed group</span>
                 <span>
                     <svg viewBox="0 0 22 14" aria-hidden="true">
                         <rect className="lg" x="1" y="3" width="17" height="10" rx="2" />
@@ -358,7 +333,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                         </label>}
                         tools={hasFlow && <FlowCollapseControls vm={vm} />}
                         diagramKey={{ id: 'flowchart-key', open: vm.keyOpen, toggle: vm.toggleKey }}
-                        status={vm.status} busy={vm.busy} error={vm.error} copied={vm.copied}
+                        status={vm.chartStatus} busy={vm.busy} stoppable={!vm.expandingId} error={vm.error} copied={vm.copied}
                         onZoom={vm.zoom} onFit={() => {
                             const canvas = root.current?.querySelector('#fl-canvas');
                             if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);

@@ -655,3 +655,20 @@ it('accepts a valid no-relevant-screens result when replacing a Sitemap-only tra
     vm.dispose();
     deps.sitemap.dispose();
 });
+it('says Copied! on the copied trace only, for two seconds', async () => {
+    vi.useFakeTimers();
+    try {
+        const { deps, repo } = fixture();
+        const vm = new TraceViewModel(deps);
+        const a = { ...normalizeTrace(raw, repo.map), _doc: 'a.json' };
+        const b = { ...normalizeTrace(raw, repo.map), _doc: 'b.json' };
+        await vm.copyCode(a);
+        expect(vm.codeCopied(a)).toBe(true);
+        expect(vm.codeCopied(b)).toBe(false);
+        vi.advanceTimersByTime(2000);
+        expect(vm.codeCopied(a)).toBe(false);
+        vm.dispose();
+    } finally {
+        vi.useRealTimers();
+    }
+});

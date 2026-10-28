@@ -118,3 +118,21 @@ it('keeps the replacement plan generation active when a canceled request returns
     expect(vm.busy).toBe(false);
     vm.dispose();
 });
+it('says Copied! on the Copy button for two seconds', async () => {
+    vi.useFakeTimers();
+    try {
+        const { repo, services } = fixture();
+        vi.mocked(services.api.stream).mockResolvedValue({ plan });
+        const vm = new PlansViewModel({ repo, services, getPick: () => ({}), saveTrace: vi.fn(async () => {}) });
+        await vm.open(normalizeTrace({ ...raw, intent: 'proposal' }, repo.map));
+        await vm.copy();
+        expect(services.browser.copy).toHaveBeenCalledWith(expect.stringContaining('Coupons'));
+        expect(vm.copied.copied).toBe(true);
+        expect(vm.status).not.toMatch(/Copied/);
+        vi.advanceTimersByTime(2000);
+        expect(vm.copied.copied).toBe(false);
+        vm.dispose();
+    } finally {
+        vi.useRealTimers();
+    }
+});

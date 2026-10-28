@@ -86,14 +86,18 @@ it('shows repeated journey steps, nearby context, cross-application navigation, 
     expect(container.querySelector('[data-id="cart"]')?.textContent).toContain('1, 2. cart');
     expect(screen.queryByText('Review cart')).toBeNull();
     expect(screen.queryByText('Edit cart')).toBeNull();
-    const step2 = screen.getByRole('button', { name: 'Step 2 · cart' });
-    fireEvent.click(step2);
-    expect(step2.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.queryByText('Review cart')).toBeNull();
-    expect(screen.getByRole('region', { name: 'Step 2 · cart' }).textContent).toContain('Edit cart');
-    fireEvent.click(step2);
-    expect(step2.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByText('Edit cart')).toBeNull();
+    // the panel stays closed until a screen is picked; a journey screen opens its trace step
+    expect(container.querySelector('#sitemap-details')).toBeNull();
+    fireEvent.click(container.querySelector('[data-id="cart"]')!);
+    const card = () => container.querySelector('#sitemap-details .trace-step')!;
+    expect(card().textContent).toContain('1 of 2');
+    expect(card().textContent).toContain('Review cart');
+    fireEvent.click(container.querySelector('#sitemap-step-next')!);
+    expect(card().textContent).toContain('2 of 2');
+    expect(card().textContent).toContain('Edit cart');
+    expect(container.querySelector<HTMLButtonElement>('#sitemap-step-next')!.disabled).toBe(true);
+    fireEvent.click(container.querySelector('#sitemap-step-prev')!);
+    expect(vm.stepIndex).toBe(0);
     expect(vm.selectedId).toBe('cart');
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'trace' } });
     expect(container.querySelector('[data-id="admin"]')).toBeNull();
@@ -101,9 +105,14 @@ it('shows repeated journey steps, nearby context, cross-application navigation, 
     expect(container.querySelector('[data-id="checkout"]')).not.toBeNull();
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'nearby' } });
     fireEvent.keyDown(container.querySelector('[data-id="checkout"]')!, { key: 'Enter' });
-    expect(screen.getByText('Accept guests')).toBeTruthy();
-    fireEvent.click(screen.getByText('Original screen'));
-    expect(screen.getByText('/checkout')).toBeTruthy();
+    // off the journey: no trace step; the change chip under the title and a Modified sub-heading in About
+    expect(container.querySelector('#sitemap-details .trace-step')).toBeNull();
+    expect(container.querySelector('#sitemap-details .fside-kind .proposal-badge.modified')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    const change = container.querySelector('#sitemap-details .flow-change')!;
+    expect(change.querySelector('h4.modified')?.textContent).toBe('Modified');
+    expect(change.textContent).toContain('Accept guests');
+    expect(change.textContent).toContain('Was: checkout — /checkout');
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'app' } });
     expect(container.querySelector('[data-id="isolated"]')).not.toBeNull();
     expect(screen.getByLabelText('Application')).toBeTruthy();
@@ -114,20 +123,27 @@ it('shows repeated journey steps, nearby context, cross-application navigation, 
     vm.dispose();
 });
 
-it('bundles screen details and From/To navigation tabs into journey steps, with hover highlighting', () => {
+it('lists navigation as connection rows in the screen panel, with hover highlighting', () => {
     const { repo, services } = fixture();
     const vm = new SitemapViewModel({ repo, services });
     vm.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal', sitemap: output }, repo.map)));
     const { container } = render(<SitemapWorkspace vm={vm} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Step 1 · cart' }));
-    const panel = screen.getByRole('region', { name: 'Step 1 · cart' });
-    expect(panel.textContent).toContain('/cart');
+    fireEvent.click(container.querySelector('[data-id="cart"]')!);
+    expect(vm.stepIndex).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: /^Navigation/ }));
+    const panel = container.querySelector<HTMLElement>('#sitemap-details')!;
     expect(within(panel).getByRole('tab', { name: 'From (0)' }).hasAttribute('disabled')).toBe(true);
     expect(within(panel).getByRole('tab', { name: 'To (2)' }).getAttribute('aria-selected')).toBe('true');
-    const items = [...panel.querySelectorAll('.sitemap-connection')];
-    expect(items.map((item) => item.querySelector('button')?.textContent)).toEqual(['checkout', 'Admin: admin']);
-    expect(items[1].classList.contains('context')).toBe(true);
-    const checkout = within(panel).getByRole('button', { name: 'checkout' });
+    const rows = [...panel.querySelectorAll('.flow-conn button.cl')];
+    expect(rows.map((row) => row.querySelector('b')?.textContent)).toEqual(['checkout', 'Admin: admin']);
+    // the journey link first; a nearby one is muted and tagged
+    expect(rows[1].classList.contains('context')).toBe(true);
+    expect(rows[1].querySelector('em')?.textContent).toBe('nearby');
+    // the connected screen's change chip, the link as an arrow, its condition below
+    expect(rows[0].querySelector('.cl-title .proposal-badge.modified')).toBeTruthy();
+    expect(rows[0].querySelector('.fl-arrow')?.textContent).toBe('Continue');
+    expect(rows[0].querySelector('.cl-note')?.textContent).toBe('When: Signed in');
+    const checkout = rows[0] as HTMLElement;
     fireEvent.mouseEnter(checkout);
     expect(container.querySelector('#sitemap-svgbox svg')?.classList.contains('hovering')).toBe(true);
     expect(container.querySelector('[data-id="checkout"]')?.classList.contains('hl')).toBe(true);
@@ -139,24 +155,21 @@ it('bundles screen details and From/To navigation tabs into journey steps, with 
     expect(vm.highlight?.nodes[0]).toBe('cart');
     expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
     expect(container.querySelectorAll('.fe.hl')).toHaveLength(vm.highlight!.edges.length);
-    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Step 2 · cart' }));
-    expect(container.querySelector('[data-id="cart"]')?.classList.contains('hl')).toBe(true);
-    expect([...container.querySelectorAll('.fn.hl-main')].map((n) => (n as SVGElement).dataset.id)).toEqual(['cart']);
-    fireEvent.mouseLeave(screen.getByRole('button', { name: 'Step 2 · cart' }));
-    // A non-journey screen shows its details below the journey.
+    // A non-journey screen has no trace step; its rows lead back to the journey.
     fireEvent.click(checkout);
     expect(vm.stepIndex).toBeNull();
-    const selected = screen.getByRole('region', { name: 'Selected screen' });
-    expect(within(selected).getByRole('tab', { name: 'From (1)' })).toBeTruthy();
-    expect(within(selected).getByRole('tab', { name: 'To (1)' }).getAttribute('aria-selected')).toBe('true');
-    fireEvent.click(within(selected).getByRole('tab', { name: 'From (1)' }));
-    fireEvent.click(within(selected).getByRole('button', { name: 'cart' }));
+    expect(panel.querySelector('.trace-step')).toBeNull();
+    expect(within(panel).getByRole('tab', { name: 'From (1)' })).toBeTruthy();
+    expect(within(panel).getByRole('tab', { name: 'To (1)' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(within(panel).getByRole('tab', { name: 'From (1)' }));
+    fireEvent.click(panel.querySelector('button.cl[data-go="cart"]')!);
     expect(vm.stepIndex).toBe(0);
     // Diagram clicks step through repeat visits, then clear.
     fireEvent.click(container.querySelector('[data-id="cart"]')!);
     expect(vm.stepIndex).toBe(1);
     fireEvent.click(container.querySelector('[data-id="cart"]')!);
     expect(vm.selectedId).toBeNull();
+    expect(container.querySelector('#sitemap-details')).toBeNull();
     // Selecting a hidden screen widens the Show scope.
     vm.setScope('trace');
     vm.select('receipt');
@@ -164,7 +177,6 @@ it('bundles screen details and From/To navigation tabs into journey steps, with 
     expect(container.querySelector('[data-id="receipt"]')).not.toBeNull();
     vm.dispose();
 });
-
 it('keeps results after cancelled or failed redraws and saves a successful retry', async () => {
     const { repo, services } = fixture();
     const saveTrace = vi.fn();

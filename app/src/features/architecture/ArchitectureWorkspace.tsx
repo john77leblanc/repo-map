@@ -11,6 +11,8 @@ import { WorkspaceBar } from './WorkspaceBar';
 import { SearchIcon, SearchPanel } from './SearchPanel';
 import { KeyToggle } from '../../shared/ui/KeyToggle';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
+import { SidePanel } from '../../shared/ui/SidePanel';
+import { TraceStepCard } from '../../shared/ui/TraceStepCard';
 
 export interface ArchitectureWorkspaceProps {
     vm: ArchitectureViewModel;
@@ -440,29 +442,23 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                     </div>
                 </div>
                 {vm.sideOpen && (
-                    <aside
-                        className={'fside arch-side' + (selected ? '' : ' arch-search-side')}
+                    <SidePanel
+                        className={'arch-side' + (selected ? '' : ' arch-search-side')}
                         id="arch-details"
-                        aria-labelledby="arch-details-title"
                         aria-live={selected ? 'polite' : undefined}
                         data-id={selected?.id}
-                    >
-                        {!selected ? <SearchPanel vm={vm} /> : <>
-                        {vm.searchOpen && (
+                        // The view's own Escape handler steps back from a card to the results first.
+                        closeOnEscape={false}
+                        onClose={vm.dismiss}
+                        before={selected && vm.searchOpen && (
                             <button className="btn sm arch-back" type="button" id="arch-back-results" onClick={vm.backToResults}>
                                 ← Results
                             </button>
                         )}
-                        <div className="fside-head">
-                            <h3 id="arch-details-title">
-                                {selected.title || selected.id}
-                                {selected.status && ' '}
-                                {selected.status && (
-                                    <span className={'proposal-badge ' + selected.status}>{change(selected.status)}</span>
-                                )}
-                            </h3>
-                            <button className="btn sm" type="button" data-close onClick={vm.dismiss}>Close</button>
-                        </div>
+                        title={!selected ? 'Search' : selected.title || selected.id}
+                        status={selected?.status}
+                    >
+                        {!selected ? <SearchPanel vm={vm} /> : <>
                         {selected.collapsed ? (
                             <CollapsedRepoDetails vm={vm} id={selected.id} />
                         ) : (
@@ -472,17 +468,14 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         <Disclosure id="arch-about" title="About" open={vm.sections.about}
                             onToggle={(open) => vm.setSection('about', open)}>
                             {vm.repoTitle(selected.repo) && <p className="hint repo-of">From <b>{vm.repoTitle(selected.repo)}</b></p>}
-                            <p className="description">
-                                {selected.desc ||
-                                    (selected.status === 'new' ? selected.rationale : '')}
-                            </p>
+                            {/* A new card's description is its rationale, so it's shown once, under the change heading. */}
+                            {selected.desc && <p className="description">{selected.desc}</p>}
                             {selected.status && (
-                                <p className="proposal-note">
-                                    {change(selected.status)}: {selected.rationale}
-                                    {selected.suggestedPath
-                                        ? ' Suggested path: ' + selected.suggestedPath
-                                        : ''}
-                                </p>
+                                <section className="flow-change" aria-label="Proposed change">
+                                    <h4 className={selected.status}>{change(selected.status)}</h4>
+                                    {selected.rationale && <p>{selected.rationale}</p>}
+                                    {selected.suggestedPath && <p className="hint">Suggested path: <code>{selected.suggestedPath}</code></p>}
+                                </section>
                             )}
                             {!!selected.facts?.length && (
                                 <ul className="facts">
@@ -524,6 +517,8 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                             key={selected.id + r.path + i}
                                             reference={r}
                                             repo={vm.repo}
+                                            list={vm.repo.docs[selected.id]}
+                                            index={i}
                                         />
                                     ))}
                                 </div>
@@ -534,7 +529,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                         </div>
                         )}
                         </>}
-                    </aside>
+                    </SidePanel>
                 )}
             </div>
         </section>
@@ -574,26 +569,14 @@ const TraceStep = observer(function TraceStep({ vm, id }: { vm: ArchitectureView
     const step = vm.trace?.steps[i];
     if (!step) return null;
     const total = vm.trace!.steps.length;
+    const stepRefs = vm.trace!.refs.filter((r) => r.step === id);
     return (
-        <section className="arch-step" aria-label="Trace step">
-            <h3>
-                <span className="arch-step-number" aria-hidden="true">{i + 1}</span>
-                <span>Trace step <span className="arch-step-of">{i + 1} of {total}</span></span>
-                <span className="arch-step-nav">
-                    <button className="link" type="button" id="arch-step-prev" aria-label="Previous trace step"
-                        disabled={!vm.hasPrev} onClick={vm.prevStep}>‹ Prev</button>
-                    <span aria-hidden="true">|</span>
-                    <button className="link" type="button" id="arch-step-next" aria-label="Next trace step"
-                        disabled={!vm.hasNext} onClick={vm.nextStep}>Next ›</button>
-                </span>
-            </h3>
-            <p>{step.note}</p>
-            {vm.trace!.refs
-                .filter((r) => r.step === id)
-                .map((r, j) => (
-                    <CodeReference key={id + r.path + j} reference={r} repo={vm.repo} />
-                ))}
-        </section>
+        <TraceStepCard idPrefix="arch" index={i} total={total} note={step.note}
+            hasPrev={vm.hasPrev} hasNext={vm.hasNext} onPrev={vm.prevStep} onNext={vm.nextStep}>
+            {stepRefs.map((r, j) => (
+                <CodeReference key={id + r.path + j} reference={r} repo={vm.repo} list={stepRefs} index={j} />
+            ))}
+        </TraceStepCard>
     );
 });
 
@@ -631,7 +614,7 @@ const CardSeams = observer(function CardSeams({ vm, id }: { vm: ArchitectureView
                                 <em>{HOW[e.seam!]}</em>
                             </button>
                             {e.why && <p className="hint">{e.why}</p>}
-                            {e.refs?.map((r, i) => <CodeReference key={r.path + i} reference={r} repo={vm.repo} />)}
+                            {e.refs?.map((r, i) => <CodeReference key={r.path + i} reference={r} repo={vm.repo} list={e.refs} index={i} />)}
                             {e.seam !== 'contract' && (
                                 <button className="btn sm" type="button" data-remove-seam onClick={() => void vm.workspace?.removeSeam(e)}>
                                     Remove connection

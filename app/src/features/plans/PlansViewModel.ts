@@ -4,6 +4,7 @@ import { plain, spend } from '../../models/trace';
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentPick, Plan, StreamResult, Trace } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
+import { CopyFeedback } from '../../models/CopyFeedback';
 export interface PlanDependencies {
     repo: RepositoryModel;
     services: Services;
@@ -40,12 +41,14 @@ export class PlansViewModel {
     busy = false;
     status = '';
     error = false;
+    /** The Copy button reads "Copied!" for a moment. */
+    readonly copied = new CopyFeedback();
     private controller: AbortController | null = null;
     private disposed = false;
     constructor(readonly deps: PlanDependencies) {
         makeAutoObservable<this, 'controller' | 'disposed'>(
             this,
-            { deps: false, trace: observableRef, controller: false, disposed: false },
+            { deps: false, copied: false, trace: observableRef, controller: false, disposed: false },
             { autoBind: true }
         );
     }
@@ -136,10 +139,7 @@ export class PlansViewModel {
         if (!this.plan) return;
         try {
             await this.deps.services.browser.copy(planText(this.plan));
-            if (!this.disposed)
-                runInAction(() => {
-                    this.status = 'Copied.';
-                });
+            if (!this.disposed) this.copied.flash();
         } catch {
             if (!this.disposed)
                 runInAction(() => {
@@ -149,6 +149,7 @@ export class PlansViewModel {
     }
     dispose() {
         this.disposed = true;
+        this.copied.dispose();
         this.stop();
     }
 }

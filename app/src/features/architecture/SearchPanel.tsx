@@ -24,10 +24,6 @@ export const SearchPanel = observer(function SearchPanel({ vm }: { vm: Architect
     let index = 0;
     return (
         <>
-            <div className="fside-head">
-                <h3 id="arch-details-title">Search</h3>
-                <button className="btn sm" type="button" data-close onClick={vm.dismiss}>Close</button>
-            </div>
             <label className="search arch-search">
                 <SearchIcon />
                 <input

@@ -113,13 +113,21 @@ describe('ArchitectureWorkspace', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(vm.selected).toBe(null);
     });
-    it.each([['new', 'New'], ['modified', 'Modified']] as const)('shows a %s proposal badge beside the details title', (status, label) => {
+    it.each([['new', 'New'], ['modified', 'Modified']] as const)('shows a %s chip under the details title and a change heading in About', (status, label) => {
         const { vm } = fixture();
-        runInAction(() => { vm.repo.map.nodes.find((n) => n.id === 'one')!.status = status; });
-        render(<ArchitectureWorkspace vm={vm} />);
+        runInAction(() => { Object.assign(vm.repo.map.nodes.find((n) => n.id === 'one')!, { status, rationale: 'Because.' }); });
+        const { container } = render(<ArchitectureWorkspace vm={vm} />);
         act(() => vm.inspect('one'));
-        const title = screen.getByRole('heading', { name: 'One ' + label });
-        expect(title.querySelector('.proposal-badge')).toHaveClass(status);
+        const title = screen.getByRole('heading', { name: 'One' });
+        expect(title.querySelector('.proposal-badge')).toBe(null);
+        const chip = container.querySelector('#arch-details .fside-head + .fside-kind .proposal-badge');
+        expect(chip).toHaveClass(status);
+        expect(chip?.textContent).toBe(label);
+        act(() => vm.setSection('about', true));
+        const changeHeading = container.querySelector('#arch-details .flow-change h4');
+        expect(changeHeading).toHaveClass(status);
+        expect(changeHeading?.textContent).toBe(label);
+        expect(changeHeading?.nextElementSibling?.textContent).toBe('Because.');
     });
     it('exposes search, connection filters and diagram key accessibly', () => {
         const { vm } = fixture();
@@ -179,10 +187,10 @@ describe('ArchitectureWorkspace', () => {
         const { container } = render(<ArchitectureWorkspace vm={vm} />);
         act(() => vm.inspect('two'));
         const body = container.querySelector('.arch-details-body')!;
-        expect([...body.children].map((el) => el.className)).toEqual(['arch-step', 'disclosure-list']);
+        expect([...body.children].map((el) => el.className)).toEqual(['arch-step trace-step', 'disclosure-list']);
         const rows = [...body.querySelectorAll('.disclosure-head')];
         expect(rows.map((b) => [b.textContent, b.getAttribute('aria-expanded')])).toEqual([
-            ['About', 'true'], ['Related documents 1', 'false'], ['Connections 1', 'false'],
+            ['About', 'false'], ['Related documents 1', 'false'], ['Connections 1', 'false'],
         ]);
         expect(body.querySelector('.arch-step')?.textContent).toContain('2 of 2');
         expect(container.querySelector('#arch-docs')).toBe(null);
@@ -200,6 +208,7 @@ describe('ArchitectureWorkspace', () => {
         });
         const { container } = render(<ArchitectureWorkspace vm={vm} />);
         fireEvent.click(screen.getByRole('button', { name: 'One' }));
+        fireEvent.click(screen.getByRole('button', { name: 'About' }));
         expect(container.querySelector('[data-contracts=provides]')?.textContent).toBe('Serves to other reposGET /one/{}');
         expect([...container.querySelectorAll('[data-contracts=consumes] li')].map((li) => li.textContent)).toEqual(['/two', 'env TWO_URL']);
     });

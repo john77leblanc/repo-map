@@ -14,7 +14,7 @@ function ExportMenu({ prefix, available, copied, onCopy, onDownload }: {
     useEffect(() => { if (!available) setOpen(false); }, [available]);
     return (
         <DiagramMore id={prefix + '-export-menu'} triggerId={prefix + '-export'} open={open} setOpen={setOpen}
-            disabled={!available} panelLabel="Export" label={<>{copied ? 'Copied' : 'Export'} <span aria-hidden="true">▾</span></>}
+            disabled={!available} panelLabel="Export" label={<>{copied ? 'Copied!' : 'Export'} <span aria-hidden="true">▾</span></>}
             actions={[
                 { id: prefix + '-mermaid', label: 'Copy Mermaid', run: onCopy,
                     title: 'Mermaid source, for GitHub, GitLab, Notion and other Markdown tools' },

@@ -1,6 +1,7 @@
 import { makeAutoObservable, observableRef, runInAction } from 'mobx';
 import type { Bootstrap, CodeRef, RepoMap } from './types';
 import type { Services } from '../shared/services/contracts';
+import { ReferenceViewerModel } from './ReferenceViewerModel';
 
 export class RepositoryModel {
     bootstrap: Bootstrap | null = null;
@@ -8,10 +9,13 @@ export class RepositoryModel {
     docs: Record<string, CodeRef[]> = {};
     ready = false;
     error = '';
+    /** The code reference modal, opened from any reference row. */
+    readonly references: ReferenceViewerModel;
     constructor(readonly services: Services) {
+        this.references = new ReferenceViewerModel(this);
         makeAutoObservable(
             this,
-            { services: false, bootstrap: observableRef, map: observableRef },
+            { services: false, references: false, bootstrap: observableRef, map: observableRef },
             { autoBind: true }
         );
     }

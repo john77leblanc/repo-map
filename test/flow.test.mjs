@@ -501,6 +501,8 @@ test('expandPrompt numbers the arrows out of the box', async () => {
     const text = expandPrompt(config, { nodes: [], edges: [] }, trace, CHECKOUT, 'd2');
     assert.match(text, /^You are taking a closer look/);
     assert.match(text, /BOX TO LOOK INSIDE: d2/);
+    // caveats belong in gaps, not the summary
+    assert.match(text, /"summary": 2-3 plain sentences[^\n]*No caveats[^\n]*go in "gaps"/);
     assert.match(text, /1\. to "Show confirmation" \(yes\)\n2\. to "Shopper edits card details" \(declined\)/);
     assert.match(expandPrompt(config, { nodes: [], edges: [] }, trace, CHECKOUT, 'p1'), /src\/pay\.ts lines 1-9/);
 });

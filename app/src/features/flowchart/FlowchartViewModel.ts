@@ -7,6 +7,7 @@ import { collapseGraph } from '../../../../lib/collapse.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
+import { CopyFeedback } from '../../models/CopyFeedback';
 import { normalizeFlow, flowToMermaid, flowLanes, flowRepos, countInferred } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
@@ -22,7 +23,9 @@ export interface FlowchartDeps {
 }
 export type ConnectionTab = 'from' | 'to';
 /** Collapsible sections of the step details panel. */
-export type StepSection = 'about' | 'closer' | 'refs' | 'connections';
+export type StepSection = 'about' | 'refs' | 'connections';
+/** Where a job's status shows: the diagram toolbar, or beside a box's closer look (its id). */
+const CHART = 'chart';
 export interface FlowConnection {
     edge: Flow['edges'][number];
     index: number;
@@ -59,13 +62,15 @@ export class FlowchartViewModel {
     selecting = false;
     connectionTab: ConnectionTab = 'to';
     /** Open step sections; kept while moving between steps. */
-    sections: Record<StepSection, boolean> = { about: true, closer: true, refs: true, connections: false };
+    sections: Record<StepSection, boolean> = { about: false, refs: false, connections: false };
     scale = 1;
     keyOpen = false;
     busy = false;
     status = '';
+    /** `'chart'` for the toolbar, else the box whose closer look the status belongs to. */
+    statusTarget = CHART;
     error = false;
-    copied = false;
+    readonly copy = new CopyFeedback();
     compact = false;
     /** Boxes whose closer look is drawn in the chart. Saved per trace in the browser. */
     shown: string[] = [];
@@ -75,25 +80,28 @@ export class FlowchartViewModel {
     private controller: AbortController | null = null;
     private revision = 0;
     private disposed = false;
-    private copyTimer: ReturnType<typeof setTimeout> | null = null;
     constructor(readonly deps: FlowchartDeps) {
         this.compact = deps.services.storage.get<boolean>(deps.repo.namespace + 'flow-compact', false) === true;
         makeAutoObservable<
             FlowchartViewModel,
-            'controller' | 'revision' | 'disposed' | 'copyTimer'
+            'controller' | 'revision' | 'disposed'
         >(
             this,
             {
                 deps: false,
                 focus: false,
+                copy: false,
                 trace: observableRef,
                 controller: false,
                 revision: false,
                 disposed: false,
-                copyTimer: false,
             },
             { autoBind: true }
         );
+    }
+    /** The Export button reads "Copied!" for a moment after Copy Mermaid. */
+    get copied() {
+        return this.copy.copied;
     }
     get repo() {
         return this.deps.repo;
@@ -388,7 +396,11 @@ export class FlowchartViewModel {
     }
     /** Proposal status for the selected node, with the rationale from its linked architecture change. */
     get selectedChange(): { status: ChangeStatus; rationale: string } | null {
-        const node = this.selected;
+        return this.changeFor(this.selectedId);
+    }
+    /** Proposal status for a box, with the rationale from its linked architecture change. */
+    changeFor(id: string | null): { status: ChangeStatus; rationale: string } | null {
+        const node = id ? this.displayFlow?.nodes.find((n) => n.id === id) : null;
         if (!node || this.trace?.intent !== 'proposal') return null;
         const stepId = node.step ? this.trace.steps[node.step - 1]?.id : null;
         const change = stepId ? this.trace.proposal?.nodes.find((n) => n.id === stepId) : undefined;
@@ -397,6 +409,25 @@ export class FlowchartViewModel {
     }
     nodeLabel(id: string) {
         return this.displayFlow?.nodes.find((node) => node.id === id)?.label || id;
+    }
+    /** How a box is drawn, for its small shape on connection rows. */
+    nodeShape(id: string): { type: string; inside: boolean; inferred: boolean; status?: ChangeStatus } {
+        const node = this.displayFlow?.nodes.find((n) => n.id === id);
+        return {
+            type: node?.collapsed ? 'collapsed' : node?.type || 'process',
+            // A step of a closer look drawn in the chart.
+            inside: (this.expansionFor(id)?.id ?? id) !== id,
+            inferred: !!node?.inferred,
+            status: this.changeFor(id)?.status,
+        };
+    }
+    /** Status for the diagram toolbar; closer-look jobs report beside their button instead. */
+    get chartStatus() {
+        return this.statusTarget === CHART ? this.status : '';
+    }
+    /** Status of the closer-look job for one box. */
+    closerStatus(box: string) {
+        return this.statusTarget === box ? this.status : '';
     }
     setSection(name: StepSection, open: boolean) {
         this.sections[name] = open;
@@ -414,7 +445,7 @@ export class FlowchartViewModel {
     setTrace(trace: Trace | null) {
         this.stop(false);
         this.trace = trace ? (isObservable(trace) ? trace : observable(trace)) : null;
-        this.copied = false;
+        this.copy.reset();
         this.selectedId = null;
         this.marked = [];
         this.selecting = false;
@@ -423,6 +454,7 @@ export class FlowchartViewModel {
         this.expandingId = null;
         this.focus.reset();
         this.status = '';
+        this.statusTarget = CHART;
         this.error = false;
     }
     select(id: string | null) {
@@ -465,7 +497,7 @@ export class FlowchartViewModel {
         if (this.disposed || this.busy) return;
         this.setTrace(trace);
         trace = this.trace!;
-        await this.run('/api/flow', { trace }, (result, current) => {
+        await this.run(CHART, '/api/flow', { trace }, (result, current) => {
             const flow = normalizeFlow(result.flow, current.steps.length) as Flow | null;
             if (!flow) throw new Error('The AI tool ended without a usable flowchart.');
             // A new drawing has new boxes: the old closer looks no longer fit.
@@ -482,7 +514,7 @@ export class FlowchartViewModel {
         const trace = this.trace;
         if (this.disposed || this.busy || !trace?.flow || !this.canExpand(id)) return;
         this.expandingId = id;
-        await this.run('/api/flow/expand', { trace: plain(trace), node: id }, (result, current) => {
+        await this.run(id, '/api/flow/expand', { trace: plain(trace), node: id }, (result, current) => {
             const raw = result.expansion as Record<string, unknown> | undefined;
             const expansion = current.flow && normalizeExpansion({ ...raw, used: result.used, createdAt: Date.now() }, current.flow, id) as FlowExpansion | null;
             if (!expansion) throw new Error('The AI tool ended without usable steps.');
@@ -516,15 +548,16 @@ export class FlowchartViewModel {
         } catch (error) {
             runInAction(() => {
                 this.error = true;
+                this.statusTarget = id;
                 this.status = error instanceof Error ? error.message : String(error);
             });
         }
     }
     /**
-     * Stream one AI job for this trace, with progress in the toolbar. `apply` turns the
-     * result into the updated trace (inside an action); it's then shown and saved.
+     * Stream one AI job for this trace, with progress at `target` (toolbar or a closer look). `apply`
+     * turns the result into the updated trace (inside an action); it's then shown and saved.
      */
-    private async run(path: string, body: Record<string, unknown>, apply: (result: StreamResult, trace: Trace) => Trace) {
+    private async run(target: string, path: string, body: Record<string, unknown>, apply: (result: StreamResult, trace: Trace) => Trace) {
         const trace = this.trace!;
         const controller = new AbortController();
         const revision = ++this.revision;
@@ -532,6 +565,8 @@ export class FlowchartViewModel {
             !this.disposed && this.revision === revision && !controller.signal.aborted;
         this.controller = controller;
         this.busy = true;
+        this.error = false;
+        this.statusTarget = target;
         this.status = 'Starting…';
         const started = Date.now();
         let progress = this.status;
@@ -586,20 +621,11 @@ export class FlowchartViewModel {
         try {
             await this.deps.services.browser.copy(flowToMermaid(this.displayFlow || this.trace.flow, this.trace.title));
             if (this.disposed || revision !== this.revision) return;
-            runInAction(() => {
-                this.copied = true;
-            });
-            if (this.copyTimer) clearTimeout(this.copyTimer);
-            this.copyTimer = setTimeout(
-                () =>
-                    runInAction(() => {
-                        this.copied = false;
-                    }),
-                1500
-            );
+            this.copy.flash();
         } catch {
-            if (!this.disposed && revision === this.revision)
+            if (!this.disposed && revision === this.revision && !this.busy)
                 runInAction(() => {
+                    this.statusTarget = CHART;
                     this.status = "Couldn't copy to the clipboard.";
                     this.error = true;
                 });
@@ -614,6 +640,6 @@ export class FlowchartViewModel {
     dispose() {
         this.stop(false);
         this.disposed = true;
-        if (this.copyTimer) clearTimeout(this.copyTimer);
+        this.copy.dispose();
     }
 }

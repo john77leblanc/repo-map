@@ -11,9 +11,12 @@ import { flowToMermaid } from '../../../../lib/flow.mjs';
 import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { SITEMAP_CSS } from './styles';
+import { CopyFeedback } from '../../models/CopyFeedback';
 
 type SitemapScope = 'trace' | 'nearby' | 'app';
 type ConnectionTab = 'from' | 'to';
+/** Collapsible sections of the screen panel. */
+type ScreenSection = 'about' | 'nav' | 'refs';
 type NavEdge = SitemapNavigation & { status?: ChangeStatus; rationale?: string; index?: number };
 /** One navigation link seen from a screen: `other` is the screen at the far end. */
 interface Connection { edge: NavEdge; nav: number; other: string; journey: boolean; original: SitemapNavigation | null }
@@ -23,10 +26,13 @@ class SitemapViewModel {
     trace: Trace | null = null;
     scope: SitemapScope = 'nearby';
     infoOpen = false;
-    detailsOpen = true;
+    /** The screen panel: closed until a screen is picked. */
+    detailsOpen = false;
+    /** Open screen sections; kept while moving between screens. */
+    sections: Record<ScreenSection, boolean> = { about: false, nav: false, refs: false };
     actionsOpen = false;
     keyOpen = false;
-    copied = false;
+    readonly copy = new CopyFeedback();
     stepIndex: number | null = null;
     freshness: SitemapResult['status'] = { state: 'missing' };
     appId = '';
@@ -48,14 +54,15 @@ class SitemapViewModel {
     private controller: AbortController | null = null;
     private disposed = false;
     private copyRevision = 0;
-    private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(readonly deps: { repo: RepositoryModel; services: Services; getPick?: () => AgentPick; saveTrace?: (trace: Trace) => Promise<void> }) {
-        makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision' | 'copyTimer'>(this, {
-            deps: false, focus: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
-            copyRevision: false, copyTimer: false,
+        makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
+            deps: false, focus: false, copy: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
+            copyRevision: false,
         }, { autoBind: true });
     }
+    /** The Export button reads "Copied!" for a moment after Copy Mermaid. */
+    get copied() { return this.copy.copied; }
     get repo() { return this.deps.repo; }
     get output() { return this.trace?.sitemap; }
     get displayed(): Sitemap | null { return this.output ? composeSitemapTrace(this.output) as Sitemap : this.trace ? null : this.sitemap; }
@@ -111,16 +118,21 @@ class SitemapViewModel {
     hoverNode(id: string | null) { this.focus.hover(id); }
     hoverEdge(index: number | null) { this.focus.hoverEdge(index); }
     toggleInfo() { this.infoOpen = !this.infoOpen; }
-    toggleDetails() { this.detailsOpen = !this.detailsOpen; }
+    setSection(name: ScreenSection, open: boolean) { this.sections[name] = open; }
+    /** The journey step shown in the panel, or -1 for a screen off the journey. */
+    get currentStep() { return this.stepIndex ?? -1; }
+    get hasPrev() { return this.currentStep > 0; }
+    get hasNext() { const i = this.currentStep; return i >= 0 && i < (this.output?.steps.length ?? 0) - 1; }
+    prevStep() { if (this.hasPrev) this.openStep(this.currentStep - 1); }
+    nextStep() { if (this.hasNext) this.openStep(this.currentStep + 1); }
+    /** The details panel's Close: hides it and clears the selection. Picking a screen opens it again. */
+    closeDetails() {
+        this.detailsOpen = false;
+        this.selectedId = null;
+        this.stepIndex = null;
+    }
     setActionsOpen(open: boolean) { this.actionsOpen = open; }
     toggleKey() { this.keyOpen = !this.keyOpen; }
-    selectStep(index: number) {
-        const step = this.output?.steps[index];
-        if (!step) return;
-        // Accordion: selecting the open step collapses it and keeps the screen selected.
-        if (this.stepIndex === index) { this.stepIndex = null; return; }
-        this.openStep(index);
-    }
     private openStep(index: number) {
         const step = this.output!.steps[index];
         const screen = this.screen(step.screen);
@@ -205,9 +217,7 @@ class SitemapViewModel {
     get exportTitle() { return this.exportName ? `${this.exportName} — Sitemap` : 'Sitemap'; }
     private resetCopy() {
         this.copyRevision++;
-        this.copied = false;
-        if (this.copyTimer) clearTimeout(this.copyTimer);
-        this.copyTimer = null;
+        this.copy.reset();
     }
     async copyMermaid() {
         if (!this.layout || this.disposed) return;
@@ -216,8 +226,7 @@ class SitemapViewModel {
         try {
             await this.deps.services.browser.copy(flowToMermaid(this.graph, this.exportTitle));
             if (this.disposed || revision !== this.copyRevision) return;
-            runInAction(() => { this.copied = true; });
-            this.copyTimer = setTimeout(() => runInAction(() => { this.copied = false; }), 1500);
+            this.copy.flash();
         } catch {
             if (!this.disposed && revision === this.copyRevision) runInAction(() => {
                 this.message = "Couldn't copy to the clipboard.";

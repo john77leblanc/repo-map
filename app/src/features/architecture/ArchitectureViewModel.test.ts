@@ -25,7 +25,7 @@ describe('ArchitectureViewModel', () => {
     });
     it('keeps open sections while moving between cards', () => {
         const { vm } = fixture();
-        expect(vm.sections).toEqual({ about: true, docs: false, connections: false });
+        expect(vm.sections).toEqual({ about: false, docs: false, connections: false });
         vm.inspect('one');
         vm.setSection('connections', true);
         vm.inspect('two');

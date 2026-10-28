@@ -304,7 +304,7 @@ test('trace step in card details walks the trace with Prev and Next', async ({ p
     const panel = page.locator('#arch-details');
     await expect(panel.locator('.arch-step')).toContainText('1 of 2');
     await expect(panel.getByRole('button', { name: 'Previous trace step' })).toBeDisabled();
-    await expect(panel.locator('#arch-about-head')).toHaveAttribute('aria-expanded', 'true');
+    await expect(panel.locator('#arch-about-head')).toHaveAttribute('aria-expanded', 'false');
     await expect(panel.locator('#arch-connections-head')).toHaveAttribute('aria-expanded', 'false');
     await panel.getByRole('button', { name: 'Next trace step' }).click();
     await expect(panel).toHaveAttribute('data-id', 'checkout-page');

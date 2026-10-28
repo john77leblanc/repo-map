@@ -32,13 +32,17 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await page.getByLabel('Show').selectOption('trace');
     await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveCount(0);
     await page.getByLabel('Show').selectOption('nearby');
-    const step3 = page.getByRole('region', { name: 'Screen journey' }).getByRole('button', { name: 'Step 3 · cart', exact: true });
-    await step3.click();
-    await expect(step3).toHaveAttribute('aria-expanded', 'true');
-    const step3Panel = page.getByRole('region', { name: 'Step 3 · cart', exact: true });
-    await expect(step3Panel).toContainText('Return to edit items');
-    await expect(step3Panel.getByRole('tab', { name: 'To (2)' })).toHaveAttribute('aria-selected', 'true');
-    await step3Panel.getByRole('button', { name: 'Guest details', exact: true }).hover();
+    // Pick the journey's first screen, then walk to step 3 with Next.
+    await expect(page.locator('#sitemap-details')).toHaveCount(0);
+    await page.locator('#sitemap-svgbox [data-id="cart"]').click();
+    const panel = page.locator('#sitemap-details');
+    await expect(panel.locator('.trace-step')).toContainText('1 of 3');
+    await panel.locator('#sitemap-step-next').click();
+    await panel.locator('#sitemap-step-next').click();
+    await expect(panel.locator('.trace-step')).toContainText('Return to edit items');
+    await panel.locator('#sitemap-nav-head').click();
+    await expect(panel.getByRole('tab', { name: 'To (2)' })).toHaveAttribute('aria-selected', 'true');
+    await panel.locator('button.cl[data-go="proposal-guest"]').hover();
     await expect(page.locator('#sitemap-svgbox svg')).toHaveClass(/hovering/);
     await expect(page.locator('#sitemap-svgbox [data-id="proposal-guest"]')).toHaveClass(/hl/);
     await expect(page.locator('#sitemap-svgbox .fe.hl')).toHaveCount(1);
@@ -48,7 +52,7 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await expect(page.locator('#sitemap-svgbox svg')).toHaveClass(/hovering/);
     await page.locator('#sitemap-svgbox [data-id="checkout"]').focus();
     await page.keyboard.press('Enter');
-    await page.getByText('Original screen', { exact: true }).click();
+    await page.locator('#sitemap-about-head').click();
     await expect(page.getByRole('region', { name: 'Proposed screen change' })).toContainText('/checkout');
     await page.getByLabel('Show').selectOption('app');
     await expect(page.locator('#sitemap-svgbox [data-id="account"]')).toHaveCount(1);

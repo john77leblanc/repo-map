@@ -49,13 +49,28 @@ describe('Sitemap', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
         await waitFor(() => expect(services.api.get).toHaveBeenCalledTimes(2));
         expect(screen.queryByRole('button', { name: 'Refresh status' })).toBeNull();
+        // the screen panel is closed until a screen is picked, and More has no Show/Hide details
         fireEvent.click(more);
-        fireEvent.click(screen.getByRole('button', { name: 'Hide details' }));
+        expect(screen.queryByRole('button', { name: /details/ })).toBeNull();
+        fireEvent.click(more);
         expect(screen.queryByRole('complementary', { name: 'Screen details' })).toBeNull();
         expect(container.querySelector('.sitemap-main.details-hidden')).toBeTruthy();
         fireEvent.keyDown(screen.getByRole('button', { name: 'Dashboard' }), { key: 'Enter' });
         expect(screen.getByRole('complementary', { name: 'Screen details' })).toBeTruthy();
-        expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy();
+        expect(container.querySelector('#sitemap-details-title')?.textContent).toBe('Dashboard');
+        expect(container.querySelector('#sitemap-details .fside-kind .ft')?.textContent).toBe('Screen');
+        // About, Navigation and References rows, all collapsed
+        expect([...container.querySelectorAll('#sitemap-details .disclosure-head')]
+            .map((h) => [h.querySelector('.disclosure-title')?.textContent, h.getAttribute('aria-expanded')]))
+            .toEqual([['About', 'false'], ['Navigation', 'false']]);
+        // Close hides the panel and clears the selection; picking a screen opens it again
+        fireEvent.click(container.querySelector('#sitemap-details-close')!);
+        expect(screen.queryByRole('complementary', { name: 'Screen details' })).toBeNull();
+        expect(vm.selectedId).toBeNull();
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Dashboard' }), { key: 'Enter' });
+        fireEvent.keyDown(screen.getByRole('complementary', { name: 'Screen details' }), { key: 'Escape' });
+        expect(screen.queryByRole('complementary', { name: 'Screen details' })).toBeNull();
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Dashboard' }), { key: 'Enter' });
         fireEvent.click(more);
         fireEvent.keyDown(screen.getByRole('button', { name: 'Hide info' }), { key: 'Escape' });
         expect(more.getAttribute('aria-expanded')).toBe('false');
@@ -74,11 +89,17 @@ describe('Sitemap', () => {
         expect(services.api.get).not.toHaveBeenCalled();
         await vm.load();
         expect(vm.appId).toBe('admin');
-        render(<SitemapWorkspace vm={vm} />);
+        const { container } = render(<SitemapWorkspace vm={vm} />);
         fireEvent.keyDown(screen.getByRole('button', { name: 'Dashboard' }), { key: 'Enter' });
-        expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy();
-        expect(screen.getByText('When: Signed in')).toBeTruthy();
-        expect(screen.getAllByRole('button', { name: 'Storefront: Shop' })).toHaveLength(2);
+        expect(screen.getByRole('heading', { name: 'Dashboard', level: 3 })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: /^Navigation/ }));
+        // flowchart-style rows: shape, screen name, the link drawn as an arrow, then its condition
+        const row = container.querySelector('#sitemap-details .flow-conn button.cl[data-go="settings"]')!;
+        expect(row.querySelector('svg.fshape')).toBeTruthy();
+        expect(row.querySelector('b')?.textContent).toBe('Settings');
+        expect(row.querySelector('.fl-arrow')?.textContent).toBe('Preferences');
+        expect(row.querySelector('.cl-note')?.textContent).toBe('When: Signed in');
+        expect(container.querySelector('#sitemap-details button.cl[data-go="shop"] b')?.textContent).toBe('Storefront: Shop');
         fireEvent.change(screen.getByLabelText('Application'), { target: { value: 'shop' } });
         expect(vm.selected).toBeNull();
         expect(vm.graph.nodes.map((node) => node.label)).toContain('Admin: Dashboard');
@@ -147,6 +168,8 @@ describe('Sitemap', () => {
             await vm.copyMermaid();
             expect(vm.copied).toBe(true);
             vi.advanceTimersByTime(1500);
+            expect(vm.copied).toBe(true);
+            vi.advanceTimersByTime(500);
             expect(vm.copied).toBe(false);
         } finally {
             vm.dispose();

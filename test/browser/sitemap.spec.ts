@@ -58,6 +58,7 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await page.locator('#sitemap-svgbox [data-id="checkout"]').focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Checkout', exact: true })).toBeVisible();
+    await page.locator('#sitemap-nav-head').click();
     await expect(page.getByText('When: Payment accepted')).toBeVisible();
     await expect(page.locator('#sitemap-info')).toBeHidden();
     await page.getByRole('button', { name: 'More', exact: true }).click();
@@ -71,8 +72,7 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await expect(page.locator('#sitemap-actions')).toBeHidden();
     await page.locator('#sitemap-svgbox [data-id="checkout"]').press('Enter');
     const withDetails = await page.locator('#sitemap-canvas').boundingBox();
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: 'Hide details', exact: true }).click();
+    await page.locator('#sitemap-details-close').click();
     await expect(page.getByRole('complementary', { name: 'Screen details' })).toBeHidden();
     const withoutDetails = await page.locator('#sitemap-canvas').boundingBox();
     expect(withoutDetails!.width).toBeGreaterThan(withDetails!.width);
@@ -83,7 +83,7 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.locator('#sitemap-export').click();
     await page.getByRole('button', { name: 'Copy Mermaid', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copied!', exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('flowchart TD');
     const downloadEvent = page.waitForEvent('download');
     await page.locator('#sitemap-export').click();
@@ -115,8 +115,7 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     const canvas = await page.locator('#sitemap-canvas').boundingBox();
     expect(canvas!.height).toBeGreaterThan(100);
     expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(680);
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: 'Hide details', exact: true }).click();
+    // the screen panel is closed until a screen is picked
     await expect(page.getByRole('complementary', { name: 'Screen details' })).toBeHidden();
     await page.screenshot({ path: testInfo.outputPath('sitemap-narrow.png') });
     expect(errors).toEqual([]);
@@ -129,6 +128,7 @@ test('execution lanes toggle, keep selection, export, and persist across reload'
     await expect(page.locator('#fl-svgbox .execution-lane')).toHaveCount(4);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
     await page.locator('#fl-svgbox [data-id="check"]').click();
+    await page.locator('#fl-about-head').click();
     await expect(page.getByText('Executes in: Backend')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('flow-lanes.png') });
     const downloaded = page.waitForEvent('download');

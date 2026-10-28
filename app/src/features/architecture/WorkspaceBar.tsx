@@ -79,7 +79,7 @@ export const WorkspaceBar = observer(function WorkspaceBar({ vm }: { vm: Archite
                             {s.why && <p className="hint">{s.why}</p>}
                             <details>
                                 <summary>Evidence ({s.refs?.length || 0})</summary>
-                                {s.refs?.map((r, i) => <CodeReference key={r.path + i} reference={r} repo={vm.repo} />)}
+                                {s.refs?.map((r, i) => <CodeReference key={r.path + i} reference={r} repo={vm.repo} list={s.refs} index={i} />)}
                             </details>
                             <button className="btn sm" type="button" data-accept onClick={() => void ws.acceptSeam(s)} disabled={ws.saving}>
                                 Accept

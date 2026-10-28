@@ -5,6 +5,9 @@ import type { AgentPick, StreamResult, Trace, Workspace } from '../../models/typ
 import { decodeTrace, encodeTrace, linkOf, normalizeTrace, plain, spend } from '../../models/trace';
 import type { WorkspaceMap } from '../../models/trace';
 import { TraceJob } from './TraceJob';
+import { CopyFeedback } from '../../models/CopyFeedback';
+
+const copyKey = (trace: Trace) => trace._doc || trace.title || 'trace';
 import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
@@ -56,6 +59,8 @@ export class TraceViewModel {
     code = '';
     storeNote =
         'Saved automatically to .repo-map/traces on this machine (git-ignored). Open an output to explore it.';
+    /** "Copied!" on a trace's Copy trace code button, keyed by trace. */
+    readonly copy = new CopyFeedback();
     private controllers = new Set<AbortController>();
     private generation: AbortController | null = null;
     private ticker: ReturnType<typeof setInterval> | null = null;
@@ -75,6 +80,7 @@ export class TraceViewModel {
             this,
             {
                 deps: false,
+                copy: false,
                 selected: observableRef,
                 editing: observableRef,
                 activeJob: observableRef,
@@ -439,10 +445,7 @@ export class TraceViewModel {
         const code = encodeTrace(trace);
         try {
             await this.deps.services.browser.copy(code);
-            if (!this.disposed)
-                runInAction(() => {
-                    this.setStatus('Copied.');
-                });
+            if (!this.disposed) this.copy.flash(copyKey(trace));
         } catch {
             if (!this.disposed)
                 runInAction(() => {
@@ -690,8 +693,13 @@ export class TraceViewModel {
                 });
         }
     }
+    /** True for a moment after this trace's code was copied. */
+    codeCopied(trace: Trace) {
+        return this.copy.isCopied(copyKey(trace));
+    }
     dispose() {
         this.disposed = true;
+        this.copy.dispose();
         for (const job of this.jobs) { job.controller.abort(); job.clearTicker(); }
         this.stop();
         this.controllers.forEach((ctl) => ctl.abort());

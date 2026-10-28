@@ -8,63 +8,116 @@ import { SITEMAP_CSS } from './styles';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
+import { SidePanel } from '../../shared/ui/SidePanel';
 import { FC_CSS, UI_CSS } from '../flowchart/styles';
-import type { SitemapViewModel, SitemapScope, ConnectionTab } from './SitemapViewModel';
+import type { SitemapViewModel, SitemapScope, ConnectionTab, Connection } from './SitemapViewModel';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
-import type { CodeRef } from '../../models/types';
+import { TraceStepCard } from '../../shared/ui/TraceStepCard';
+import { ConnectionRow } from '../flowchart/ConnectionRow';
 
-/** Everything about one screen: shown inside its journey step, or below the journey otherwise. */
-const ScreenDetails = observer(function ScreenDetails({ vm, id, stepRefs }: { vm: SitemapViewModel; id: string; stepRefs?: CodeRef[] }) {
-    const screen = vm.screen(id);
+/** The selected screen's panel: trace step, then About, Navigation and References, like the flowchart's. */
+const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel }) {
+    const screen = vm.selected;
     if (!screen) return null;
+    const id = screen.id;
     const change = vm.changeFor(id);
     const original = vm.originalFor(id);
-    return <div className="sitemap-screen-details">
-        {screen.route && <p><code>{screen.route}</code></p>}
-        <p>{screen.detail}</p>
-        {change && <section aria-label="Proposed screen change">
-            <h4>{CHANGE_LABELS[change.status]}</h4><p>{change.rationale}</p>
-            {original && <details><summary>Original screen</summary><p>{original.label} — <code>{original.route}</code></p><p>{original.detail}</p></details>}
-        </section>}
-        {(!!stepRefs?.length || screen.refs.length > 0) && <div className="refs">
-            {stepRefs?.map((reference, index) => <CodeReference key={`step:${index}`} reference={reference} repo={vm.repo} />)}
-            {screen.refs.map((reference, index) => <CodeReference key={`${id}:${index}`} reference={reference} repo={vm.repo} />)}
-        </div>}
-        <ConnectionTabs vm={vm} id={id} />
-    </div>;
+    const nav = vm.navFor(id);
+    const all = [...nav.from, ...nav.to];
+    const changedNav = all.filter((c) => c.edge.status);
+    const navRefs = all.filter((c) => c.edge.refs.length);
+    const refCount = screen.refs.length + navRefs.reduce((n, c) => n + c.edge.refs.length, 0);
+    const step = vm.currentStep >= 0 ? vm.output?.steps[vm.currentStep] : undefined;
+    const navLabel = (c: Connection) => `${vm.screenLabel(c.edge.from)} → ${vm.screenLabel(c.edge.to)}`;
+    return (
+        <SidePanel id="sitemap-details" aria-label="Screen details" aria-live="polite" closeId="sitemap-details-close"
+            onClose={vm.closeDetails} title={vm.screenLabel(id)} status={change?.status} kind="Screen">
+            {step && (
+                <TraceStepCard idPrefix="sitemap" index={vm.currentStep} total={vm.output!.steps.length} note={step.note}
+                    hasPrev={vm.hasPrev} hasNext={vm.hasNext} onPrev={vm.prevStep} onNext={vm.nextStep}>
+                    {step.refs.map((r, i) => <CodeReference key={i} reference={r} repo={vm.repo} list={step.refs} index={i} />)}
+                </TraceStepCard>
+            )}
+            <DisclosureList>
+                <Disclosure id="sitemap-about" title="About" open={vm.sections.about} onToggle={(open) => vm.setSection('about', open)}>
+                    {screen.route && <p><code>{screen.route}</code></p>}
+                    {screen.detail && <p className="fd">{screen.detail}</p>}
+                    {change && (
+                        <section className="flow-change" aria-label="Proposed screen change">
+                            <h4 className={change.status}>{CHANGE_LABELS[change.status]}</h4>
+                            {change.rationale && <p>{change.rationale}</p>}
+                            {original && <p className="hint">Was: {original.label}{original.route && <> — <code>{original.route}</code></>}{original.detail ? '. ' + original.detail : ''}</p>}
+                        </section>
+                    )}
+                    {changedNav.length > 0 && (
+                        <section className="flow-change sitemap-nav-changes" aria-label="Proposed navigation">
+                            <h4>Proposed navigation</h4>
+                            {changedNav.map((c) => (
+                                <p key={c.nav}>
+                                    <span className={'proposal-badge ' + c.edge.status}>{CHANGE_LABELS[c.edge.status!]}</span>{' '}
+                                    <b>{navLabel(c)}</b>{c.edge.rationale ? ': ' + c.edge.rationale : ''}
+                                    {c.original && <span className="hint"> Was: {c.original.label || 'link'}{c.original.condition ? ' when ' + c.original.condition : ''}.</span>}
+                                </p>
+                            ))}
+                        </section>
+                    )}
+                </Disclosure>
+                <Disclosure id="sitemap-nav" title="Navigation" count={all.length} open={vm.sections.nav} onToggle={(open) => vm.setSection('nav', open)}>
+                    <ScreenNavigation vm={vm} id={id} />
+                </Disclosure>
+                {refCount > 0 && (
+                    <Disclosure id="sitemap-refs" title="References" count={refCount} open={vm.sections.refs} onToggle={(open) => vm.setSection('refs', open)}>
+                        {screen.refs.length > 0 && <div className="refs">
+                            {screen.refs.map((r, i) => <CodeReference key={i} reference={r} repo={vm.repo} list={screen.refs} index={i} />)}
+                        </div>}
+                        {navRefs.length > 0 && <section className="sitemap-nav-refs" aria-label="Navigation code">
+                            <h4>Navigation</h4>
+                            {navRefs.map((c) => (
+                                <div key={c.nav}>
+                                    <p className="hint">{navLabel(c)}</p>
+                                    <div className="refs">
+                                        {c.edge.refs.map((r, i) => <CodeReference key={i} reference={r} repo={vm.repo} list={c.edge.refs} index={i} />)}
+                                    </div>
+                                </div>
+                            ))}
+                        </section>}
+                    </Disclosure>
+                )}
+            </DisclosureList>
+        </SidePanel>
+    );
 });
 
-const ConnectionTabs = observer(function ConnectionTabs({ vm, id }: { vm: SitemapViewModel; id: string }) {
+/** Links arriving at (From) and leaving (To) the screen, as flowchart-style connection rows. */
+const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: SitemapViewModel; id: string }) {
     const nav = vm.navFor(id);
     if (!nav.from.length && !nav.to.length) return <p className="hint">No navigation found in code.</p>;
     const tabs: DirectionTab<ConnectionTab>[] = [{ id: 'from', label: 'From', count: nav.from.length }, { id: 'to', label: 'To', count: nav.to.length }];
-    return <section className="sitemap-nav" aria-label="Navigation">
-        <h4>Navigation</h4>
-        <DirectionTabs idPrefix={'sitemap-nav-' + id} label="Navigation direction" tabs={tabs} active={vm.connectionTab} onChange={vm.setConnectionTab}>
-            {(active) => nav[active].map((connection) => {
-                const { edge, original } = connection;
-                return <div className={'sitemap-connection' + (connection.journey ? '' : ' context')} key={connection.nav}>
-                    <p><button className="btn sm" onClick={() => vm.select(connection.other)}
-                        onMouseEnter={() => vm.hoverConnection(connection)} onMouseLeave={() => vm.hoverConnection(null)}
-                        onFocus={() => vm.hoverConnection(connection)} onBlur={() => vm.hoverConnection(null)}>
-                        {vm.screenLabel(connection.other)}
-                    </button>{!connection.journey && <span className="hint"> · nearby</span>}</p>
-                    {edge.label && <p>{edge.label}</p>}
-                    {edge.condition && <p>When: {edge.condition}</p>}
-                    {edge.status && <><p>{CHANGE_LABELS[edge.status]}: {edge.rationale}</p>
-                        {original && <details><summary>Original navigation</summary>
-                            <p>{original.from} → {original.to}: {original.label}</p><p>{original.condition}</p>
-                        </details>}
-                    </>}
-                    {edge.refs.length > 0 && <div className="refs">{edge.refs.map((reference, i) => <CodeReference key={i} reference={reference} repo={vm.repo} />)}</div>}
-                </div>;
-            })}
-        </DirectionTabs>
-    </section>;
+    return (
+        <section className="flow-conn sitemap-nav" aria-label="Navigation">
+            <DirectionTabs idPrefix={'sitemap-nav-' + id} label="Navigation direction" tabs={tabs} active={vm.connectionTab} onChange={vm.setConnectionTab}>
+                {(active) => (
+                    <ul>
+                        {nav[active].map((c) => (
+                            <li key={c.nav}>
+                                <ConnectionRow go={c.other} title={vm.screenLabel(c.other)} shape={{ type: 'process' }}
+                                    status={vm.changeFor(c.other)?.status} arrow={{ label: c.edge.label, status: c.edge.status }}
+                                    note={c.edge.condition && 'When: ' + c.edge.condition} context={!c.journey}
+                                    onClick={() => { vm.hoverConnection(null); vm.select(c.other); }}
+                                    onHover={(on) => vm.hoverConnection(on ? c : null)} />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </DirectionTabs>
+        </section>
+    );
 });
 
 const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: SitemapViewModel }) {
     const root = useRef<HTMLElement>(null);
+    // Closed until a screen is picked, like the flowchart's step panel.
+    const panelOpen = vm.detailsOpen && !!vm.selected;
     return (
         <section className="sitemap-workspace" id="sitemap-workspace" aria-label="Sitemap" ref={root}>
             <style>{FC_CSS + UI_CSS + SITEMAP_CSS}</style>
@@ -93,8 +146,6 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                 extraActions={<DiagramMore id="sitemap-actions" open={vm.actionsOpen} setOpen={vm.setActionsOpen} actions={[
                     { label: vm.infoOpen || !vm.layout ? 'Hide info' : 'Show info', run: vm.toggleInfo,
                         disabled: !vm.layout, expanded: vm.infoOpen || !vm.layout, controls: 'sitemap-info' },
-                    { label: vm.detailsOpen ? 'Hide details' : 'Show details', run: vm.toggleDetails,
-                        disabled: !vm.layout, expanded: vm.detailsOpen && !!vm.layout, controls: 'sitemap-details' },
                     { label: 'Refresh status', run: () => void vm.load(), disabled: vm.loading || vm.busy },
                 ]} />}
                 generation={{
@@ -127,31 +178,9 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     </div> : !vm.loading && <p>Generate a sitemap to explore the whole application. Uses the map-generation AI settings in Settings.</p>}
                 </div>
             </div>
-            {vm.layout && <div className={'fmain sitemap-main' + (vm.detailsOpen ? '' : ' details-hidden')}>
+            {vm.layout && <div className={'fmain sitemap-main' + (panelOpen ? '' : ' details-hidden')}>
                 <DiagramSvg vm={vm} prefix="sitemap" />
-                <aside className="fside" id="sitemap-details" aria-label="Screen details" aria-live="polite" hidden={!vm.detailsOpen}>
-                    {!!vm.output?.steps.length && <section aria-label="Screen journey">
-                        <h3>Journey</h3>
-                        <DisclosureList ordered className="sitemap-journey">
-                            {vm.output.steps.map((step, index) => (
-                                <Disclosure key={index} id={`sitemap-step-${index}`} headId={`sitemap-step-head-${index}`}
-                                    title={`Step ${index + 1} · ${vm.screenLabel(step.screen)}`}
-                                    open={vm.stepIndex === index} onToggle={() => vm.selectStep(index)}
-                                    headProps={{
-                                        onMouseEnter: () => vm.hoverScreen(step.screen), onMouseLeave: () => vm.hoverScreen(null),
-                                        onFocus: () => vm.hoverScreen(step.screen), onBlur: () => vm.hoverScreen(null),
-                                    }}>
-                                    <p>{step.note}</p>
-                                    <ScreenDetails vm={vm} id={step.screen} stepRefs={step.refs} />
-                                </Disclosure>
-                            ))}
-                        </DisclosureList>
-                    </section>}
-                    {vm.selected && !vm.output?.steps.some((step) => step.screen === vm.selectedId) ? <section aria-label="Selected screen">
-                        <h3>{vm.screenLabel(vm.selected.id)}</h3>
-                        <ScreenDetails vm={vm} id={vm.selected.id} />
-                    </section> : !vm.selected && <p>Select a screen for its routes, navigation conditions, and code references. Arrows show navigation found in code.</p>}
-                </aside>
+                {panelOpen && <ScreenPanel vm={vm} />}
             </div>}
         </section>
     );

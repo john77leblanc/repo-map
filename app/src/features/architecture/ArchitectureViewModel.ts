@@ -67,7 +67,7 @@ export class ArchitectureViewModel {
     /** Connection tab in card details; kept while moving between cards. */
     connectionTab: ConnectionDirection = 'from';
     /** Open card sections; kept while moving between cards. */
-    sections: Record<CardSection, boolean> = { about: true, docs: false, connections: false };
+    sections: Record<CardSection, boolean> = { about: false, docs: false, connections: false };
     /** Trace step shown in card details (a card can be visited more than once). */
     stepAt: number | null = null;
     revealId: string | null = null;

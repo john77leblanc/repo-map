@@ -34,10 +34,16 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .mk-badge path{fill:none;stroke:var(--panel);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .fside-input{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;font-weight:600;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin:2px 0 10px}
 .fside-input:focus{outline:2px solid var(--http);outline-offset:1px}
+.fside .fside-inside{margin:-4px 0 10px}
+.fside-head.sticky + .flow-members{margin-top:10px}
 .fside-rule{border:0;border-top:1px solid var(--line);margin:8px 0 10px}
+.fside .disclosure-list + .fside-rule{margin-top:14px}
 .flow-member-row{display:flex;align-items:center;gap:.5em}
 .flow-member-row .unmark{margin-left:auto;flex:none}
 .flow-select-actions{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em}
+.flow-closer h4{margin:0 0 .4em}
+.flow-closer .status{min-width:0;overflow-wrap:anywhere}
+.flow-closer .status:empty{display:none}
 #fl-select-mode[aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
 .flow-members{margin:.25em 0 .75em;padding-left:1.2em}
 .flow-members li{margin:.15em 0}
@@ -72,9 +78,32 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fn.hl-main .fs-gap{display:inline;stroke:var(--bg);stroke-width:7}
 .fc .fe.hl{stroke:var(--http);stroke-width:2.6}
 .fc .fl.hl text{fill:var(--ink)}
-.flegend .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}
-.flegend .lg.act{stroke:var(--sync)} .flegend .lg.dec{stroke:var(--event)} .flegend .lg.err{stroke:var(--err)} .flegend .lg.inf{stroke-dasharray:3 2}
-.flegend .lg.xp{fill:color-mix(in srgb,var(--ext) 22%,var(--panel))} .flegend .lg-badge{fill:var(--ext)} .flegend .lg-frame{fill:none;stroke:var(--ext);stroke-dasharray:3 2}
+:is(.flegend,.fshape) .lg{fill:var(--panel);stroke:var(--muted);stroke-width:1.2}
+:is(.flegend,.fshape) .lg.act{stroke:var(--sync)} :is(.flegend,.fshape) .lg.dec{stroke:var(--event)} :is(.flegend,.fshape) .lg.err{stroke:var(--err)} :is(.flegend,.fshape) .lg.inf{stroke-dasharray:3 2}
+:is(.flegend,.fshape) .lg.xp{fill:color-mix(in srgb,var(--ext) 22%,var(--panel))} :is(.flegend,.fshape) .lg-badge{fill:var(--ext)} :is(.flegend,.fshape) .lg-frame{fill:none;stroke:var(--ext);stroke-dasharray:3 2}
+:is(.flegend,.fshape) .lg.se{fill:var(--soft);stroke:var(--ink)}
+.cl .fshape{flex:none;width:18px;height:12px;overflow:visible}
+.flow-conn .cl{align-items:flex-start;gap:8px;padding:5px 6px}
+.flow-conn .cl .fshape{margin-top:3px}
+.flow-conn .cl-text{color:var(--ink);overflow:visible;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.flow-conn .cl-text span{overflow:visible}
+.flow-conn .cl-title{display:block;color:var(--ink)}
+.flow-conn .cl-title .proposal-badge{display:inline-block;margin-right:6px;vertical-align:1px;font-size:10px;font-weight:600;line-height:1.2;padding:1px 4px}
+.flow-conn .cl b{font-family:inherit;font-size:12.5px;white-space:normal;overflow-wrap:anywhere}
+/* Arrow under a connection: ── label ──▶, styled like the chart's arrows */
+.fl-arrow{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:11.5px;line-height:1}
+.fl-arrow-line{flex:none;width:14px;border-top:1.5px solid currentColor}
+.fl-arrow-label{white-space:nowrap}
+.fl-arrow-head{position:relative;margin-right:6px}
+.fl-arrow-head::after{content:"";position:absolute;right:-6px;top:-4.25px;border-left:6px solid currentColor;border-top:3.5px solid transparent;border-bottom:3.5px solid transparent}
+.fl-arrow.inf .fl-arrow-line{border-top-style:dashed}
+.fl-arrow.change-new{color:var(--sync)}.fl-arrow.change-new .fl-arrow-line{border-top-style:dashed;border-top-width:2px}
+.fl-arrow.change-modified{color:var(--event)}.fl-arrow.change-modified .fl-arrow-line{border-top-width:2.5px}
+.fl-arrow.change-removed .fl-arrow-line{border-top-style:dotted}.fl-arrow.change-removed .fl-arrow-label{text-decoration:line-through}
+.flow-conn ul{gap:2px}
+.cl-note{color:var(--muted);font-size:11.5px}
+.cl.context{opacity:.75}
+.flow-conn .cl-title em{margin-left:6px}
 .fc.hovering .xp-frame,.fc.hovering .xp-title{opacity:.35}
 .flow-mini{margin:.5em 0;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 .flow-mini svg{display:block;width:100%;height:auto;max-height:280px;pointer-events:none}

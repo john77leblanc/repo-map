@@ -42,6 +42,7 @@ test('the workspace view joins the linked API where the shop calls it, and switc
     await expect(seam).toContainText('matched contract');
     await seam.locator('.cl').click();
     await expect(page.locator('#arch-details-title')).toHaveText('orders route');
+    await page.locator('#arch-about-head').click();
     await expect(page.locator('#arch-details .repo-of')).toHaveText('From Shop API');
 
     // a card away from the seam dims it, like any other unrelated wire
@@ -160,8 +161,10 @@ test('a workspace trace follows the order into the linked API, in repo bands tha
     await expect(steps.nth(1)).toContainText('orders route (Shop API)');
     await expect(steps.nth(2)).toContainText('worker (from gone, not linked)');
     await expect(page.locator('#trace-unlinked')).toContainText('gone');
-    await steps.nth(1).locator('details.ref summary').click();
-    await expect(steps.nth(1).locator('.code .cl2')).toHaveCount(3);
+    await steps.nth(1).locator('button.ref').click();
+    await expect(page.locator('#ref-dialog .code .cl2.cited')).toHaveCount(3);
+    await page.locator('#ref-close').click();
+    await expect(page.locator('#ref-dialog')).not.toBeVisible();
 
     await page.getByRole('tab', { name: 'Flowchart', exact: true }).click();
     await expect(page.locator('#fl-svgbox .repo-band')).toHaveCount(2);

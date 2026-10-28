@@ -7,6 +7,7 @@ import { ArchitectureWorkspace } from '../features/architecture/ArchitectureWork
 import { FlowchartWorkspace } from '../features/flowchart/FlowchartWorkspace';
 import { TraceHome, SelectedTraceSidebar } from '../features/traces/TraceViews';
 import { PlanModal } from '../features/plans/PlanModal';
+import { ReferenceModal } from '../shared/ui/ReferenceModal';
 import { CodeReference } from '../shared/ui/CodeReference';
 import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
 import { StartView } from '../features/start/StartView';
@@ -69,6 +70,7 @@ export const App = observer(function App() {
                 }
             />
             <PlanModal vm={app.plans} />
+            <ReferenceModal vm={app.repo.references} />
         </>
     );
 });

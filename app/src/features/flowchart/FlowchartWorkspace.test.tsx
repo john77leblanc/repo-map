@@ -55,8 +55,10 @@ describe('FlowchartWorkspace', () => {
         await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Look closer' })));
         // drawn in place: the panel follows the closer look's first step
         expect(vm.selectedId).toBe('a.1');
-        expect(screen.getByText('Inside: Ready?')).toBeTruthy();
+        expect(screen.getByText('Inside: Ready?').nextElementSibling?.className).toBe('disclosure-list');
         expect(screen.getByText('Checks the cart.')).toBeTruthy();
+        expect(container.querySelector('#fl-closer h4')?.textContent).toBe('Closer look 2 steps');
+        expect(container.querySelector('#fl-closer ol')).toBe(null);
         expect(container.querySelector('.fc .xp-frame')).toBeTruthy();
         expect(container.querySelector('.fc .xp-title')?.textContent).toContain('Expanded: Ready?');
         expect(container.querySelectorAll('.fc .fn.xp')).toHaveLength(2);
@@ -65,6 +67,32 @@ describe('FlowchartWorkspace', () => {
         expect(container.querySelector('.fc .xp-badge')).toBeTruthy();
         expect(container.querySelector('.flow-mini svg')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Show in chart' })).toBeTruthy();
+        unmount();
+        vm.dispose();
+    });
+    it('puts Closer look below the sections, with its progress and Stop beside the button, not in the toolbar', async () => {
+        const { vm, trace, services } = fixture();
+        Object.defineProperty(vm.repo, 'aiAvailable', { get: () => true });
+        let progress: (text: string) => void = () => {};
+        vi.mocked(services.api.stream).mockImplementationOnce((_path, _body, signal, onProgress) => {
+            progress = onProgress as (text: string) => void;
+            return new Promise((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted'))));
+        });
+        vm.setTrace(trace);
+        const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
+        act(() => vm.select('a'));
+        const closer = container.querySelector('#fl-side > section#fl-closer')!;
+        expect(closer).toBeTruthy();
+        expect(closer.previousElementSibling?.className).toBe('fside-rule');
+        expect(container.querySelector('.disclosure[data-section="fl-closer"]')).toBe(null);
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Look closer' })));
+        act(() => progress('Reading the cart'));
+        expect(container.querySelector('#fl-closer-status')?.textContent).toMatch(/^Reading the cart/);
+        expect(container.querySelector('#fl-status')?.textContent).toBe('');
+        expect(container.querySelector('#fl-stop')?.hasAttribute('hidden')).toBe(true);
+        await act(async () => fireEvent.click(container.querySelector('#fl-closer-stop')!));
+        expect(container.querySelector('#fl-closer-status')?.textContent).toBe('Stopped.');
+        expect(container.querySelector('#fl-status')?.textContent).toBe('');
         unmount();
         vm.dispose();
     });
@@ -100,6 +128,9 @@ describe('FlowchartWorkspace', () => {
         expect(side).toBeTruthy();
         expect(container.querySelector('.fmain.details-closed')).toBeNull();
         expect(side.querySelector('h3')?.textContent).toBe('Ready?');
+        expect(side.querySelector('.fside-kind .ft')?.textContent).toBe('Step — Decision');
+        expect([...side.querySelectorAll('.disclosure-head')].every((h) => h.getAttribute('aria-expanded') === 'false')).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: /^References/ }));
         expect(screen.getByText('Checkout guide')).toBeTruthy();
         expect(screen.getByText('Agent guide')).toBeTruthy();
         expect(screen.getByText('README.md#L3-L4')).toBeTruthy();
@@ -113,6 +144,7 @@ describe('FlowchartWorkspace', () => {
         expect(container.querySelector('.fn[data-id="a"]')?.classList.contains('hl')).toBe(true);
         fireEvent.click(side.querySelector('[data-go="b"]')!);
         expect(vm.selectedId).toBe('b');
+        fireEvent.click(screen.getByRole('button', { name: 'About' }));
         expect(screen.getByText(/Inferred\. Check this step/)).toBeTruthy();
         expect(side.querySelector('[data-go="a"]')).toBeTruthy();
         fireEvent.keyDown(side, { key: 'Escape' });
@@ -133,11 +165,25 @@ describe('FlowchartWorkspace', () => {
         } });
         act(() => vm.select('a'));
         vm.setSection('connections', true);
+        vm.setSection('about', true);
         const { container, unmount } = render(<FlowchartWorkspace vm={vm} CodeReference={Reference} />);
-        const badge = container.querySelector('#fl-side [data-go="b"] .proposal-badge.new');
-        expect(badge?.textContent).toBe('New');
         expect(container.querySelector('#fl-side .flow-change h4.modified')?.textContent).toBe('Modified');
-        expect(container.querySelector('#fl-side .flow-conn li .hint')?.textContent).toBe('yes');
+        expect(container.querySelector('#fl-side .fside-kind .proposal-badge.modified')?.textContent).toBe('Modified');
+        // rows look like architecture's: target's shape, its name, then the arrow label
+        const row = container.querySelector('#fl-side .flow-conn button.cl[data-go="b"]')!;
+        expect(row.querySelector('svg.fshape .lg.se')).toBeTruthy();
+        expect(row.querySelector('b')?.textContent).toBe('Done');
+        // the chip is the connected step's status (Done is unchanged), and the arrow carries the arrow's
+        expect(row.querySelector('.proposal-badge')).toBe(null);
+        const arrow = row.querySelector('.fl-arrow')!;
+        expect(arrow.textContent).toBe('yes');
+        expect(arrow).toHaveClass('change-new');
+        expect(row.querySelector('em')).toBe(null);
+        // from Done's side, the connected step is the modified one: chip before its title
+        act(() => vm.select('b'));
+        act(() => vm.setConnectionTab('from'));
+        const back = container.querySelector('#fl-side .flow-conn button.cl[data-go="a"]')!;
+        expect(back.querySelector('.cl-title .proposal-badge.modified + b')?.textContent).toBe('Ready?');
         unmount();
         vm.dispose();
     });
@@ -149,6 +195,7 @@ describe('FlowchartWorkspace', () => {
         );
         const node = container.querySelector('.fn[data-id="a"]')!;
         fireEvent.keyDown(node, { key: 'Enter' });
+        fireEvent.click(screen.getByRole('button', { name: /^References/ }));
         expect(screen.getByText('main.ts')).toBeTruthy();
         expect(screen.getByText('README.md')).toBeTruthy();
         expect(container.querySelector('.fn.sel')).toBe(node);

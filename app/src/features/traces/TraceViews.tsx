@@ -292,7 +292,7 @@ const TracePromptActions = observer(function TracePromptActions({ vm, trace }: T
         </div>
     );
 });
-function TraceActions({ vm, trace }: TraceViewProps & { trace: Trace }) {
+const TraceActions = observer(function TraceActions({ vm, trace }: TraceViewProps & { trace: Trace }) {
     return (
         <div className="sva">
             <button
@@ -301,7 +301,7 @@ function TraceActions({ vm, trace }: TraceViewProps & { trace: Trace }) {
                 type="button"
                 onClick={() => void vm.copyCode(trace)}
             >
-                Copy trace code
+                {vm.codeCopied(trace) ? 'Copied!' : 'Copy trace code'}
             </button>
             {(!trace._doc || vm.temp === trace) && (
                 <button
@@ -315,7 +315,7 @@ function TraceActions({ vm, trace }: TraceViewProps & { trace: Trace }) {
             )}
         </div>
     );
-}
+});
 export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: TraceViewProps) {
     const t = vm.selected;
     if (!t) return null;
@@ -371,11 +371,13 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                                 <div className="refs">
                                     {t.refs
                                         .filter((r) => r.step === step.id)
-                                        .map((reference, j) => (
+                                        .map((reference, j, stepRefs) => (
                                             <CodeReference
                                                 key={j}
                                                 reference={reference}
                                                 repo={vm.repo}
+                                                list={stepRefs}
+                                                index={j}
                                             />
                                         ))}
                                 </div>

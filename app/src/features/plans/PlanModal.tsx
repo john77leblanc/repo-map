@@ -93,7 +93,7 @@ export const PlanModal = observer(function PlanModal({ vm }: { vm: PlansViewMode
                         hidden={!plan}
                         onClick={() => void vm.copy()}
                     >
-                        Copy
+                        {vm.copied.copied ? 'Copied!' : 'Copy'}
                     </button>
                 </div>
             </div>

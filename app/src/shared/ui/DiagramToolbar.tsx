@@ -25,11 +25,13 @@ interface DiagramToolbarProps {
     onCopy: () => void;
     onDownload: (resolve: (variable: string) => string) => void;
     onStop: () => void;
+    /** False hides Stop while busy, for a job stopped from elsewhere (e.g. a side panel). */
+    stoppable?: boolean;
     generation: { label: string; title: string; hidden?: boolean; disabled?: boolean; run: () => void };
 }
 
 function DiagramToolbar({ prefix, label, available, selectors, tools, extraActions, diagramKey,
-    status, log, busy, loading, error, copied, onZoom, onFit, onCopy, onDownload, onStop, generation }: DiagramToolbarProps) {
+    status, log, busy, loading, error, copied, onZoom, onFit, onCopy, onDownload, onStop, stoppable = true, generation }: DiagramToolbarProps) {
     return (
         <div className="diagram-toolbar flow-tools">
             <div className="flow-zoom" role="group" aria-label={label + ' controls'}>
@@ -50,7 +52,7 @@ function DiagramToolbar({ prefix, label, available, selectors, tools, extraActio
                     onDownload(variable => style.getPropertyValue(variable).trim());
                 }} />
                 {extraActions}
-                <button className="btn sm" id={prefix + '-stop'} type="button" hidden={!busy} onClick={onStop}>Stop</button>
+                <button className="btn sm" id={prefix + '-stop'} type="button" hidden={!busy || !stoppable} onClick={onStop}>Stop</button>
                 <button className="btn sm" id={prefix + '-redraw'} type="button" title={generation.title}
                     hidden={generation.hidden} disabled={busy || generation.disabled} onClick={generation.run}>{generation.label}</button>
             </div>
