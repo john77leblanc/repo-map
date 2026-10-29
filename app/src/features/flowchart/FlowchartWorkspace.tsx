@@ -1,4 +1,5 @@
 ﻿import { useRef, type ComponentType } from 'react';
+import { hasChanges } from '../../models/trace';
 import { observer } from 'mobx-react-lite';
 import type { CodeRef } from '../../models/types';
 import type { RepositoryModel } from '../../models/RepositoryModel';
@@ -7,7 +8,7 @@ import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { FC_CSS, UI_CSS } from './styles';
 import { DiagramSvg } from '../../shared/ui/DiagramSvg';
 import { DiagramToolbar } from '../../shared/ui/DiagramToolbar';
-import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
+import { Tabs, type TabItem } from '../../shared/ui/Tabs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { SidePanel } from '../../shared/ui/SidePanel';
 import { FlowShape } from './FlowShape';
@@ -198,13 +199,13 @@ const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: Flow
     if (!conns.from.length && !conns.to.length) {
         return <p className="hint">No connections.</p>;
     }
-    const tabs: DirectionTab<ConnectionTab>[] = [
+    const tabs: TabItem<ConnectionTab>[] = [
         { id: 'from', label: 'From', count: conns.from.length },
         { id: 'to', label: 'To', count: conns.to.length },
     ];
     return (
         <section className="flow-conn" aria-label="Connections">
-            <DirectionTabs idPrefix={'fl-conn-' + id} label="Connection direction" tabs={tabs}
+            <Tabs idPrefix={'fl-conn-' + id} label="Connection direction" tabs={tabs}
                 active={vm.connectionTab} onChange={vm.setConnectionTab}>
                 {(active) => (
                     <ul>
@@ -221,7 +222,7 @@ const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: Flow
                         })}
                     </ul>
                 )}
-            </DirectionTabs>
+            </Tabs>
         </section>
     );
 });
@@ -292,7 +293,7 @@ export const FlowchartDetails = observer(function FlowchartDetails({
     );
 });
 
-function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean }) {
+function FlowchartLegend({ open, proposal, review = false }: { open: boolean; proposal: boolean; review?: boolean }) {
     return (
         <section className="flegend" id="flowchart-key" aria-label="Diagram key" hidden={!open}>
             <div>
@@ -319,7 +320,7 @@ function FlowchartLegend({ open, proposal }: { open: boolean; proposal: boolean 
                 </span>
             </div>
             <p data-proposal-key className="proposal-legend" hidden={!proposal}>
-                Proposed changes: <span className="key-change">New</span>{' '}
+                {review ? 'Changes in this review:' : 'Proposed changes:'} <span className="key-change">New</span>{' '}
                 <span className="key-change modified">Modified</span>{' '}
                 <span className="key-change removed">Removed</span>
             </p>
@@ -360,7 +361,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             title: 'Ask the AI tool to draw this flowchart again', hidden: !vm.repo.aiAvailable,
                             run: () => { if (vm.trace) void vm.generate(vm.trace); } }}
                     />
-                    <FlowchartLegend open={vm.keyOpen} proposal={vm.trace.intent === 'proposal'} />
+                    <FlowchartLegend open={vm.keyOpen} proposal={hasChanges(vm.trace)} review={vm.trace.intent === 'review'} />
                     {!hasFlow && (
                         <p id="flow-missing" className="hint">
                             The supporting walkthrough was kept. Draw the flowchart to complete this

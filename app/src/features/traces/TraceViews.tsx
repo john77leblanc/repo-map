@@ -5,6 +5,8 @@ import { ModalHeader } from '../../shared/ui/ModalHeader';
 import { StepNumber } from '../../shared/ui/StepNumber';
 import { SettingsSection } from '../../shared/ui/SettingsSection';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
+import { reviewLabel } from '../../../../lib/review-data.mjs';
+import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import type { TraceJob } from './TraceJob';
 import type { TraceViewModel } from './TraceViewModel';
 import type { Trace, Workspace } from '../../models/types';
@@ -13,6 +15,8 @@ export interface TraceViewProps {
 }
 export interface TraceHomeProps extends TraceViewProps {
     onRefreshAgents?: () => void;
+    /** Open the "Review changes" window. */
+    onReview?: () => void;
 }
 function OutputOption({ id, label, description, checked, onChange }: {
     id: string;
@@ -224,6 +228,7 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
                         >
                             <span className="trace-card-head">
                                 <span className="trace-card-title" title={trace.title}>{trace.title}</span>
+                                {trace.intent === 'review' && <span className="trace-badge review">{reviewLabel(trace.review) || 'Review'}</span>}
                                 {trace.intent === 'proposal' && (vm.isPlanBusy(trace)
                                     ? <span className="trace-badge busy" role="status" aria-label="Writing implementation plan">Planning…</span>
                                     : <span className="trace-badge">{trace.plan ? 'Plan' : 'Proposal'}</span>)}
@@ -248,6 +253,7 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
 export const TraceHome = observer(function TraceHome({
     vm,
     onRefreshAgents,
+    onReview,
 }: TraceHomeProps) {
     return (
         <div id="sidebar-home" hidden={!!vm.selected}>
@@ -266,6 +272,13 @@ export const TraceHome = observer(function TraceHome({
             >
                 New trace
             </button>
+            {onReview && (
+                <button className="btn" id="review-changes" hidden={!!vm.editing} type="button" aria-haspopup="dialog"
+                    aria-controls="review-dialog" onClick={onReview}
+                    title="See what a pull request, branch or your local changes do, on the map">
+                    Review changes
+                </button>
+            )}
             <hr className="trace-library-divider" hidden={!!vm.editing} />
             <div className="pane" id="pane-traces">
                 {!vm.editing && <TraceLibrary vm={vm} />}
@@ -283,8 +296,8 @@ const TracePromptActions = observer(function TracePromptActions({ vm, trace }: T
     }, [armed]);
     return (
         <div className="trace-prompt-actions">
-            <button className="btn sm" type="button" disabled={!trace._doc || !vm.repo.aiAvailable || vm.busy}
-                onClick={() => vm.editPrompt(trace)}>Edit</button>
+            {trace.intent !== 'review' && <button className="btn sm" type="button" disabled={!trace._doc || !vm.repo.aiAvailable || vm.busy}
+                onClick={() => vm.editPrompt(trace)}>Edit</button>}
             <button className="btn sm danger" type="button" disabled={!trace._doc || vm.busy}
                 onClick={() => {
                     if (armed) void vm.removeTrace(trace);
@@ -319,6 +332,86 @@ const TraceActions = observer(function TraceActions({ vm, trace }: TraceViewProp
         </div>
     );
 });
+/** What a review compared, whether it still matches the code, and Re-run. */
+const ReviewHeader = observer(function ReviewHeader({ vm, trace }: TraceViewProps & { trace: Trace }) {
+    const r = trace.review!;
+    const state = vm.reviewState(trace);
+    const rerun = vm.rerunJob(trace);
+    const short = (sha: string) => sha.slice(0, 7);
+    return (
+        <div className="review-head" id="review-head">
+            <p className="review-range">
+                <span className="trace-badge review">{reviewLabel(r)}</span>{' '}
+                {r.url ? <a href={r.url} target="_blank" rel="noopener">{r.head}</a> : <code>{r.head}</code>}
+                {' → '}<code>{r.base}</code>{' '}
+                <span className="hint" title={r.mergeBase + '..' + r.headSha}>
+                    {short(r.mergeBase)}..{r.kind === 'local' ? (r.dirty ? 'working tree' : short(r.headSha)) : short(r.headSha)}
+                </span>
+            </p>
+            <p className={'status review-state' + (state?.state === 'stale' ? ' err' : '') + (rerun ? ' busy' : '')} id="review-state" aria-live="polite">
+                {rerun ? rerun.status || 'Re-running review…'
+                    : !state ? 'Checking whether the code changed…'
+                    : state.state === 'current' ? 'Up to date with ' + (r.kind === 'pr' ? 'the pull request' : r.kind === 'local' ? 'your checkout' : r.head) + (state.prState && state.prState !== 'open' ? ' (' + state.prState + ')' : '') + '.'
+                    : state.state === 'stale' ? 'Out of date: ' + (state.reason || 'the code changed.')
+                    : 'Couldn\'t check: ' + (state.reason || 'unknown.')}
+            </p>
+            <div className="trace-prompt-actions">
+                <button className="btn sm" id="review-rerun" type="button" disabled={!!rerun || !vm.repo.aiAvailable || !trace._doc}
+                    onClick={() => vm.rerunReview(trace)}>{rerun ? 'Re-running…' : 'Re-run review'}</button>
+                {rerun && <button className="btn sm" type="button" onClick={() => vm.stopJob(rerun)}>Stop</button>}
+            </div>
+        </div>
+    );
+});
+/** A review's notes (map changes, risks, questions) and its changed files by card. */
+const ReviewSections = observer(function ReviewSections({ vm, trace }: TraceViewProps & { trace: Trace }) {
+    const r = trace.review;
+    if (!r) return null;
+    const groups = vm.reviewFileGroups(trace);
+    const notes = !!(trace.proposal?.rationale || r.risks.length || r.questions.length || r.skipped.length);
+    return <>
+        {notes && (
+            <SettingsSection id="trace-review" title="Review notes" open={vm.sections.review}
+                onToggle={(open) => vm.setSection('review', open)}>
+                <div className="proposal-summary">
+                    {trace.proposal?.rationale && <p>{trace.proposal.rationale}</p>}
+                    {r.risks.length > 0 && <div><h4>Worth a careful look</h4><ul>{r.risks.map((s, i) => <li key={i}>{s}</li>)}</ul></div>}
+                    {r.questions.length > 0 && <div><h4>Questions for the author</h4><ul>{r.questions.map((s, i) => <li key={i}>{s}</li>)}</ul></div>}
+                    {r.skipped.length > 0 && <p className="hint">Diffs too large to send in full: {r.skipped.join(', ')}.</p>}
+                </div>
+            </SettingsSection>
+        )}
+        {r.files.length > 0 && (
+            <SettingsSection id="trace-files" title="Changed files" count={r.files.length} open={vm.sections.files}
+                onToggle={(open) => vm.setSection('files', open)}>
+                <DisclosureList className="review-files">
+                    {groups.map((g) => {
+                        const refs = g.files.map((f) => vm.fileReference(trace, f));
+                        return (
+                            <Disclosure key={g.id || '-'} id={'review-files-' + (g.id || 'other').replace(/[^\w-]/g, '-')}
+                                title={<>{g.status && <span className={'proposal-badge ' + g.status}>{CHANGE_LABELS[g.status]}</span>} {g.title}</>}
+                                count={g.files.length} open={vm.isFileGroupOpen(g.id)} onToggle={(open) => vm.setFileGroup(g.id, open)}>
+                                <ul className="review-file-list">
+                                    {g.files.map((f, i) => (
+                                        <li key={f.path}>
+                                            <CodeReference reference={refs[i]} repo={vm.repo} list={refs} index={i} />
+                                            <span className="review-file-meta">
+                                                <span className={'review-file-status s-' + f.status}>{FILE_STATUS[f.status] || f.status}</span>
+                                                {' '}<span className="da">+{f.additions}</span> <span className="dd">−{f.deletions}</span>
+                                                {f.note && <> · {f.note}</>}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Disclosure>
+                        );
+                    })}
+                </DisclosureList>
+            </SettingsSection>
+        )}
+    </>;
+});
+const FILE_STATUS: Record<string, string> = { A: 'added', M: 'changed', D: 'deleted', R: 'renamed', C: 'copied', T: 'type changed' };
 export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: TraceViewProps) {
     const t = vm.selected;
     if (!t) return null;
@@ -331,6 +424,7 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                     {t.gaps && <p className="gaps">Not shown clearly: {t.gaps}</p>}
                 </SettingsSection>
             )}
+            {t.intent === 'review' && <ReviewSections vm={vm} trace={t} />}
             {t.intent === 'proposal' && t.proposal && (
                 <SettingsSection id="trace-proposal" title="Proposed change" open={vm.sections.proposal}
                     onToggle={(open) => vm.setSection('proposal', open)}>
@@ -400,14 +494,14 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
             {t.refs.length > 0 && (
                 <div className="codestat">
                     <span className="status">
-                        {t.refs.length} code reference{t.refs.length === 1 ? '' : 's'} · read from
-                        your checkout
+                        {t.refs.length} code reference{t.refs.length === 1 ? '' : 's'} · {t.review && t.review.kind !== 'local'
+                            ? 'read at commit ' + t.review.headSha.slice(0, 7) : 'read from your checkout'}
                     </span>
                 </div>
             )}
             {t.used?.label && (
                 <div className="codestat">
-                    <span className="status">Traced with {t.used.label}</span>
+                    <span className="status">{t.review ? 'Reviewed' : 'Traced'} with {t.used.label}</span>
                 </div>
             )}
             <TraceActions key={t._doc || t.title} vm={vm} trace={t} />
@@ -437,6 +531,7 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
             <h2 id="trace-title">{vm.selected?.title}</h2>
             {vm.editing ? <TraceComposer vm={vm} inline /> : <>
                 <p id="trace-prompt">{vm.selected?.prompt || 'No prompt saved.'}</p>
+                {vm.selected?.review && <ReviewHeader vm={vm} trace={vm.selected} />}
                 {vm.selected && <TracePromptActions key={vm.selected._doc || vm.selected.title} vm={vm} trace={vm.selected} />}
                 {vm.selected?.intent === 'proposal' && (
                     <button className={'btn primary trace-plan-btn' + (vm.planBusy ? ' busy' : '')} id="trace-plan" type="button"

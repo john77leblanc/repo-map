@@ -103,6 +103,45 @@ export interface CodeRef {
     step?: string;
     title?: string;
     kind?: string;
+    /** Read at this commit (a review's head), not from the checkout. */
+    rev?: string;
+    /** Show this file's diff between two commits (head '' = the working tree) instead of its lines. */
+    diff?: { base: string; head: string };
+}
+/** A changed file in a review, with the cards it belongs to. */
+export interface ReviewFile {
+    path: string;
+    status: string;
+    from?: string;
+    additions: number;
+    deletions: number;
+    cards: string[];
+    note: string;
+}
+/** What a review compared, and what it found beyond the map changes. */
+export interface Review {
+    kind: 'pr' | 'refs' | 'local';
+    base: string;
+    head: string;
+    headRef?: string;
+    baseSha: string;
+    headSha: string;
+    mergeBase: string;
+    number?: number;
+    url?: string;
+    dirty?: boolean;
+    fingerprint?: string;
+    risks: string[];
+    questions: string[];
+    files: ReviewFile[];
+    skipped: string[];
+}
+/** What to review: a pull request, two refs, or local changes. */
+export interface ReviewRequest {
+    pr?: string;
+    base?: string;
+    head?: string;
+    local?: boolean;
 }
 export interface Proposal {
     rationale: string;
@@ -218,7 +257,7 @@ export interface SitemapTrace {
     };
 }
 export interface Trace {
-    intent: 'description' | 'proposal';
+    intent: 'description' | 'proposal' | 'review';
     title: string;
     prompt: string;
     summary: string;
@@ -235,6 +274,8 @@ export interface Trace {
     expansions?: Record<string, FlowExpansion>;
     proposal?: Proposal | null;
     plan?: Plan | null;
+    /** Set on reviews of a code change (intent 'review'). */
+    review?: Review | null;
     used?: { agent: string; model: string; effort: string; label: string } | null;
     /** Traced over the workspace: step ids and refs may carry a `<name>:` prefix. */
     scope?: 'workspace';
@@ -294,6 +335,8 @@ export interface FileContent {
     lines: string[];
     total?: number;
     text?: string;
+    /** Diff lines (unified format) rather than file lines. */
+    diff?: boolean;
 }
 export interface StreamResult {
     type?: string;

@@ -1,4 +1,4 @@
-function SitemapLegend({ open, trace, proposal }: { open: boolean; trace: boolean; proposal: boolean }) {
+function SitemapLegend({ open, trace, proposal, review = false }: { open: boolean; trace: boolean; proposal: boolean; review?: boolean }) {
     return (
         <section className="flegend" id="sitemap-key" aria-label="Diagram key" hidden={!open}>
             <div>
@@ -10,9 +10,9 @@ function SitemapLegend({ open, trace, proposal }: { open: boolean; trace: boolea
                 </>}
             </div>
             <p data-proposal-key className="proposal-legend" hidden={!proposal}>
-                Proposed changes: <span className="key-change">New</span>{' '}
+                {review ? 'Changes in this review:' : 'Proposed changes:'} <span className="key-change">New</span>{' '}
                 <span className="key-change modified">Modified</span>{' '}
-                <span className="key-change removed">Removed</span>. Proposed changes are not implemented code.
+                <span className="key-change removed">Removed</span>{review ? '.' : '. Proposed changes are not implemented code.'}
             </p>
         </section>
     );

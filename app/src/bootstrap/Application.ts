@@ -7,6 +7,7 @@ import { TraceViewModel } from '../features/traces/TraceViewModel';
 import { ArchitectureViewModel } from '../features/architecture/ArchitectureViewModel';
 import { FlowchartViewModel } from '../features/flowchart/FlowchartViewModel';
 import { PlansViewModel } from '../features/plans/PlansViewModel';
+import { ReviewViewModel } from '../features/review/ReviewViewModel';
 import { SitemapViewModel } from '../features/sitemap/SitemapViewModel';
 import { StartViewModel } from '../features/start/StartViewModel';
 import { ViewSwitcherViewModel } from '../features/shell/ViewSwitcherViewModel';
@@ -21,6 +22,7 @@ export class Application {
     readonly architecture: ArchitectureViewModel;
     readonly flowchart: FlowchartViewModel;
     readonly plans: PlansViewModel;
+    readonly review: ReviewViewModel;
     readonly sitemap: SitemapViewModel;
     readonly start: StartViewModel;
     readonly workspace: WorkspaceModel;
@@ -73,11 +75,13 @@ export class Application {
                 void this.plans.open(trace);
             },
             isPlanBusy: (trace) => this.plans.isGenerating(trace),
+            onOpenReview: (job) => this.review.showJob(job),
             onRequestFlow: (trace) => {
                 this.traces.select(trace, 'flowchart');
                 return this.flowchart.generate(this.traces.selected!);
             },
         });
+        this.review = new ReviewViewModel({ repo, traces: this.traces, getPickLabel: () => this.settings.pickLabel() });
         this.views = new ViewSwitcherViewModel({
             repo,
             shell: this.shell,
@@ -102,12 +106,16 @@ export class Application {
     }
     async init() {
         await Promise.all([this.settings.init(), this.traces.init(), this.workspace.load()]);
+        // `repo-map review` opens the page with what to review in the query
+        const query = this.services.browser.takeQuery?.() || {};
+        if (query.review && !this.start.visible) this.review.fromQuery(query);
     }
     dispose() {
         this.start.dispose();
         this.sitemap.dispose();
         this.traces.dispose();
         this.plans.dispose();
+        this.review.dispose();
         this.flowchart.dispose();
         this.architecture.dispose();
         this.settings.dispose();

@@ -1,24 +1,29 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 
-export interface DirectionTab<T extends string> {
+export interface TabItem<T extends string> {
     id: T;
     label: string;
-    count: number;
+    /** How many items the tab holds, shown as "Label (n)"; a tab with 0 is disabled. */
+    count?: number;
+    disabled?: boolean;
 }
-export interface DirectionTabsProps<T extends string> {
+export interface TabsProps<T extends string> {
     /** Unique per instance; used for tab and panel ids. */
     idPrefix: string;
     label: string;
-    tabs: DirectionTab<T>[];
+    tabs: TabItem<T>[];
     active: T;
     onChange: (tab: T) => void;
     className?: string;
     children: (active: T) => ReactNode;
 }
 
-/** The tab actually shown: the requested one, or the first with items when it is empty. */
-export function shownTab<T extends string>(tabs: DirectionTab<T>[], active: T): T {
-    return tabs.find((t) => t.id === active && t.count)?.id ?? tabs.find((t) => t.count)?.id ?? active;
+/** Can the tab be chosen? Not when disabled, or when it counts no items. */
+const usable = <T extends string>(tab: TabItem<T>) => !tab.disabled && tab.count !== 0;
+
+/** The tab actually shown: the requested one, or the first usable one when it can't be. */
+export function shownTab<T extends string>(tabs: TabItem<T>[], active: T): T {
+    return tabs.find((t) => t.id === active && usable(t))?.id ?? tabs.find(usable)?.id ?? active;
 }
 
 function onArrow(e: KeyboardEvent<HTMLButtonElement>) {
@@ -31,18 +36,21 @@ function onArrow(e: KeyboardEvent<HTMLButtonElement>) {
     if (target) { target.focus(); target.click(); }
 }
 
-/** From/To style tabs with counts, roving focus and arrow keys. Empty tabs are disabled. */
-export function DirectionTabs<T extends string>({ idPrefix, label, tabs, active: requested, onChange, className = '', children }: DirectionTabsProps<T>) {
+/**
+ * Underlined tabs with roving focus and arrow keys, and one panel for the active
+ * tab: From/To connections (with counts; empty tabs are disabled) and the review modes.
+ */
+export function Tabs<T extends string>({ idPrefix, label, tabs, active: requested, onChange, className = '', children }: TabsProps<T>) {
     const active = shownTab(tabs, requested);
     const panel = `${idPrefix}-${active}`;
     return (
         <>
-            <div className={'direction-tabs ' + className} role="tablist" aria-label={label}>
+            <div className={'tab-row ' + className} role="tablist" aria-label={label}>
                 {tabs.map((tab) => (
                     <button key={tab.id} type="button" role="tab" id={`${idPrefix}-${tab.id}-tab`}
                         aria-selected={active === tab.id} aria-controls={panel} tabIndex={active === tab.id ? 0 : -1}
-                        disabled={!tab.count} onClick={() => onChange(tab.id)} onKeyDown={onArrow}>
-                        {tab.label} ({tab.count})
+                        disabled={!usable(tab)} onClick={() => onChange(tab.id)} onKeyDown={onArrow}>
+                        {tab.label}{tab.count !== undefined && ` (${tab.count})`}
                     </button>
                 ))}
             </div>

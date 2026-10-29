@@ -1,9 +1,10 @@
 ﻿import { normalizeFlow } from '../../../lib/flow.mjs';
 import { normalizeExpansions } from '../../../lib/flow-expand.mjs';
 import { normalizePlan, normalizeProposal } from '../../../lib/proposal.mjs';
+import { normalizeReview } from '../../../lib/review-data.mjs';
 import { traceOutputs } from '../../../lib/trace-outputs.mjs';
 import { normalizeSitemapTrace } from '../../../lib/sitemap-trace.mjs';
-import type { CodeRef, Flow, Plan, Proposal, RepoMap, StreamResult, Trace, SitemapTrace } from './types';
+import type { CodeRef, Flow, Plan, Proposal, RepoMap, Review, StreamResult, Trace, SitemapTrace } from './types';
 
 type PlainTrace = Omit<Trace, 'pairs' | '_doc' | 'key' | 'createdAt'>;
 type TraceStep = Trace['steps'][number];
@@ -11,6 +12,12 @@ type TraceStep = Trace['steps'][number];
 type WorkspaceMap = RepoMap & { replaced?: Record<string, string> };
 
 const LINKED_ID = /^([a-z][a-z0-9-]{1,30}):/;
+const SHA = /^[0-9a-f]{7,40}$/i;
+
+/** Proposals and reviews carry changes to the map; descriptions don't. */
+function hasChanges(trace: Pick<Trace, 'intent'> | null | undefined): boolean {
+    return trace?.intent === 'proposal' || trace?.intent === 'review';
+}
 
 /** The linked repo a prefixed id or path belongs to, or '' for this repo. */
 function linkOf(id: string): string {
@@ -43,6 +50,7 @@ function cleanRefs(value: unknown, steps: readonly TraceStep[]): CodeRef[] | nul
                 start,
                 end: Math.max(start, end),
                 why: String(ref.why || '').slice(0, 300),
+                ...(SHA.test(String(ref.rev || '')) ? { rev: String(ref.rev).toLowerCase() } : {}),
             };
         })
         .filter((ref) => ids.has(ref.step || '') && ref.path && !/(^|\/)\.\.(\/|$)/.test(ref.path))
@@ -57,14 +65,14 @@ function cleanRefs(value: unknown, steps: readonly TraceStep[]): CodeRef[] | nul
 function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, workspace?: WorkspaceMap | null): Trace {
     if (!isRecord(value)) throw new Error('no trace');
     const raw = value;
-    const intent = raw.intent === 'proposal' ? 'proposal' : 'description';
+    const intent = raw.intent === 'proposal' || raw.intent === 'review' ? raw.intent : 'description';
     const scope = raw.scope === 'workspace' && intent === 'description' ? 'workspace' : undefined;
     const map: WorkspaceMap = scope && workspace ? workspace : homeMap;
     const replaced = map.replaced || {};
     const swap = (id: string) => replaced[id] || id;
     // These shared JS normalizers validate and construct their output schemas.
     const proposal =
-        intent === 'proposal' ? (normalizeProposal(raw.proposal, map) as Proposal) : null;
+        intent !== 'description' ? (normalizeProposal(raw.proposal, map) as Proposal) : null;
     const known = new Set(map.nodes.map((node) => node.id));
     proposal?.nodes.forEach((node) => known.add(node.id));
     const repos = new Set(map.nodes.map((node) => linkOf(node.id)));
@@ -98,6 +106,7 @@ function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, works
                       start: ref.start,
                       end: ref.end,
                       why: ref.why,
+                      rev: ref.rev,
                   };
               })
           );
@@ -129,6 +138,7 @@ function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, works
         intent,
         proposal,
         plan: intent === 'proposal' ? (normalizePlan(raw.plan) as Plan | null) : null,
+        ...(intent === 'review' ? { review: normalizeReview(raw.review, known) as Review | null } : {}),
         title: String(raw.title || 'Untitled trace').slice(0, 80),
         prompt: String(prompt || raw.prompt || '').slice(0, 4000),
         summary: String(raw.summary || ''),
@@ -175,6 +185,7 @@ function plain(trace: Trace): PlainTrace {
     };
     if (trace.proposal) result.proposal = trace.proposal;
     if (trace.plan) result.plan = trace.plan;
+    if (trace.review) result.review = trace.review;
     if (trace.flow) result.flow = trace.flow;
     if (trace.flow && trace.expansions && Object.keys(trace.expansions).length) result.expansions = trace.expansions;
     if (trace.sitemap) result.sitemap = trace.sitemap;
@@ -205,5 +216,5 @@ function spend(result: StreamResult): string {
     return result.spend ? ' · ' + String(result.spend) : '';
 }
 
-export { normalizeTrace, plain, encodeTrace, decodeTrace, cleanRefs, cleanUsed, linkOf, spend };
+export { hasChanges, normalizeTrace, plain, encodeTrace, decodeTrace, cleanRefs, cleanUsed, linkOf, spend };
 export type { PlainTrace, WorkspaceMap };

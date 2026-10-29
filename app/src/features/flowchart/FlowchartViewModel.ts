@@ -2,7 +2,7 @@
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { AgentPick, ChangeStatus, CollapseGroup, Flow, FlowExpansion, Trace, StreamResult } from '../../models/types';
 import { expandFlow, expandable, normalizeExpansion, subRefs } from '../../../../lib/flow-expand.mjs';
-import { plain } from '../../models/trace';
+import { hasChanges, plain } from '../../models/trace';
 import { collapseGraph } from '../../../../lib/collapse.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
@@ -420,7 +420,7 @@ export class FlowchartViewModel {
     /** Proposal status for a box, with the rationale from its linked architecture change. */
     changeFor(id: string | null): { status: ChangeStatus; rationale: string } | null {
         const node = id ? this.displayFlow?.nodes.find((n) => n.id === id) : null;
-        if (!node || this.trace?.intent !== 'proposal') return null;
+        if (!node || !this.trace || !hasChanges(this.trace)) return null;
         const stepId = node.step ? this.trace.steps[node.step - 1]?.id : null;
         const change = stepId ? this.trace.proposal?.nodes.find((n) => n.id === stepId) : undefined;
         const status = node.status || change?.status;

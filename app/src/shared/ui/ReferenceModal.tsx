@@ -33,6 +33,15 @@ function FittedPath({ path, suffix }: { path: string; suffix: string }) {
     return <code ref={code}>{trimPath(path, keep)}{suffix}</code>;
 }
 
+/** How one unified-diff line is drawn: hunk header, file header, added or removed. */
+function diffClass(line: string) {
+    if (line.startsWith('@@')) return 'dh';
+    if (/^(diff |index |--- |\+\+\+ |new file|deleted file|similarity|rename )/.test(line)) return 'dm';
+    if (line.startsWith('+')) return 'da';
+    if (line.startsWith('-')) return 'dd';
+    return '';
+}
+
 /** The code reference modal: the cited lines with a little context, Copy path, GitHub and Prev/Next. */
 export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: ReferenceViewerModel }) {
     const dialog = useRef<HTMLDialogElement>(null);
@@ -59,7 +68,7 @@ export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: Ref
                             data-tip={vm.copy.copied ? 'Copied!' : 'Copy path'}
                             aria-label={(vm.copy.copied ? 'Copied: ' : 'Copy path: ') + `${r.path}#L${r.start}-L${r.end}`}
                             onClick={() => void vm.copyPath()}>
-                            <FittedPath path={r.path} suffix={`#L${r.start}-L${r.end}`} />
+                            <FittedPath path={r.path} suffix={vm.isDiff ? '' : `#L${r.start}-L${r.end}`} />
                         </button>
                         {vm.href && (
                             <a className="btn" id="ref-github" href={vm.href} target="_blank" rel="noopener"
@@ -74,6 +83,11 @@ export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: Ref
                         {vm.loading ? <p className="ref-note">Loading…</p>
                             : vm.error ? <p className="ref-note err">{vm.error}{' '}
                                 <button className="btn sm" type="button" onClick={vm.retry}>Retry</button></p>
+                            : content?.diff ? (content.lines.length ? content.lines.map((line, i) => (
+                                <div className={'cl2 diff ' + diffClass(line)} key={i}>
+                                    <span className="lc">{line || ' '}</span>
+                                </div>
+                            )) : <p className="ref-note">No changes in this file.</p>)
                             : content?.lines.map((line, i) => {
                                 const n = content.start + i;
                                 return (
@@ -83,7 +97,10 @@ export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: Ref
                                     </div>
                                 );
                             })}
-                        {content && r.end > content.end && content.end < (content.total || 0) && (
+                        {content?.diff && (content.total || 0) > content.lines.length && (
+                            <div className="more">… {content.total! - content.lines.length} more lines of changes</div>
+                        )}
+                        {content && !content.diff && r.end > content.end && content.end < (content.total || 0) && (
                             <div className="more">
                                 … {Math.min(r.end, content.total!) - content.end} more lines in the file
                             </div>

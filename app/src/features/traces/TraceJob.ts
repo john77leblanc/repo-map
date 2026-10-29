@@ -1,5 +1,5 @@
 import { makeAutoObservable, observableRef } from 'mobx';
-import type { AgentPick, Trace, Workspace } from '../../models/types';
+import type { AgentPick, ReviewRequest, Trace, Workspace } from '../../models/types';
 
 let nextJob = 0;
 
@@ -14,6 +14,10 @@ class TraceJob {
     state: 'running' | 'saving' | 'completed' | 'failed' | 'stopped' = 'running';
     result: Trace | null = null;
     saveFailed = false;
+    /** Set on review jobs: what is being reviewed. */
+    review: ReviewRequest | null = null;
+    /** A re-run review: the saved review it replaces. */
+    replaces = '';
     ticker: ReturnType<typeof setInterval> | null = null;
 
     constructor(

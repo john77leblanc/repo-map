@@ -37,6 +37,12 @@ export function createBrowserService(): BrowserService {
     return {
         copy: (text) => navigator.clipboard.writeText(text),
         reload: () => window.location.reload(),
+        takeQuery() {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.toString()) return {};
+            window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+            return Object.fromEntries(params);
+        },
         download(name, text, type) {
             const url = URL.createObjectURL(new Blob([text], { type }));
             const anchor = document.createElement('a');

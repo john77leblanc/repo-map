@@ -74,6 +74,7 @@ For scripted or CI setups, configuring a specific AI tool, and troubleshooting, 
 | `update`   | Bring the map up to date with code changed since it was last evaluated (only the diff is sent); `--check` for scripts |
 | `validate` | Report unknown ids, groups, kinds and missing paths; exits 1 on errors, so it fits in CI |
 | `export`   | Write a snapshot of this map (`--out <file>`, or `-` for stdout) for another repo's workspace to import |
+| `review`   | Open the map on a review of a code change: `repo-map review main..feature`, `repo-map review --pr 12` (needs the `gh` CLI) or `repo-map review --local`; see [Reviewing changes](#reviewing-changes) |
 | `serve`    | Start the map without any setup steps |
 
 Options: `--dir <repo root>`, `--port <n>` (or `REPO_MAP_PORT`), `--force`, `--model <id>`, `--effort <level>`, `--version`, `--help`.
@@ -202,6 +203,27 @@ Flowcharts and sitemaps share the same zoom, **Fit**, **Diagram key**, export, a
 
 Use **More > Show info** for sitemap freshness, snapshot details, and analysis notes. Click a screen to open its panel (closed until then): the screen name, a **Trace step N of M** card with **‹ Prev / Next ›** along the journey when it is on one, then **About**, **Navigation** (From / To links drawn like flowchart connections, with their conditions) and **References**; **Close** or Escape hides it. **More > Refresh status** reloads the saved result without AI; **Regenerate** explicitly refreshes the analysis. Failed or stopped generation keeps the previous result. Generation has its own job slot, so it can run alongside a map update or redraw; on the first-run starter screen it is opt-in and builds in parallel with the map. Sitemap generation reads code only; it does not crawl a running site.
 
+### Reviewing changes
+
+**Review changes** (under **New trace**, or `repo-map review`) explains what a code change does, using the same views as traces. Pick what to review:
+
+- **Branches**: the changes on one branch, tag or commit since it split from another (the default branch unless you pick one), as a pull request would show them.
+- **Pull request**: a GitHub pull request by number or link. repo-map asks the [GitHub CLI](https://cli.github.com) (`gh`, signed in) for its head and base, and fetches its code (`git fetch origin pull/<n>/head`) when it isn't in your clone yet.
+- **Local changes**: your current branch as it is in your checkout, uncommitted changes to tracked files included.
+
+Each field is a searchable list you can also type into (a tag, a commit, `HEAD~3`). The branch lists hold local branches, remote branches (a remote copy at the same commit as its local branch is listed once) and tags, most recently committed first, each with its last commit's age and, for **Changes on**, how many commits it is ahead of **Compared with**. Branches with nothing to review are greyed out, and the counts follow the base you pick. **Pull request** lists open pull requests from `gh pr list` (number, title, author, branches, draft). **Fetch** runs `git fetch --prune origin` to bring in new branches, then refreshes the lists (`GET /api/review/refs?base=`, `GET /api/review/prs`, `POST /api/review/fetch`).
+
+The trace AI tool gets the diff (size-capped like `update`), the pull request's title, description and commit messages, and the changed code itself: a commit other than your checkout is checked out in a temporary git worktree outside the repo, read there, then removed, so your branch and files are never touched. The result is saved like a trace (intent `review`, labelled **PR #12**, **Changes** or **Local changes** in **Saved traces**):
+
+- **Architecture**: cards and connections the change adds, modifies or removes, with the same **New** / **Modified** / **Removed** chips as proposals, and the cards it touches as trace steps. A card's panel lists its **Changed files**.
+- **Flowchart**: the main process the change alters, as it works after the change, with new and changed boxes and arrows marked.
+- **Sitemap**: screens and navigation the change adds or changes, when the repo has a sitemap.
+- In the sidebar: **Summary**, **Review notes** (what changes on the map, risks worth a careful look, questions for the author) and **Changed files** grouped by card (files that fit no card under **Other files**), each with its status and line counts. Clicking a file opens its diff in the reference window; code references open the file as it is at the reviewed commit (`GET /api/file?rev=`, `GET /api/diff`).
+
+When you open a saved review, repo-map checks whether the code moved on (new commits on the branch or pull request, the base moving, or different uncommitted changes) and says **Out of date** with the reason; **Re-run review** reviews it again and replaces it. Closer looks, **Redraw** and sitemap outputs on a review also read the reviewed commit. Reviews are not workspace-wide and have no implementation plan.
+
+`review` in the saved trace is `{ kind: pr|refs|local, base, head, baseSha, headSha, mergeBase, number?, url?, risks, questions, files: [{ path, status, additions, deletions, cards, note }], skipped }`; map changes are in `proposal`, in the proposal shape.
+
 ## Safety
 
 - Listens on `127.0.0.1` only and rejects requests addressed to any other host name.
@@ -209,6 +231,7 @@ Use **More > Show info** for sitemap freshness, snapshot details, and analysis n
 - File reads are limited to `codeRoots` and never touch `.env*`, `.repo-map/` or `blocked` segments.
 - Linked repos (workspace `dir` links) are read with their own `codeRoots`, docs and the same exclusions, through a `<name>:` path prefix. Snapshot links have no file access. During **Find seams** and workspace traces, Claude Code gets each linked folder with `--add-dir` (still `Read`, `Grep`, `Glob` only); API models use the same prefixed read-only tools.
 - Claude Code runs with `Read`, `Grep` and `Glob` only; shell, edit and web tools are disallowed.
+- Reviews read another commit from a temporary git worktree that the server creates in the system temp folder and removes afterwards; the AI tool only reads inside it, under the same rules. Refs and pull request numbers are checked before they reach git or `gh` (no options, no ranges), and `gh` is only asked to view pull requests.
 - Documents (`docs` in config.json, and agent guidance files) are readable outside `codeRoots`, with the same rules: never `.env*`, `.repo-map/` or `blocked` folders.
 - Settings can only save the map's tool, model and effort to `.repo-map/local.json`, after the same checks as the trace menu.
 - The trace menu can only choose among the tools repo-map detected, their effort levels, and model ids that look like model ids. The browser can never set a command, its arguments or a URL.

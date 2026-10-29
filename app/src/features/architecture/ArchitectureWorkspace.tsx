@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { StepNumber } from '../../shared/ui/StepNumber';
-import { DirectionTabs } from '../../shared/ui/DirectionTabs';
+import { Tabs } from '../../shared/ui/Tabs';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { contractLabel } from '../../../../lib/contracts.mjs';
 import type { ArchitectureViewModel } from './ArchitectureViewModel';
@@ -197,7 +197,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                     </span>
                 </div>
                 <p data-proposal-key className="proposal-legend" hidden={!vm.trace?.proposal}>
-                    Proposed changes: <span className="key-change">New</span>{' '}
+                    {vm.trace?.intent === 'review' ? 'Changes in this review:' : 'Proposed changes:'} <span className="key-change">New</span>{' '}
                     <span className="key-change modified">Modified</span>{' '}
                     <span className="key-change removed">Removed</span>
                 </p>
@@ -470,7 +470,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             {/* A new card's description is its rationale, so it's shown once, under the change heading. */}
                             {selected.desc && <p className="description">{selected.desc}</p>}
                             {selected.status && (
-                                <section className="flow-change" aria-label="Proposed change">
+                                <section className="flow-change" aria-label={vm.trace?.intent === 'review' ? 'Change' : 'Proposed change'}>
                                     <h4 className={selected.status}>{change(selected.status)}</h4>
                                     {selected.rationale && <p>{selected.rationale}</p>}
                                     {selected.suggestedPath && <p className="hint">Suggested path: <code>{selected.suggestedPath}</code></p>}
@@ -507,6 +507,17 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                 </p>
                             )}
                         </Disclosure>
+                        {vm.changedFiles(selected.id).length > 0 && (
+                            <Disclosure id="arch-files" title="Changed files" count={vm.changedFiles(selected.id).length}
+                                open={vm.sections.files} onToggle={(open) => vm.setSection('files', open)}>
+                                <div className="refs">
+                                    {vm.changedFiles(selected.id).map(({ file, ref }, i, all) => (
+                                        <CodeReference key={file.path} reference={ref} repo={vm.repo}
+                                            list={all.map((x) => x.ref)} index={i} />
+                                    ))}
+                                </div>
+                            </Disclosure>
+                        )}
                         {!!vm.repo.docs[selected.id]?.length && (
                             <Disclosure id="arch-docs" title="Related documents" count={vm.repo.docs[selected.id].length}
                                 open={vm.sections.docs} onToggle={(open) => vm.setSection('docs', open)}>
@@ -635,7 +646,7 @@ const CardConnections = observer(function CardConnections({ vm, id }: { vm: Arch
     }
     return (
         <section className="conn" aria-label="Connections in the map">
-            <DirectionTabs idPrefix={'arch-conn-' + id} label="Connection direction" active={vm.connectionTab}
+            <Tabs idPrefix={'arch-conn-' + id} label="Connection direction" active={vm.connectionTab}
                 onChange={vm.setConnectionTab}
                 tabs={[{ id: 'from', label: 'From', count: conns.from.length }, { id: 'to', label: 'To', count: conns.to.length }]}>
                 {(active) => (
@@ -654,7 +665,7 @@ const CardConnections = observer(function CardConnections({ vm, id }: { vm: Arch
                         ))}
                     </ul>
                 )}
-            </DirectionTabs>
+            </Tabs>
         </section>
     );
 });

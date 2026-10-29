@@ -1,7 +1,7 @@
 import { makeAutoObservable, observableRef } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
-import type { MapNode, RepoMap, Trace } from '../../models/types';
+import type { CodeRef, MapNode, RepoMap, ReviewFile, Trace } from '../../models/types';
 import { proposalMap } from '../../../../lib/proposal.mjs';
 import { REPO_PREFIX, collapseRepos } from '../../../../lib/workspace-map.mjs';
 import type { WorkspaceModel } from '../../models/WorkspaceModel';
@@ -19,7 +19,7 @@ export type MapScope = 'repo' | 'workspace';
 
 export type ConnectionDirection = 'from' | 'to';
 /** Collapsible sections of the card details panel. */
-export type CardSection = 'about' | 'docs' | 'connections';
+export type CardSection = 'about' | 'docs' | 'files' | 'connections';
 /** Description text around a search hit, for results matched only by description. */
 export interface SearchSnippet {
     before: string;
@@ -67,7 +67,7 @@ export class ArchitectureViewModel {
     /** Connection tab in card details; kept while moving between cards. */
     connectionTab: ConnectionDirection = 'from';
     /** Open card sections; kept while moving between cards. */
-    sections: Record<CardSection, boolean> = { about: false, docs: false, connections: false };
+    sections: Record<CardSection, boolean> = { about: false, docs: false, files: false, connections: false };
     /** Trace step shown in card details (a card can be visited more than once). */
     stepAt: number | null = null;
     revealId: string | null = null;
@@ -210,6 +210,14 @@ export class ArchitectureViewModel {
     }
     setConnectionTab(tab: ConnectionDirection) {
         this.connectionTab = tab;
+    }
+    /** A review's changed files in this card, each with the reference that opens its diff. */
+    changedFiles(id: string): { file: ReviewFile; ref: CodeRef }[] {
+        const review = this.trace?.review;
+        if (!review) return [];
+        const diff = { base: review.mergeBase, head: review.kind === 'local' ? '' : review.headSha };
+        return review.files.filter((f) => f.cards.includes(id))
+            .map((file) => ({ file, ref: { path: file.path, start: 1, end: 1, why: file.note || undefined, diff } }));
     }
     setSection(name: CardSection, open: boolean) {
         this.sections[name] = open;

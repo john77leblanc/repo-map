@@ -377,6 +377,19 @@ Click an architecture card or flowchart box for explanations, code references an
 
 Each diagram's **Diagram key** button is an accordion beside its controls, collapsed by default. Expanding it reveals the complete key below the controls. Architecture card details open in a panel on the right of the map, with explanations, code references, documentation, and connections in **From** (cards that send to it) and **To** (cards it sends to) tabs. Hovering a connection highlights that card. Use **Close** or Escape to dismiss it. Flowchart step details use the same kind of panel. Flowcharts initially zoom in two steps beyond the fitted view; **Fit** restores the fitted view. Settings is available from the sidebar home; use **Back to all traces** to return there.
 
+### Reviewing a pull request or branch
+
+**Review changes** (in the sidebar, under **New trace**) or `repo-map review` shows what a change does on the map, as a flowchart and on the sitemap, with the changed files under each card. It uses the trace AI tool and saves the result with your traces.
+
+```sh
+repo-map review                 # this branch against the default branch
+repo-map review main..feature   # one branch against another (also: repo-map review feature --base main)
+repo-map review --local         # this branch with its uncommitted changes
+repo-map review --pr 12         # a GitHub pull request (or its URL)
+```
+
+Pull requests need the [GitHub CLI](https://cli.github.com) installed and signed in (`gh auth login`), with `origin` pointing at the GitHub repo; the window lists open pull requests with `gh pr list`, and says why when it can't. Remote branches are listed as of your last fetch; **Fetch** in the window runs `git fetch --prune origin` (it needs access to the remote, without prompting for a password). Set `REPO_MAP_GH` to use a `gh` that isn't on your PATH. Branch reviews only need git. Reviewing a commit you don't have checked out makes a temporary git worktree in your system's temp folder; it is removed when the review ends (and on the next review if repo-map was stopped mid-way). Local reviews read your checkout directly; new files count once they are added with git.
+
 ### Sitemap and execution lanes
 
 At repository home, open **Sitemap**, then **Generate sitemap**. Configure the tool, model, and effort under **Settings → Map agent**; sitemap generation uses the same settings as architecture generation. There is no extra dependency or automatic AI run when switching views. Saved results live in `.repo-map/sitemap.json` and can be committed for teammates.
@@ -437,6 +450,9 @@ To share a trace, anyone who has an AI tool can run it, press **Copy trace code*
 | Missing frontend assets | Use Node >=22.12, enable lifecycle scripts, then run `npm ci` and `npm run build` in the checkout. Registry packages include prebuilt assets. |
 | Playwright cannot find Chromium | Run `npx playwright install chromium` once, then retry `npm run test:e2e`. |
 | Port 4477 in use | `repo-map serve --port 4478`, or set `REPO_MAP_PORT`. |
+| "The GitHub CLI (gh) isn't installed" / "isn't signed in" | Install `gh` and run `gh auth login`, or review the branch by name instead (**Branches**). |
+| "Couldn't fetch the code of pull request #…" | Check that `origin` is the pull request's GitHub repo and that you can fetch from it. |
+| "No changes under the code folders" | The change only touches files outside `codeRoots`, or the two refs are the same. |
 
 ### Sitemap trace outputs
 

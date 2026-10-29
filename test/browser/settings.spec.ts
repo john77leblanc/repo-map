@@ -68,7 +68,8 @@ test('custom trace model and effort persist, and map settings use the generate A
     await expect(page.locator('#settings-dialog #repo-name')).toHaveText('local repo');
     await expect(page.locator('#settings-dialog #stat')).toContainText('1 service');
     await expect(page.locator('#settings-dialog #repoinfo')).toHaveText('reading main @ bbbbbbbbb');
-    const button = await page.locator('#new-trace').boundingBox();
+    // the library divider follows the sidebar's buttons (New trace, then Review changes)
+    const button = await page.locator('#review-changes').boundingBox();
     const divider = await page.locator('.trace-library-divider').boundingBox();
     const library = await page.locator('#pane-traces').boundingBox();
     expect(divider!.y - button!.y - button!.height).toBeLessThanOrEqual(12);

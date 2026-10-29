@@ -44,7 +44,8 @@ export class ReferenceViewerModel {
         const info = this.repo.bootstrap?.repo;
         if (!r || !info?.ghBase || /^[a-z][a-z0-9-]{1,30}:/.test(r.path)) return '';
         const plain = this.isDocument && /\.(md|mdx|mdc)$/i.test(r.path) ? '?plain=1' : '';
-        return `${info.ghBase}/blob/${info.ghRef}/${r.path}${plain}#L${r.start}-L${r.end}`;
+        if (r.diff) return r.diff.head ? `${info.ghBase}/blob/${r.diff.head}/${r.path}` : '';
+        return `${info.ghBase}/blob/${r.rev || info.ghRef}/${r.path}${plain}#L${r.start}-L${r.end}`;
     }
     /** A document (guide, doc, comment) rather than code: shown by its title, read as plain text on GitHub. */
     get isDocument() {
@@ -52,12 +53,16 @@ export class ReferenceViewerModel {
     }
     /** GitHub may show different lines when the checkout isn't the pushed commit. */
     get exact() {
-        return !!this.repo.bootstrap?.repo.exact;
+        return !!this.current?.rev || !!this.current?.diff || !!this.repo.bootstrap?.repo.exact;
+    }
+    /** Showing a file's changes rather than its lines. */
+    get isDiff() {
+        return !!this.current?.diff;
     }
     /** A line number inside the cited range (the rest is context). */
     cited(line: number) {
         const r = this.current;
-        return !!r && line >= r.start && line <= r.end;
+        return !!r && !r.diff && line >= r.start && line <= r.end;
     }
     open(list: CodeRef[], index = 0, documentation = false) {
         this.list = list.slice();
@@ -114,10 +119,21 @@ export class ReferenceViewerModel {
         const controller = (this.controller = new AbortController());
         const start = Math.max(1, r.start - CONTEXT);
         try {
-            const content = await this.repo.services.api.get<FileContent>(
-                `/api/file?path=${encodeURIComponent(r.path)}&start=${start}&end=${r.end + CONTEXT}`,
-                controller.signal
-            );
+            const path = encodeURIComponent(r.path);
+            const content: FileContent = r.diff
+                ? {
+                      ...(await this.repo.services.api.get<FileContent>(
+                          `/api/diff?path=${path}&base=${r.diff.base}${r.diff.head ? '&head=' + r.diff.head : ''}`,
+                          controller.signal
+                      )),
+                      start: 1,
+                      end: 1,
+                      diff: true,
+                  }
+                : await this.repo.services.api.get<FileContent>(
+                      `/api/file?path=${path}&start=${start}&end=${r.end + CONTEXT}${r.rev ? '&rev=' + r.rev : ''}`,
+                      controller.signal
+                  );
             if (!controller.signal.aborted)
                 runInAction(() => {
                     this.content = content;
@@ -125,7 +141,8 @@ export class ReferenceViewerModel {
         } catch (error) {
             if (!controller.signal.aborted)
                 runInAction(() => {
-                    this.error = `Couldn't read ${r.path} from your checkout (${error instanceof Error ? error.message : error}). It may have moved since this was saved.`;
+                    const where = r.diff ? `the changes to ${r.path}` : r.rev ? `${r.path} at commit ${r.rev.slice(0, 9)}` : `${r.path} from your checkout`;
+                    this.error = `Couldn't read ${where} (${error instanceof Error ? error.message : error}). It may have moved since this was saved.`;
                 });
         } finally {
             if (this.controller === controller)

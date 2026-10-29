@@ -188,6 +188,7 @@ button.ref .fu{font-family:var(--f-mono);font-size:11px;color:var(--muted);overf
 .code:focus-visible{outline:2px solid var(--http);outline-offset:-2px}
 .cl2{display:flex;white-space:pre}
 .cl2 .ln{flex:none;width:44px;padding-right:10px;text-align:right;color:var(--muted);user-select:none;border-right:1px solid var(--line);margin-right:10px;font-variant-numeric:tabular-nums}
+.cl2.diff .lc{padding-left:10px}.cl2.da{background:color-mix(in srgb,var(--sync) 14%,transparent)}.cl2.dd{background:color-mix(in srgb,var(--event) 14%,transparent)}.cl2.dh{color:var(--http)}.cl2.dm{color:var(--muted)}
 .code .more{color:var(--muted);padding:4px 10px 0 64px;font-family:var(--f-ui);font-size:11.5px}
 .codestat{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
 .codestat:empty{display:none}
@@ -520,11 +521,11 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* Trace journeys retain nearby navigation as secondary context. */
 .sitemap-workspace .fc .context.sel, .sitemap-workspace .fc .context:focus { opacity: 1; }
 .sitemap-workspace .fc.picking .fe:not(.context) { opacity: 1; }
-.direction-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
-.direction-tabs [role="tab"] { padding: 4px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; cursor: pointer; }
-.direction-tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--http); font-weight: 600; }
-.direction-tabs [role="tab"]:disabled { opacity: .45; cursor: default; }
-.direction-tabs [role="tab"]:focus-visible { outline: 2px solid var(--http); outline-offset: -2px; }
+.tab-row { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tab-row [role="tab"] { padding: 4px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; cursor: pointer; }
+.tab-row [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--http); font-weight: 600; }
+.tab-row [role="tab"]:disabled { opacity: .45; cursor: default; }
+.tab-row [role="tab"]:focus-visible { outline: 2px solid var(--http); outline-offset: -2px; }
 /* Sitemap screen panel: proposed navigation and navigation code, under their own sub-headings */
 .sitemap-nav-changes{margin-top:12px}.sitemap-nav-changes p{margin:0 0 6px}.sitemap-nav-changes .proposal-badge{font-size:10px;font-weight:600}
 .sitemap-nav-refs{margin-top:12px}.sitemap-nav-refs .hint{margin:6px 0 4px}
@@ -534,8 +535,8 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .trace-job .status{display:block;margin-top:9px}
 @keyframes trace-shimmer{to{background-position:-220% 0}}
 @media (prefers-reduced-motion:reduce){.trace-title-skeleton{animation:none}}
-.direction-tabs [role="tab"] { font-size: 12.5px; }
-.conn .direction-tabs { margin-top: 2px; }
+.tab-row [role="tab"] { font-size: 12.5px; }
+.conn .tab-row { margin-top: 2px; }
 /* One-line job progress; expands into the history (ProgressLine) */
 .progress-line{min-width:0;max-width:100%}
 .progress-line>.progress-text,.progress-line>summary{display:flex;align-items:center;min-width:0}
@@ -621,3 +622,40 @@ dialog.modal>.fhead{flex:none}
 .view-tabs [aria-selected="true"].missing{border-style:dashed}
 .view-divider{width:1px;align-self:stretch;margin:4px 0;background:var(--line);flex:none}.view-tabs .seg{flex:none}
 .seg .btn:disabled{opacity:.5;cursor:default}
+/* Review changes: the window, the review header in the trace sidebar, and changed files by card */
+#review-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(560px,calc(100vw - 32px));max-height:min(90dvh,calc(100dvh - 32px));padding:0;box-shadow:0 16px 64px #0003}
+#review-dialog::backdrop{background:rgba(0,0,0,.4)}
+#review-dialog .review-form{padding:20px 24px;overflow:auto;min-height:0}
+#review-changes{margin-top:8px;width:100%}
+.review-mode-tabs{margin:0 0 12px}
+.review-fields{display:grid;gap:6px;border:0;padding:0;margin:8px 0 14px;min-width:0}
+.review-fields label{font-size:12.5px;font-weight:600;margin-top:6px}
+.review-fields input{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0}
+.review-fields .hint{margin:4px 0 0}
+.review-head{margin:6px 0 10px}
+.review-range{margin:0 0 4px;font-size:12.5px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0}
+.review-range code,.review-range a{overflow-wrap:anywhere}
+.review-state{display:block;margin:0 0 6px}
+.trace-badge.review{border-color:var(--http);color:var(--http)}
+.review-file-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.review-file-meta{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.review-file-meta .da{color:var(--sync)}.review-file-meta .dd{color:var(--event)}
+.disclosure-title .proposal-badge{font-size:10px;font-weight:600;margin-right:4px}
+/* Combobox: a text field with a filterable suggestion list (shared/ui/Combobox.tsx) */
+.combobox{position:relative;display:flex;min-width:0}
+.combobox>input{flex:1;min-width:0;padding-right:30px!important}
+.combobox-toggle{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:26px;height:26px;display:grid;place-items:center;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:4px}
+.combobox-toggle:hover{background:var(--soft);color:var(--ink)}
+.combobox-toggle svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1.5}
+.combobox.open .combobox-toggle svg{transform:rotate(180deg)}
+.combobox-list{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px #0002;padding:4px 0}
+.combobox-group{padding:6px 10px 2px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.combobox-option{display:flex;align-items:baseline;gap:10px;padding:5px 10px;font-size:13px;cursor:pointer}
+.combobox-option.active,.combobox-option:hover{background:var(--soft)}
+.combobox-option.muted .combobox-label{color:var(--muted)}
+.combobox-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--f-mono);font-size:12.5px}
+.combobox-meta{flex:none;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.combobox-empty{padding:6px 10px;font-size:12px;color:var(--muted)}
+.review-fetch{display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0}
+.review-fetch .status{font-size:12px;min-width:0}
+.hint.err{color:var(--event)}

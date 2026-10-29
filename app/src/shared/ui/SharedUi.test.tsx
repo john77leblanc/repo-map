@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { ProgressLog } from '../../models/ProgressLog';
 import { ProgressLine } from './ProgressLine';
-import { DirectionTabs, shownTab } from './DirectionTabs';
+import { Tabs, shownTab } from './Tabs';
 import { ModalHeader } from './ModalHeader';
 import { Disclosure, DisclosureList } from './Disclosure';
 
@@ -47,14 +47,14 @@ describe('ProgressLine', () => {
     });
 });
 
-describe('DirectionTabs', () => {
+describe('Tabs', () => {
     function Harness({ from, to }: { from: number; to: number }) {
         const [active, setActive] = useState<'from' | 'to'>('from');
         return (
-            <DirectionTabs idPrefix="t" label="Direction" active={active} onChange={setActive}
+            <Tabs idPrefix="t" label="Direction" active={active} onChange={setActive}
                 tabs={[{ id: 'from', label: 'From', count: from }, { id: 'to', label: 'To', count: to }]}>
                 {(tab) => <p>panel {tab}</p>}
-            </DirectionTabs>
+            </Tabs>
         );
     }
 
@@ -63,6 +63,22 @@ describe('DirectionTabs', () => {
         render(<Harness from={0} to={2} />);
         expect(screen.getByRole('tab', { name: 'From (0)' })).toBeDisabled();
         expect(screen.getByRole('tabpanel')).toHaveTextContent('panel to');
+    });
+
+    it('shows tabs without counts, and disables the ones marked disabled', () => {
+        const onChange = vi.fn();
+        render(<Tabs idPrefix="m" label="Mode" active="a" onChange={onChange}
+            tabs={[{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }, { id: 'c', label: 'Gamma', disabled: true }]}>
+            {(tab) => <p>panel {tab}</p>}
+        </Tabs>);
+        expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tab', { name: 'Beta' })).toBeEnabled();
+        expect(screen.getByRole('tab', { name: 'Gamma' })).toBeDisabled();
+        fireEvent.keyDown(screen.getByRole('tab', { name: 'Alpha' }), { key: 'ArrowRight' });
+        expect(onChange).toHaveBeenLastCalledWith('b');
+        fireEvent.keyDown(screen.getByRole('tab', { name: 'Beta' }), { key: 'ArrowRight' });
+        expect(onChange).toHaveBeenLastCalledWith('a');
+        expect(shownTab([{ id: 'a', label: '', disabled: true }, { id: 'b', label: '' }], 'a')).toBe('b');
     });
 
     it('switches with arrow keys', () => {

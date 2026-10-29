@@ -1,3 +1,4 @@
+import { hasChanges } from '../../models/trace';
 import { useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { DiagramSvg } from '../../shared/ui/DiagramSvg';
@@ -6,7 +7,7 @@ import { DiagramMore } from '../../shared/ui/DiagramMore';
 import { SitemapLegend } from './SitemapLegend';
 import { SITEMAP_CSS } from './styles';
 import { CodeReference } from '../../shared/ui/CodeReference';
-import { DirectionTabs, type DirectionTab } from '../../shared/ui/DirectionTabs';
+import { Tabs, type TabItem } from '../../shared/ui/Tabs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { SidePanel } from '../../shared/ui/SidePanel';
 import { FC_CSS, UI_CSS } from '../flowchart/styles';
@@ -50,8 +51,8 @@ const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel
                         </section>
                     )}
                     {changedNav.length > 0 && (
-                        <section className="flow-change sitemap-nav-changes" aria-label="Proposed navigation">
-                            <h4>Proposed navigation</h4>
+                        <section className="flow-change sitemap-nav-changes" aria-label={vm.trace?.intent === 'review' ? 'Changed navigation' : 'Proposed navigation'}>
+                            <h4>{vm.trace?.intent === 'review' ? 'Changed navigation' : 'Proposed navigation'}</h4>
                             {changedNav.map((c) => (
                                 <p key={c.nav}>
                                     <span className={'proposal-badge ' + c.edge.status}>{CHANGE_LABELS[c.edge.status!]}</span>{' '}
@@ -92,10 +93,10 @@ const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel
 const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: SitemapViewModel; id: string }) {
     const nav = vm.navFor(id);
     if (!nav.from.length && !nav.to.length) return <p className="hint">No navigation found in code.</p>;
-    const tabs: DirectionTab<ConnectionTab>[] = [{ id: 'from', label: 'From', count: nav.from.length }, { id: 'to', label: 'To', count: nav.to.length }];
+    const tabs: TabItem<ConnectionTab>[] = [{ id: 'from', label: 'From', count: nav.from.length }, { id: 'to', label: 'To', count: nav.to.length }];
     return (
         <section className="flow-conn sitemap-nav" aria-label="Navigation">
-            <DirectionTabs idPrefix={'sitemap-nav-' + id} label="Navigation direction" tabs={tabs} active={vm.connectionTab} onChange={vm.setConnectionTab}>
+            <Tabs idPrefix={'sitemap-nav-' + id} label="Navigation direction" tabs={tabs} active={vm.connectionTab} onChange={vm.setConnectionTab}>
                 {(active) => (
                     <ul>
                         {nav[active].map((c) => (
@@ -109,7 +110,7 @@ const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: Si
                         ))}
                     </ul>
                 )}
-            </DirectionTabs>
+            </Tabs>
         </section>
     );
 });
@@ -155,7 +156,7 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     run: () => void (vm.trace && vm.sitemap ? vm.generateTrace() : vm.generate()),
                 }}
             />
-            <SitemapLegend open={vm.keyOpen} trace={!!vm.output} proposal={vm.trace?.intent === 'proposal'} />
+            <SitemapLegend open={vm.keyOpen} trace={!!vm.output} proposal={hasChanges(vm.trace)} review={vm.trace?.intent === 'review'} />
             <div className="sitemap-heading" hidden={!vm.infoOpen && !!vm.layout}>
                 <div id="sitemap-info" className="sitemap-info" hidden={!vm.infoOpen && !!vm.layout}>
                     <p className="hint">{vm.trace ? 'Repository sitemap: ' : ''}{vm.freshnessLabel}</p>

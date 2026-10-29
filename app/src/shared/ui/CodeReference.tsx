@@ -29,13 +29,13 @@ export const CodeReference = observer(function CodeReference({
     };
     return (
         <button className="ref" type="button" onClick={open}
-            title={`${reference.path}#L${reference.start}-L${reference.end}`}>
+            title={reference.diff ? `Changes to ${reference.path}` : `${reference.path}#L${reference.start}-L${reference.end}`}>
             <span className="fn">
                 {(documentation && reference.title) || reference.path.split('/').pop()}
             </span>
             <span className="fu">
                 {documentation ? reference.path : '…/' + reference.path.split('/').slice(-2).join('/')}
-                #L{reference.start}-L{reference.end}
+                {!reference.diff && <>#L{reference.start}-L{reference.end}</>}
             </span>
             {documentation && (
                 <span className={'kb ' + (reference.kind || 'doc')}>

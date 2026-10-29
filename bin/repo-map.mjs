@@ -19,7 +19,7 @@ import { AI_PRESETS, aiPatch, writeAiSettings } from '../lib/settings.mjs';
 import { describeLinks, docsStatus, linkDocs, loadDocs } from '../lib/docs.mjs';
 import { writeConfig } from '../lib/scaffold.mjs';
 import { startServer } from '../lib/server.mjs';
-import { runStart } from '../lib/start.mjs';
+import { runReviewCommand, runStart } from '../lib/start.mjs';
 import { mapStatus, markCurrent } from '../lib/freshness.mjs';
 import { updateMap } from '../lib/update.mjs';
 import { validateMap } from '../lib/validate.mjs';
@@ -44,6 +44,8 @@ Commands
   validate    Check map.json for unknown ids, groups, kinds and missing paths
   export      Write a snapshot of this map (with its commit) for another repo's workspace
               to import, when that repo can't link this folder directly
+  review      Open the map on a review of a code change: what it does, drawn on the map,
+              as a flowchart and on the sitemap
   serve       Start the map on http://localhost:<port> (default)
 
 Common options
@@ -88,6 +90,12 @@ export
   --out <file>        Where to write it (default: <repo name>.map.json in the current folder;
                       - for stdout)
 
+review [<base>..<head> | <head>]
+  --pr <n|url>        Review a GitHub pull request (needs the gh CLI, signed in)
+  --local             Review the current branch with its uncommitted changes
+  --base <ref>        What to compare with (default: origin/<defaultBranch>)
+                      e.g.  repo-map review main..feature   repo-map review --pr 12
+
 start / serve
   --port <n>          Port (default 4477, or REPO_MAP_PORT; start moves on if it's taken)
   --no-open           start: don't open the browser
@@ -98,7 +106,7 @@ Scripted setup examples are in SETUP.md.`;
 const VALUE_FLAGS = {
     '--dir': 'dir', '--port': 'port', '--model': 'model', '--provider': 'provider',
     '--name': 'name', '--roots': 'roots', '--context': 'context', '--github': 'github',
-    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for', '--out': 'out',
+    '--base-url': 'baseUrl', '--key-env': 'keyEnv', '--bin': 'bin', '--effort': 'effort', '--for': 'for', '--out': 'out', '--pr': 'pr', '--base': 'base',
 };
 const BOOL_FLAGS = {
     '--force': 'force', '--json': 'json', '--yes': 'yes',
@@ -452,7 +460,7 @@ async function main() {
     if (opts.provider) {
         process.env.REPO_MAP_AI_PROVIDER = opts.provider;
     }
-    const commands = { start: runStart, init: cmdInit, ai: cmdAi, update: cmdUpdate, docs: cmdDocs, validate: cmdValidate, export: cmdExport, doctor: cmdDoctor, serve: cmdServe };
+    const commands = { start: runStart, review: runReviewCommand, init: cmdInit, ai: cmdAi, update: cmdUpdate, docs: cmdDocs, validate: cmdValidate, export: cmdExport, doctor: cmdDoctor, serve: cmdServe };
     if (opts.cmd === 'version') {
         const pkg = JSON.parse(await fs.readFile(path.join(PKG_DIR, 'package.json'), 'utf8'));
         console.log(pkg.version);

@@ -1,7 +1,7 @@
 import { makeAutoObservable, observable, observableRef, isObservable, runInAction } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
 import type { Services } from '../../shared/services/contracts';
-import type { AgentPick, StreamResult, Trace, Workspace } from '../../models/types';
+import type { AgentPick, ChangeStatus, CodeRef, Review, ReviewFile, ReviewRequest, StreamResult, Trace, Workspace } from '../../models/types';
 import { decodeTrace, encodeTrace, linkOf, normalizeTrace, plain, spend } from '../../models/trace';
 import type { WorkspaceMap } from '../../models/trace';
 import { TraceJob } from './TraceJob';
@@ -12,7 +12,7 @@ import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
 /** A collapsible section of the trace sidebar. */
-export type TraceSection = 'summary' | 'proposal' | 'steps';
+export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps';
 export interface TraceDependencies {
     repo: RepositoryModel;
     services: Services;
@@ -34,6 +34,27 @@ export interface TraceDependencies {
     getRepoTitles?(): Record<string, string>;
     /** Resolves once the workspace has loaded (or failed to), so workspace traces read the merged map. */
     workspaceReady?(): Promise<void>;
+    /** Show a review job that hasn't finished (its progress, or why it failed). */
+    onOpenReview?(job: TraceJob): void;
+}
+/** Whether a saved review still matches the code (POST /api/review/status). */
+export interface ReviewState {
+    state: 'current' | 'stale' | 'unknown';
+    reason?: string;
+    prState?: string;
+}
+const reviewKey = (trace: Trace) => trace.review ? trace.review.kind + ':' + trace.review.headSha + ':' + (trace.review.fingerprint || '') + ':' + (trace._doc || '') : '';
+/** What a saved review compared, as a request to review it again. */
+function reviewRequest(review: Review): ReviewRequest {
+    if (review.kind === 'pr') return { pr: String(review.number || '') };
+    if (review.kind === 'local') return { local: true, base: review.base };
+    return { base: review.base, head: review.headRef || review.head };
+}
+/** The sidebar's "question" for a review that is still running. */
+function reviewPrompt(request: ReviewRequest) {
+    if (request.pr) return 'Review pull request #' + request.pr.replace(/^#/, '').replace(/^.*\/pull\/(\d+).*$/, '$1');
+    if (request.local) return 'Review local changes' + (request.base ? ' against ' + request.base : '');
+    return 'Review ' + (request.head || 'this branch') + (request.base ? ' against ' + request.base : '');
 }
 export class TraceViewModel {
     selected: Trace | null = null;
@@ -60,7 +81,11 @@ export class TraceViewModel {
     importMessage = '';
     code = '';
     /** Which trace sidebar sections are open (kept while switching traces). */
-    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, steps: true };
+    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, review: true, files: false, steps: true };
+    /** Review status checks, by review (see reviewKey). */
+    reviewStates: Record<string, ReviewState> = {};
+    /** Which card groups of a review's changed files are open, by card id ('' = other files). */
+    openFileGroups: Record<string, boolean> = {};
     storeNote =
         'Saved automatically to .repo-map/traces on this machine (git-ignored). Open an output to explore it.';
     /** "Copied!" on a trace's Copy trace code button, keyed by trace. */
@@ -241,6 +266,10 @@ export class TraceViewModel {
     }
     openJob(job: TraceJob) {
         if (this.disposed || this.editing) return;
+        if (job.review && !(job.result && !job.busy)) {
+            this.deps.onOpenReview?.(job);
+            return;
+        }
         if (job.result && !job.busy) {
             if (job.saveFailed) this.temp = job.result;
             this.message = job.status;
@@ -305,6 +334,7 @@ export class TraceViewModel {
         this.selected = isObservable(trace) ? trace : observable(trace);
         if (!this.editing) this.composerOpen = false;
         this.deps.onSelect(this.selected, workspace);
+        if (this.selected.review && !this.reviewStates[reviewKey(this.selected)]) void this.checkReview(this.selected);
     }
     clear() {
         this.releaseJob();
@@ -498,6 +528,95 @@ export class TraceViewModel {
         const job = new TraceJob(prompt, outputs, { ...this.deps.getPick() }, this.deps.getPickLabel(), this.workspace);
         this.jobs.unshift(job);
         this.activeJob = job;
+        return this.runJob(job, '/api/trace',
+            { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.scopeBody, ...job.pick });
+    }
+    /**
+     * Review a code change (a pull request, two refs, or local changes). It runs as a
+     * job in the trace list and is saved as a trace with intent 'review'. `replace`
+     * is a saved review being re-run: the result takes its place.
+     */
+    startReview(request: ReviewRequest, replace: Trace | null = null): TraceJob | null {
+        if (this.disposed || !this.repo.aiAvailable) return null;
+        if (this.jobs.some((job) => job.review && job.busy)) {
+            // said in the review window; the trace composer stays closed
+            this.message = 'A review is already running.';
+            this.statusError = true;
+            return null;
+        }
+        const outputs = { architecture: true, flowchart: true };
+        const job = new TraceJob(reviewPrompt(request), outputs, { ...this.deps.getPick() }, this.deps.getPickLabel(), 'architecture');
+        job.review = { ...request };
+        job.replaces = replace?._doc || '';
+        this.jobs.unshift(job);
+        void this.runJob(job, '/api/review', { ...request, ...job.pick }, replace);
+        return job;
+    }
+    /** Re-run a saved review on the code as it is now; the result replaces it. */
+    rerunReview(trace: Trace) {
+        if (!trace.review) return null;
+        return this.startReview(reviewRequest(trace.review), trace);
+    }
+    /** Ask whether the selected review still matches its branch or pull request. */
+    async checkReview(trace: Trace) {
+        if (!trace.review || this.disposed) return;
+        const key = reviewKey(trace);
+        const ctl = new AbortController();
+        this.controllers.add(ctl);
+        try {
+            const result = await this.deps.services.api.request<ReviewState>('/api/review/status',
+                { method: 'POST', signal: ctl.signal, body: JSON.stringify({ review: trace.review }) });
+            if (!this.disposed && !ctl.signal.aborted) runInAction(() => { this.reviewStates[key] = result; });
+        } catch {
+            if (!this.disposed && !ctl.signal.aborted) runInAction(() => { this.reviewStates[key] = { state: 'unknown', reason: "Couldn't check." }; });
+        } finally {
+            this.controllers.delete(ctl);
+        }
+    }
+    /** Whether a review still matches the code, once checked. */
+    reviewState(trace: Trace): ReviewState | null {
+        return trace.review ? this.reviewStates[reviewKey(trace)] || null : null;
+    }
+    /** Stop one job (a review runs beside the composer's job). */
+    stopJob(job: TraceJob) {
+        if (!job.busy || job.state === 'saving') return;
+        job.controller.abort();
+        job.clearTicker();
+        job.state = 'stopped';
+        job.status = 'Stopped.';
+        job.title ||= job.review ? 'Stopped review' : 'Stopped trace';
+    }
+    /**
+     * A review's changed files, grouped by the card they belong to (cards in step
+     * order, then the others), with files that fit no card last.
+     */
+    reviewFileGroups(trace: Trace): { id: string; title: string; status?: ChangeStatus; files: ReviewFile[] }[] {
+        const files = trace.review?.files || [];
+        const order = [...trace.steps.map((s) => s.id), ...(trace.proposal?.nodes || []).map((n) => n.id)];
+        const ids = [...new Set([...order, ...files.flatMap((f) => f.cards)])].filter((id) => files.some((f) => f.cards.includes(id)));
+        const groups = ids.map((id) => ({ id, title: this.stepTitle(trace, id), status: trace.proposal?.nodes.find((n) => n.id === id)?.status,
+            files: files.filter((f) => f.cards.includes(id)) }));
+        const other = files.filter((f) => !f.cards.length);
+        return other.length ? [...groups, { id: '', title: 'Other files', files: other }] : groups;
+    }
+    /** A changed file as a reference that opens its diff. */
+    fileReference(trace: Trace, file: ReviewFile): CodeRef {
+        const review = trace.review!;
+        return { path: file.path, start: 1, end: 1, why: file.note || undefined,
+            diff: { base: review.mergeBase, head: review.kind === 'local' ? '' : review.headSha } };
+    }
+    isFileGroupOpen(id: string) {
+        return !!this.openFileGroups[id];
+    }
+    setFileGroup(id: string, open: boolean) {
+        this.openFileGroups[id] = open;
+    }
+    /** The running or finished review job for a re-run of `trace`. */
+    rerunJob(trace: Trace) {
+        return trace._doc ? this.jobs.find((job) => job.replaces === trace._doc && job.busy) || null : null;
+    }
+    private async runJob(job: TraceJob, url: string, body: Record<string, unknown>, replace: Trace | null = null) {
+        const outputs = job.outputs;
         const signal = job.controller.signal;
         this.controllers.add(job.controller);
         const current = () => !this.disposed && !signal.aborted;
@@ -515,15 +634,17 @@ export class TraceViewModel {
                 if (!current()) return;
                 if (!this.deps.sitemap?.sitemap) throw new Error('Generate the repository sitemap before tracing screens. Your question has been kept.');
             }
-            const result = await this.deps.services.api.stream<StreamResult>('/api/trace',
-                { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.scopeBody, ...job.pick },
+            const result = await this.deps.services.api.stream<StreamResult>(url, body,
                 signal, (text) => { last = text; tick(); },
                 (title) => { if (current() && job.state === 'running') runInAction(() => { job.title = title.trim().slice(0, 80); }); });
             if (!current()) return;
             job.clearTicker();
             if (!result) throw new Error(job.agentLabel + ' ended without an answer. Run repo-map doctor to check your setup.');
-            const trace = observable(this.normalize({ ...(result.trace as object), outputs, used: result.used }, prompt));
-            trace.createdAt = job.createdAt;
+            const trace = observable(this.normalize({ ...(result.trace as object), outputs, used: result.used }, job.review ? undefined : job.prompt));
+            trace.createdAt = replace?.createdAt || job.createdAt;
+            if (replace?._doc) trace._doc = replace._doc;
+            // a review draws its sitemap changes only when the repo has a sitemap
+            if (job.review && trace.sitemap) outputs.sitemap = true;
             trace.outputs = {
                 architecture: outputs.architecture && trace.steps.length > 0,
                 flowchart: outputs.flowchart && !!trace.flow,
@@ -551,7 +672,10 @@ export class TraceViewModel {
                         : 'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.';
                     job.error = true;
                 }
-                if (this.activeJob === job) {
+                if (replace && this.selected?._doc === replace._doc) delete this.reviewStates[reviewKey(replace)];
+                // a review opens when it is done, unless another trace is open (a re-run opens over its original)
+                const open = job.review ? !this.editing && !this.composerOpen && (!this.selected || this.selected._doc === replace?._doc) : this.activeJob === job;
+                if (open) {
                     if (!saved) this.temp = trace;
                     this.select(trace, this.resultWorkspace(trace, job.workspace));
                 }
@@ -562,7 +686,7 @@ export class TraceViewModel {
                 job.status = signal.aborted ? 'Stopped.' : error instanceof Error && error.message !== 'no known services'
                     ? error.message : 'The AI returned no usable trace outputs. Your question was kept; try again.';
                 job.error = !signal.aborted;
-                job.title ||= signal.aborted ? 'Stopped trace' : 'Trace failed';
+                job.title ||= job.review ? (signal.aborted ? 'Stopped review' : 'Review failed') : signal.aborted ? 'Stopped trace' : 'Trace failed';
             });
         } finally {
             job.clearTicker();

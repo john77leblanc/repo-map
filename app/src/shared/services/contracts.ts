@@ -19,6 +19,8 @@ export interface BrowserService {
     copy(text: string): Promise<void>;
     download(name: string, text: string, type: string): void;
     reload(): void;
+    /** Read the page's query parameters once and remove them from the address bar. */
+    takeQuery?(): Record<string, string>;
 }
 export interface Services {
     api: ApiClient;
