@@ -32,10 +32,10 @@ describe('shell', () => {
         vm.setWidth(900, 1000);
         expect(vm.width).toBe(600);
         vm.resizeKey('Home');
-        expect(vm.width).toBe(300);
+        expect(vm.width).toBe(360);
         vm.toggleSidebar();
         expect(f.services.storage.set).toHaveBeenLastCalledWith('repomap:shop:library', {
-            w: 300,
+            w: 360,
             c: true,
         });
         vm.dispose();

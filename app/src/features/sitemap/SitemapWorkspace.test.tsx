@@ -99,6 +99,8 @@ describe('Sitemap', () => {
         expect(row.querySelector('b')?.textContent).toBe('Settings');
         expect(row.querySelector('.fl-arrow')?.textContent).toBe('Preferences');
         expect(row.querySelector('.cl-note')?.textContent).toBe('When: Signed in');
+        expect(row.firstElementChild).toHaveClass('cl-arrow');
+        expect(row.lastElementChild).toHaveClass('cl-note');
         expect(container.querySelector('#sitemap-details button.cl[data-go="shop"] b')?.textContent).toBe('Storefront: Shop');
         fireEvent.change(screen.getByLabelText('Application'), { target: { value: 'shop' } });
         expect(vm.selected).toBeNull();

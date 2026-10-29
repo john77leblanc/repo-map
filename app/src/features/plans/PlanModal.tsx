@@ -18,7 +18,37 @@ export const PlanModal = observer(function PlanModal({ vm }: { vm: PlansViewMode
             onClose={vm.close}
             onCancel={vm.close}
         >
-            <ModalHeader titleId="plan-title" title="Implementation plan" closeId="plan-close" onClose={vm.close} />
+            <ModalHeader titleId="plan-title" title="Implementation plan" closeId="plan-close" onClose={vm.close}
+                actions={<>
+                    <button
+                        className={'btn' + (vm.busy ? ' busy' : '')}
+                        id="plan-generate"
+                        type="button"
+                        aria-busy={vm.busy}
+                        disabled={vm.busy || !vm.deps.repo.aiAvailable}
+                        onClick={() => void vm.generatePlan()}
+                    >
+                        {vm.busy ? (plan ? 'Regenerating…' : 'Generating…') : plan ? 'Regenerate' : 'Retry'}
+                    </button>
+                    <button
+                        className="btn"
+                        id="plan-stop"
+                        type="button"
+                        hidden={!vm.busy}
+                        onClick={vm.stop}
+                    >
+                        Stop
+                    </button>
+                    <button
+                        className="btn"
+                        id="plan-copy"
+                        type="button"
+                        hidden={!plan}
+                        onClick={() => void vm.copy()}
+                    >
+                        {vm.copied.copied ? 'Copied!' : 'Copy'}
+                    </button>
+                </>} />
             <div className="modal-body plan-content">
                 <p
                     id="plan-status"
@@ -66,35 +96,6 @@ export const PlanModal = observer(function PlanModal({ vm }: { vm: PlansViewMode
                             )}
                         </>
                     )}
-                </div>
-                <div className="plan-actions">
-                    <button
-                        className="btn"
-                        id="plan-generate"
-                        type="button"
-                        disabled={vm.busy || !vm.deps.repo.aiAvailable}
-                        onClick={() => void vm.generatePlan()}
-                    >
-                        {plan ? 'Regenerate' : 'Retry'}
-                    </button>
-                    <button
-                        className="btn"
-                        id="plan-stop"
-                        type="button"
-                        hidden={!vm.busy}
-                        onClick={vm.stop}
-                    >
-                        Stop
-                    </button>
-                    <button
-                        className="btn"
-                        id="plan-copy"
-                        type="button"
-                        hidden={!plan}
-                        onClick={() => void vm.copy()}
-                    >
-                        {vm.copied.copied ? 'Copied!' : 'Copy'}
-                    </button>
                 </div>
             </div>
         </dialog>

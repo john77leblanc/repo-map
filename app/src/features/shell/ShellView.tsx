@@ -56,7 +56,7 @@ export const ShellView = observer(function ShellView({
                         aria-label="Resize library"
                         tabIndex={0}
                         title="Drag to resize · double-click to reset"
-                        aria-valuemin={260}
+                        aria-valuemin={312}
                         aria-valuemax={760}
                         aria-valuenow={vm.width}
                         onPointerDown={(e) => {
@@ -75,7 +75,7 @@ export const ShellView = observer(function ShellView({
                         onPointerUp={vm.endResize}
                         onPointerCancel={vm.endResize}
                         onLostPointerCapture={vm.endResize}
-                        onDoubleClick={() => vm.setWidth(300, window.innerWidth)}
+                        onDoubleClick={() => vm.setWidth(360, window.innerWidth)}
                         onKeyDown={(e) => {
                             if (vm.resizeKey(e.key, window.innerWidth)) e.preventDefault();
                         }}

@@ -1,7 +1,8 @@
 ﻿import { beforeEach, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { observable, runInAction } from 'mobx';
 import { TraceViewModel } from './TraceViewModel';
-import { SelectedTraceSidebar, TraceBackButton, TraceHome } from './TraceViews';
+import { SelectedTraceSidebar, TraceBackButton, TraceHome, TraceLibrary } from './TraceViews';
 import { fixture, raw, flow } from './testFixtures';
 import { normalizeTrace } from '../../models/trace';
 beforeEach(() => {
@@ -34,6 +35,64 @@ it('keeps node details out of the trace sidebar and shows the inferred warning i
     const { container } = render(<SelectedTraceSidebar vm={vm} />);
     expect(container.querySelector('#fl-side')).toBeNull();
     expect(screen.getByText(/1 part is inferred/)).toBeVisible();
+    vm.dispose();
+});
+it('numbers architecture steps upright with the shared pill and shows changes as chips before the title', () => {
+    const { deps, repo } = fixture();
+    const vm = new TraceViewModel({ ...deps, getWorkspace: () => 'architecture' });
+    vm.select(normalizeTrace({ ...raw, summary: 'Places the order.', intent: 'proposal', proposal: { nodes: [{ id: 'checkout', status: 'modified' }] },
+        refs: [{ path: 'src/checkout/CartPage.jsx', start: 3, end: 12, step: 'checkout' }] }, repo.map), 'architecture');
+    const { container } = render(<SelectedTraceSidebar vm={vm} />);
+    const step = container.querySelector('.steps li > button')!;
+    expect(step.querySelector('i')).toBeNull();
+    expect(step.querySelector('.step-number.n')?.textContent).toBe('1');
+    expect(step.querySelector('b > .proposal-badge.modified:first-child')?.textContent).toBe('Modified');
+    expect(step.textContent).not.toContain('[Modified]');
+    // the reference is its own row, not laid out like the step button
+    expect(container.querySelector('.steps li > .refs button.ref')).toBeTruthy();
+    // Summary and Proposed change are Settings-style sections above the steps, closed by default
+    const summary = container.querySelector<HTMLDetailsElement>('details.settings-section#trace-summary')!;
+    const proposal = container.querySelector<HTMLDetailsElement>('details.settings-section#trace-proposal')!;
+    expect(summary.open).toBe(false);
+    expect(proposal.open).toBe(false);
+    expect(proposal.querySelector('summary h2')?.textContent).toBe('Proposed change');
+    // Trace steps is its own section after them, open, with the step count on the right
+    const steps = proposal.nextElementSibling as HTMLDetailsElement;
+    expect(steps.id).toBe('trace-steps');
+    expect(steps.open).toBe(true);
+    expect(steps.querySelector('summary h2')?.textContent).toBe('Trace steps');
+    expect(steps.querySelector('summary .settings-section-count')?.textContent).toBe('1');
+    expect(steps.querySelector('.settings-section-body > ol.steps')).toBeTruthy();
+    proposal.open = true;
+    fireEvent(proposal, new Event('toggle'));
+    expect(vm.sections.proposal).toBe(true);
+    vm.dispose();
+});
+it('shows a Planning… spinner chip on a library card while its plan is written', () => {
+    const { deps, repo } = fixture();
+    const busy = observable.box(true);
+    const vm = new TraceViewModel({ ...deps, isPlanBusy: () => busy.get() });
+    const trace = normalizeTrace({ ...raw, intent: 'proposal', proposal: { nodes: [] } }, repo.map);
+    runInAction(() => { vm.items = [trace]; });
+    const { container } = render(<TraceLibrary vm={vm} />);
+    const chip = container.querySelector('#trace-list .trace-badge')!;
+    expect(chip).toHaveClass('busy');
+    expect(chip.textContent).toBe('Planning…');
+    expect(chip.getAttribute('aria-label')).toBe('Writing implementation plan');
+    act(() => busy.set(false));
+    expect(container.querySelector('#trace-list .trace-badge')).not.toHaveClass('busy');
+    expect(container.querySelector('#trace-list .trace-badge')?.textContent).toBe('Proposal');
+    vm.dispose();
+});
+it('says Regenerating on the sidebar plan button when a plan is written again', () => {
+    const { deps, repo } = fixture();
+    const vm = new TraceViewModel({ ...deps, isPlanBusy: () => true });
+    vm.select(normalizeTrace({ ...raw, intent: 'proposal', proposal: { nodes: [] },
+        plan: { tasks: [{ title: 'Validate', detail: 'Check expiry', files: ['new: coupons.mjs'] }] } }, repo.map), 'architecture');
+    render(<SelectedTraceSidebar vm={vm} />);
+    const button = document.getElementById('trace-plan')!;
+    expect(button).toHaveClass('busy');
+    expect(button.textContent).toBe('Regenerating implementation plan…');
     vm.dispose();
 });
 it('supports copy fallback and confirmed deletion, with no output tabs in the sidebar', async () => {

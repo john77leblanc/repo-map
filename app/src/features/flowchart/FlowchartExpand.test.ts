@@ -46,7 +46,15 @@ describe('FlowchartViewModel closer looks', () => {
         expect(vm.selectedId).toBe('a');
         expect(vm.displayFlow?.nodes.find((n) => n.id === 'a')?.expandable).toBe(true);
         expect(vm.miniSvg('a')).toContain('Load the cart');
-        expect(vm.miniSvg('a')).not.toContain('tabindex');
+        expect(vm.miniSvg('a')).toContain('role="group"');
+        expect(vm.miniSvg('a', 'a.2')).toMatch(/class="fn [^"]* sel" data-id="a.2"/);
+        expect(vm.miniSvg('a', 'b')).not.toContain(' sel"');
+        expect(vm.miniSvg('a', 'a.2').match(/ sel"/g)).toHaveLength(1);
+        // a step picked in the mini drawing draws the closer look again
+        vm.openCloserStep('a', 'a.3');
+        expect(vm.isShown('a')).toBe(true);
+        expect(vm.selectedId).toBe('a.3');
+        vm.setShown('a', false);
         expect(services.storage.set).toHaveBeenCalledWith(vm.repo.namespace + 'flow-shown:Checkout', []);
     });
 

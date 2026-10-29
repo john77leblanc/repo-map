@@ -102,7 +102,7 @@ const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: Si
                             <li key={c.nav}>
                                 <ConnectionRow go={c.other} title={vm.screenLabel(c.other)} shape={{ type: 'process' }}
                                     status={vm.changeFor(c.other)?.status} arrow={{ label: c.edge.label, status: c.edge.status }}
-                                    note={c.edge.condition && 'When: ' + c.edge.condition} context={!c.journey}
+                                    note={c.edge.condition && 'When: ' + c.edge.condition} context={!c.journey} direction={active}
                                     onClick={() => { vm.hoverConnection(null); vm.select(c.other); }}
                                     onHover={(on) => vm.hoverConnection(on ? c : null)} />
                             </li>

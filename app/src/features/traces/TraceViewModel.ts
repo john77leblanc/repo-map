@@ -11,6 +11,8 @@ const copyKey = (trace: Trace) => trace._doc || trace.title || 'trace';
 import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
+/** A collapsible section of the trace sidebar. */
+export type TraceSection = 'summary' | 'proposal' | 'steps';
 export interface TraceDependencies {
     repo: RepositoryModel;
     services: Services;
@@ -57,6 +59,8 @@ export class TraceViewModel {
     importCode = '';
     importMessage = '';
     code = '';
+    /** Which trace sidebar sections are open (kept while switching traces). */
+    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, steps: true };
     storeNote =
         'Saved automatically to .repo-map/traces on this machine (git-ignored). Open an output to explore it.';
     /** "Copied!" on a trace's Copy trace code button, keyed by trace. */
@@ -309,11 +313,18 @@ export class TraceViewModel {
         this.code = '';
         this.deps.onClear();
     }
+    setSection(id: TraceSection, open: boolean) {
+        this.sections[id] = open;
+    }
     reveal(id: string) {
         this.deps.onReveal(id);
     }
     openPlan(trace: Trace) {
         this.deps.onOpenPlan(trace);
+    }
+    /** True while an implementation plan is being written for `trace`. */
+    isPlanBusy(trace: Trace) {
+        return !!this.deps.isPlanBusy?.(trace);
     }
     get planBusy() {
         return !!this.selected && !!this.deps.isPlanBusy?.(this.selected);

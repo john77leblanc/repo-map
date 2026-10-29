@@ -2,6 +2,7 @@
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { FlowchartWorkspace } from './FlowchartWorkspace';
 import { CodeReference } from '../../shared/ui/CodeReference';
+import { ConnectionRow } from './ConnectionRow';
 import { fixture } from './testFixture';
 import type { CodeRef } from '../../models/types';
 
@@ -39,7 +40,7 @@ describe('FlowchartWorkspace', () => {
         unmount();
         vm.dispose();
     });
-    it('offers a closer look for a box, then shows it with Show in chart / Fold back', async () => {
+    it('offers a closer look for a box, then shows it with Expand / Collapse in chart and a clickable mini drawing', async () => {
         const { vm, trace, services } = fixture();
         Object.defineProperty(vm.repo, 'aiAvailable', { get: () => true });
         vi.mocked(services.api.stream).mockResolvedValueOnce({ expansion: {
@@ -55,18 +56,34 @@ describe('FlowchartWorkspace', () => {
         await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Look closer' })));
         // drawn in place: the panel follows the closer look's first step
         expect(vm.selectedId).toBe('a.1');
-        expect(screen.getByText('Inside: Ready?').nextElementSibling?.className).toBe('disclosure-list');
+        expect(screen.queryByText(/^Inside:/)).toBe(null);
+        expect(container.querySelector('#fl-side .disclosure-list.in-closer')).toBeTruthy();
+        expect(container.querySelector('#fl-closer.has-look')).toBeTruthy();
         expect(screen.getByText('Checks the cart.')).toBeTruthy();
-        expect(container.querySelector('#fl-closer h4')?.textContent).toBe('Closer look 2 steps');
+        expect(container.querySelector('#fl-closer h4')?.textContent?.replace(/\s+/g, ' ')).toBe('Closer look inside Ready?');
+        expect(container.querySelector('#fl-closer .flow-closer-box')?.getAttribute('title')).toBe('Ready?');
+        expect(container.querySelector('#fl-closer h4 .fshape')).toBe(null);
+        expect(container.querySelector('#fl-side .fside-head h3 .fshape .xp')).toBeTruthy();
+        expect(container.querySelector('#fl-closer .flow-closer-count')?.textContent).toBe('(2 steps)');
+        // the mini drawing shows while drawn in the chart, outlines the selected step and selects on click
+        expect(container.querySelector('.flow-mini .fn.sel')?.getAttribute('data-id')).toBe('a.1');
+        fireEvent.click(container.querySelector('.flow-mini .fn[data-id="a.2"] text')!);
+        expect(vm.selectedId).toBe('a.2');
+        expect(container.querySelector('.flow-mini .fn.sel')?.getAttribute('data-id')).toBe('a.2');
         expect(container.querySelector('#fl-closer ol')).toBe(null);
         expect(container.querySelector('.fc .xp-frame')).toBeTruthy();
         expect(container.querySelector('.fc .xp-title')?.textContent).toContain('Expanded: Ready?');
         expect(container.querySelectorAll('.fc .fn.xp')).toHaveLength(2);
-        fireEvent.click(screen.getByRole('button', { name: 'Fold back' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse in chart' }));
         expect(vm.selectedId).toBe('a');
+        expect(container.querySelector('#fl-closer h4')?.textContent).toBe('Closer look');
         expect(container.querySelector('.fc .xp-badge')).toBeTruthy();
         expect(container.querySelector('.flow-mini svg')).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Show in chart' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Expand in chart' })).toBeTruthy();
+        // clicking a step in the folded mini drawing draws the closer look and selects it
+        fireEvent.click(container.querySelector('.flow-mini .fn[data-id="a.2"]')!);
+        expect(vm.isShown('a')).toBe(true);
+        expect(vm.selectedId).toBe('a.2');
         unmount();
         vm.dispose();
     });
@@ -138,7 +155,7 @@ describe('FlowchartWorkspace', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Connections/ }));
         expect(vm.sections.connections).toBe(true);
         expect(screen.getByRole('tab', { name: /To/ }).getAttribute('aria-selected')).toBe('true');
-        expect(side.querySelector('.flow-conn li')?.textContent).toBe('Doneyes');
+        expect(side.querySelector('.flow-conn li')?.textContent).toBe('yesDone');
         fireEvent.mouseEnter(side.querySelector('[data-go="b"]')!);
         expect([...container.querySelectorAll('.fn.hl-main')].map((n) => (n as SVGElement).dataset.id)).toEqual(['b']);
         expect(container.querySelector('.fn[data-id="a"]')?.classList.contains('hl')).toBe(true);
@@ -178,12 +195,22 @@ describe('FlowchartWorkspace', () => {
         const arrow = row.querySelector('.fl-arrow')!;
         expect(arrow.textContent).toBe('yes');
         expect(arrow).toHaveClass('change-new');
+        // a To row reads arrow first, then the target; a From row starts with the shape
+        expect(row).toHaveClass('to');
+        expect(row.firstElementChild).toHaveClass('cl-arrow');
+        expect(row.firstElementChild?.nextElementSibling).toHaveClass('fshape');
         expect(row.querySelector('em')).toBe(null);
         // from Done's side, the connected step is the modified one: chip before its title
         act(() => vm.select('b'));
         act(() => vm.setConnectionTab('from'));
         const back = container.querySelector('#fl-side .flow-conn button.cl[data-go="a"]')!;
         expect(back.querySelector('.cl-title .proposal-badge.modified + b')?.textContent).toBe('Ready?');
+        expect(back).not.toHaveClass('to');
+        // same parts as a To row, with the arrow below the name
+        expect([...back.children].map((c) => c.getAttribute('class'))).toEqual(['fshape', 'cl-text', 'cl-arrow']);
+        expect([...row.children].map((c) => c.getAttribute('class'))).toEqual(['cl-arrow', 'fshape', 'cl-text']);
+        expect(back.querySelector('.cl-arrow .fl-arrow-head')).toBeTruthy();
+        expect(row.querySelector('.cl-arrow .fl-arrow-head')).toBeTruthy();
         unmount();
         vm.dispose();
     });
@@ -219,5 +246,16 @@ describe('FlowchartWorkspace', () => {
         expect(screen.getByText(/supporting walkthrough was kept/).id).toBe('flow-missing');
         unmount();
         vm.dispose();
+    });
+});
+describe('ConnectionRow', () => {
+    it('leaves the arrow out of a To or From row without a label', () => {
+        const props = { go: 'x', title: 'Next', shape: { type: 'process' }, arrow: {}, onClick: () => {}, onHover: () => {} };
+        const { container, rerender } = render(<ConnectionRow {...props} direction="to" />);
+        expect(container.querySelector('.cl.to .cl-arrow')).toBe(null);
+        expect(container.querySelector('.cl.to')?.firstElementChild).toHaveClass('fshape');
+        expect(container.querySelector('.fl-arrow')).toBe(null);
+        rerender(<ConnectionRow {...props} />);
+        expect(container.querySelector('.fl-arrow')).toBe(null);
     });
 });

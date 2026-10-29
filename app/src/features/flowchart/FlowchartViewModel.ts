@@ -187,12 +187,13 @@ export class FlowchartViewModel {
         return t ? `${this.repo.namespace}flow-shown:${t._doc || t.key || t.title}` : '';
     }
     /** The closer look for a box, or for the box a sub-box sits in. */
-    expansionFor(id: string | null | undefined): { id: string; label: string; expansion: FlowExpansion } | null {
+    expansionFor(id: string | null | undefined): { id: string; label: string; type: string; expansion: FlowExpansion } | null {
         if (!id || !this.trace?.expansions) return null;
         const box = id.split('.')[0];
         const expansion = this.trace.expansions[box];
         if (!expansion) return null;
-        return { id: box, label: this.trace.flow?.nodes.find((n) => n.id === box)?.label || box, expansion };
+        const node = this.trace.flow?.nodes.find((n) => n.id === box);
+        return { id: box, label: node?.label || box, type: node?.type || 'process', expansion };
     }
     /** True for a box of the saved flow that may get a closer look (one level deep only). */
     canExpand(id: string | null | undefined) {
@@ -351,13 +352,31 @@ export class FlowchartViewModel {
         if (!t?.flow) return '';
         return [t._doc || t.key || t.title, this.compact, t.flow.nodes.length, t.flow.edges.length].join('|');
     }
-    /** A small, read-only drawing of a closer look, for the side panel. */
-    miniSvg(id: string) {
+    /**
+     * A small drawing of a closer look, for the side panel, with `selected` outlined. Its boxes
+     * are buttons (see `openCloserStep`) only when the closer look can be drawn in the chart.
+     */
+    miniSvg(id: string, selected?: string | null) {
         const exp = this.trace?.expansions?.[id];
         if (!exp) return '';
         const layout = fitCaptions(layoutFlow({ nodes: exp.nodes, edges: exp.edges }, { lanes: false }));
-        // Not part of the chart: no focus stops or buttons in it.
-        return renderFlowSvg(layout, { title: 'Closer look' }).replace(/ tabindex="0" role="button"/g, '');
+        let svg = renderFlowSvg(layout, { title: 'Closer look' });
+        if (exp.inline === false) svg = svg.replace(/ tabindex="0" role="button"/g, '');
+        else svg = svg.replace(' role="img"', ' role="group"');
+        const at = selected && exp.nodes.some((n) => n.id === selected) ? svg.indexOf(` data-id="${selected}"`) : -1;
+        if (at > 0) {
+            // Close the box's class attribute with " sel", as the chart marks its selection.
+            const end = svg.lastIndexOf('"', at - 1);
+            svg = svg.slice(0, end) + ' sel' + svg.slice(end);
+        }
+        return svg;
+    }
+    /** Select a closer look's step from its mini drawing, drawing the closer look in the chart first. */
+    openCloserStep(box: string, step: string) {
+        const exp = this.trace?.expansions?.[box];
+        if (!exp || exp.inline === false || !exp.nodes.some((n) => n.id === step)) return;
+        if (!this.isShown(box)) this.setShown(box, true);
+        this.select(step);
     }
     get svg() {
         return this.layout ? renderFlowSvg(this.layout, { title: this.trace?.title }) : '';

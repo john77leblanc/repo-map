@@ -20,17 +20,26 @@ export interface ConnectionRowProps {
     onClick: () => void;
     /** Hover or focus on (true) and off (false). */
     onHover: (on: boolean) => void;
+    /** `to` (leaving this item) puts the arrow first, so the row reads `──▶ target`. */
+    direction?: 'from' | 'to';
 }
 
 /**
- * One connection in a side panel (flowchart step, sitemap screen): the connected item's
- * shape, its change chip and name, then the arrow `── label ──▶` and an optional note.
+ * One connection in a side panel (flowchart step, sitemap screen). From: the connected item's
+ * shape, its change chip and name, then the arrow `── label ──▶` (when labelled) and an optional
+ * note. To: the arrow first (when labelled), then the shape and name, then the note.
  */
-export function ConnectionRow({ go, title, shape, status, arrow, note, context = false, onClick, onHover }: ConnectionRowProps) {
+export function ConnectionRow({ go, title, shape, status, arrow, note, context = false, onClick, onHover, direction = 'from' }: ConnectionRowProps) {
+    const to = direction === 'to';
+    // Same parts both ways; only the arrow moves (above the name for To, below it for From).
+    const line = arrow?.label
+        ? <span className="cl-arrow"><FlowArrow label={arrow.label} status={arrow.status} inferred={arrow.inferred} /></span>
+        : null;
     return (
-        <button className={'cl' + (context ? ' context' : '')} type="button" data-go={go} onClick={onClick}
+        <button className={'cl' + (to ? ' to' : '') + (context ? ' context' : '')} type="button" data-go={go} onClick={onClick}
             onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)}
             onFocus={() => onHover(true)} onBlur={() => onHover(false)}>
+            {to && line}
             <FlowShape type={shape.type} inside={shape.inside} inferred={shape.inferred} />
             <span className="cl-text">
                 <span className="cl-title">
@@ -38,9 +47,9 @@ export function ConnectionRow({ go, title, shape, status, arrow, note, context =
                     <b>{title}</b>
                     {context && <em>nearby</em>}
                 </span>
-                {arrow?.label && <FlowArrow label={arrow.label} status={arrow.status} inferred={arrow.inferred} />}
-                {note && <span className="cl-note">{note}</span>}
             </span>
+            {!to && line}
+            {note && <span className="cl-note">{note}</span>}
         </button>
     );
 }

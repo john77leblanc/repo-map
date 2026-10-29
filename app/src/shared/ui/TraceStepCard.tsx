@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { StepNumber } from './StepNumber';
 
 export interface TraceStepCardProps {
     /** Prefix for the Prev / Next button ids (`<prefix>-step-prev`). */
@@ -20,7 +21,7 @@ export function TraceStepCard({ idPrefix, index, total, note, hasPrev, hasNext, 
     return (
         <section className="arch-step trace-step" aria-label="Trace step">
             <h3>
-                <span className="arch-step-number" aria-hidden="true">{index + 1}</span>
+                <StepNumber n={index + 1} className="arch-step-number" />
                 <span>Trace step <span className="arch-step-of">{index + 1} of {total}</span></span>
                 <span className="arch-step-nav">
                     <button className="link" type="button" id={idPrefix + '-step-prev'} aria-label="Previous trace step"

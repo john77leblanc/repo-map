@@ -1,7 +1,37 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import type { ReferenceViewerModel } from '../../models/ReferenceViewerModel';
 import { ModalHeader } from './ModalHeader';
+import { trimPath } from './trimPath';
+
+/**
+ * A path on one line: leading folders give way to `.../` until it fits.
+ * Re-fits when the modal header changes width.
+ */
+function FittedPath({ path, suffix }: { path: string; suffix: string }) {
+    const code = useRef<HTMLElement>(null);
+    const [keep, setKeep] = useState(Infinity);
+    const segments = path.split('/').length;
+    useLayoutEffect(() => setKeep(Infinity), [path, suffix]);
+    // Drop one more folder per pass until the line fits (runs before paint).
+    useLayoutEffect(() => {
+        const el = code.current;
+        if (el && el.scrollWidth > el.clientWidth && Math.min(keep, segments) > 1) setKeep(Math.min(keep, segments) - 1);
+    });
+    useEffect(() => {
+        const head = code.current?.closest('.fhead');
+        if (!head || typeof ResizeObserver === 'undefined') return;
+        let width = head.clientWidth;
+        const observer = new ResizeObserver(() => {
+            if (head.clientWidth === width) return;
+            width = head.clientWidth;
+            setKeep(Infinity);
+        });
+        observer.observe(head);
+        return () => observer.disconnect();
+    }, []);
+    return <code ref={code}>{trimPath(path, keep)}{suffix}</code>;
+}
 
 /** The code reference modal: the cited lines with a little context, Copy path, GitHub and Prev/Next. */
 export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: ReferenceViewerModel }) {
@@ -29,7 +59,7 @@ export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: Ref
                             data-tip={vm.copy.copied ? 'Copied!' : 'Copy path'}
                             aria-label={(vm.copy.copied ? 'Copied: ' : 'Copy path: ') + `${r.path}#L${r.start}-L${r.end}`}
                             onClick={() => void vm.copyPath()}>
-                            <code>{r.path}#L{r.start}-L{r.end}</code>
+                            <FittedPath path={r.path} suffix={`#L${r.start}-L${r.end}`} />
                         </button>
                         {vm.href && (
                             <a className="btn" id="ref-github" href={vm.href} target="_blank" rel="noopener"

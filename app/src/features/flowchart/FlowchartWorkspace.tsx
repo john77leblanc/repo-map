@@ -107,7 +107,7 @@ const SelectionDetails = observer(function SelectionDetails({ vm }: { vm: Flowch
 
 /**
  * A box's closer look: the AI's explanation and the smaller steps inside it, with
- * Show in chart / Fold back. Boxes inside a shown closer look show it too.
+ * Expand / Collapse in chart. Steps inside a closer look show it too; its mini drawing selects them.
  */
 /** A closer-look job's progress and Stop, beside its button. */
 const CloserStatus = observer(function CloserStatus({ vm, box }: { vm: FlowchartViewModel; box: string }) {
@@ -145,20 +145,25 @@ const CloserLook = observer(function CloserLook({ vm, id }: { vm: FlowchartViewM
     const { expansion } = found;
     const box = found.id;
     const shown = vm.isShown(box);
+    // Mini drawing boxes open that step in the chart (delegated: the drawing is markup).
+    const pick = (event: { target: EventTarget }) => {
+        const step = (event.target as Element).closest?.('.fn')?.getAttribute('data-id');
+        if (step) vm.openCloserStep(box, step);
+    };
     return (
         <>
         <hr className="fside-rule" />
-        <section className="flow-closer" id="fl-closer" aria-label="Closer look">
-            <h4>Closer look <span className="disclosure-count">
-                {expansion.nodes.length} step{expansion.nodes.length === 1 ? '' : 's'}</span></h4>
-            {expansion.summary && <p className="fd">{expansion.summary}</p>}
-            {!shown && <div className="flow-mini" aria-hidden="true" dangerouslySetInnerHTML={{ __html: vm.miniSvg(box) }} />}
-            {expansion.gaps && <p className="fwarn">Not clear from the code: {expansion.gaps}</p>}
-            {!expansion.inline && <p className="hint">Its arrows couldn't be matched to the chart, so it's shown here only.</p>}
+        <section className="flow-closer has-look" id="fl-closer" aria-label="Closer look">
+            <div className="flow-closer-head">
+                {/* On the box itself the panel title already names it. */}
+                {id === box ? <h4>Closer look</h4>
+                    : <h4>Closer look inside <span className="flow-closer-box" title={found.label}>{found.label}</span></h4>}
+                <span className="flow-closer-count">({expansion.nodes.length} step{expansion.nodes.length === 1 ? '' : 's'})</span>
+            </div>
             <div className="flow-select-actions">
                 {expansion.inline && (
                     <button className="btn sm primary" id="fl-closer-toggle" type="button" onClick={() => vm.setShown(box, !shown)}>
-                        {shown ? 'Fold back' : 'Show in chart'}
+                        {shown ? 'Collapse in chart' : 'Expand in chart'}
                     </button>
                 )}
                 {vm.repo.aiAvailable && (
@@ -169,6 +174,18 @@ const CloserLook = observer(function CloserLook({ vm, id }: { vm: FlowchartViewM
                     onClick={() => void vm.removeExpansion(box)}>Delete</button>
                 <CloserStatus vm={vm} box={box} />
             </div>
+            {expansion.summary && <p className="fd">{expansion.summary}</p>}
+            {expansion.inline
+                ? <div className="flow-mini" onClick={pick}
+                    onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        pick(event);
+                    }}
+                    dangerouslySetInnerHTML={{ __html: vm.miniSvg(box, vm.selectedId) }} />
+                : <div className="flow-mini" aria-hidden="true" dangerouslySetInnerHTML={{ __html: vm.miniSvg(box) }} />}
+            {expansion.gaps && <p className="fwarn">Not clear from the code: {expansion.gaps}</p>}
+            {!expansion.inline && <p className="hint">Its arrows couldn't be matched to the chart, so it's shown here only.</p>}
             {expansion.used?.label && <p className="hint">By {expansion.used.label}</p>}
         </section>
         </>
@@ -196,7 +213,7 @@ const FlowConnections = observer(function FlowConnections({ vm, id }: { vm: Flow
                             return (
                                 <li key={active + index}>
                                     <ConnectionRow go={other} title={vm.nodeLabel(other)} shape={target} status={target.status}
-                                        arrow={edge}
+                                        arrow={edge} direction={active}
                                         onClick={() => { vm.hoverConnection(null); vm.select(other); }}
                                         onHover={(on) => vm.hoverConnection(on ? index : null, on ? other : null)} />
                                 </li>
@@ -229,11 +246,11 @@ export const FlowchartDetails = observer(function FlowchartDetails({
         main?.querySelector<SVGElement>(`.fn[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
     };
     return (
-        <SidePanel id="fl-side" aria-label="Step details" aria-live="polite" closeId="fl-side-close" title={node.label} onClose={close}
+        <SidePanel id="fl-side" aria-label="Step details" aria-live="polite" closeId="fl-side-close" onClose={close}
+            title={<><FlowShape type={node.type} inside={!!parent} inferred={node.inferred} />{node.label}</>}
             status={change?.status} kind={'Step' + (FLOW_KIND[node.type] ? ' — ' + FLOW_KIND[node.type] : '')}>
             {node.collapsed && <CollapsedDetails vm={vm} id={node.id} label={node.label} />}
-            {parent && <p className="ft fside-inside">Inside: {parent.label}</p>}
-            <DisclosureList>
+            <DisclosureList className={parent ? 'in-closer' : undefined}>
                 {(vm.selectedLane || node.detail || node.inferred || change) && (
                     <Disclosure id="fl-about" title="About" open={vm.sections.about}
                         onToggle={(open) => vm.setSection('about', open)}>

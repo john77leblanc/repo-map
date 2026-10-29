@@ -34,14 +34,22 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .mk-badge path{fill:none;stroke:var(--panel);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .fside-input{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;font-weight:600;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin:2px 0 10px}
 .fside-input:focus{outline:2px solid var(--http);outline-offset:1px}
-.fside .fside-inside{margin:-4px 0 10px}
+.fside .disclosure-list.in-closer{border-left:3px solid var(--ext)}
 .fside-head.sticky + .flow-members{margin-top:10px}
 .fside-rule{border:0;border-top:1px solid var(--line);margin:8px 0 10px}
 .fside .disclosure-list + .fside-rule{margin-top:14px}
 .flow-member-row{display:flex;align-items:center;gap:.5em}
 .flow-member-row .unmark{margin-left:auto;flex:none}
 .flow-select-actions{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em}
-.flow-closer h4{margin:0 0 .4em}
+.flow-closer h4{margin:0}
+.flow-closer.has-look{border-left:3px solid var(--ext);border-radius:0 6px 6px 0;padding:8px 10px;background:color-mix(in srgb,var(--ext) 6%,transparent)}
+.flow-closer.has-look h4{color:var(--ext)}
+.flow-closer-head{display:flex;align-items:baseline;gap:8px}
+.flow-closer-head h4{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flow-closer-head .flow-closer-count{flex:none}
+.fside-head h3 .fshape{width:20px;height:13px;vertical-align:-1px;margin-right:8px}
+.flow-closer.has-look .flow-select-actions{margin-bottom:.9em}
+.flow-closer-count{margin-left:auto;white-space:nowrap;color:var(--muted);font-size:12px}
 .flow-closer .status{min-width:0;overflow-wrap:anywhere}
 .flow-closer .status:empty{display:none}
 #fl-select-mode[aria-pressed="true"]{background:var(--soft);border-color:var(--ink)}
@@ -83,8 +91,11 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 :is(.flegend,.fshape) .lg.xp{fill:color-mix(in srgb,var(--ext) 22%,var(--panel))} :is(.flegend,.fshape) .lg-badge{fill:var(--ext)} :is(.flegend,.fshape) .lg-frame{fill:none;stroke:var(--ext);stroke-dasharray:3 2}
 :is(.flegend,.fshape) .lg.se{fill:var(--soft);stroke:var(--ink)}
 .cl .fshape{flex:none;width:18px;height:12px;overflow:visible}
-.flow-conn .cl{align-items:flex-start;gap:8px;padding:5px 6px}
-.flow-conn .cl .fshape{margin-top:3px}
+.flow-conn .cl{display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:8px;row-gap:3px;align-items:start;text-align:left;padding:5px 6px}
+.flow-conn .cl .fshape{grid-column:1;margin-top:3px}
+.flow-conn .cl :is(.cl-arrow,.cl-text,.cl-note){grid-column:2}
+.flow-conn .cl .cl-arrow{display:flex;overflow:visible}
+.flow-conn .cl .cl-arrow span{overflow:visible}
 .flow-conn .cl-text{color:var(--ink);overflow:visible;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .flow-conn .cl-text span{overflow:visible}
 .flow-conn .cl-title{display:block;color:var(--ink)}
@@ -106,6 +117,7 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .flow-conn .cl-title em{margin-left:6px}
 .fc.hovering .xp-frame,.fc.hovering .xp-title{opacity:.35}
 .flow-mini{margin:.5em 0;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
-.flow-mini svg{display:block;width:100%;height:auto;max-height:280px;pointer-events:none}
+.flow-mini svg{display:block;width:100%;height:auto;max-height:280px}
+.flow-mini[aria-hidden] svg{pointer-events:none}
 .flow-members [aria-current="step"]{border-color:var(--http)}
 `;

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
+import { StepNumber } from '../../shared/ui/StepNumber';
 import { DirectionTabs } from '../../shared/ui/DirectionTabs';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { contractLabel } from '../../../../lib/contracts.mjs';
@@ -355,9 +356,7 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                                                                 >
                                                                     <span className="dot" />
                                                                     {vm.step(n.id) >= 0 && (
-                                                                        <span className="stepn">
-                                                                            {vm.step(n.id) + 1}
-                                                                        </span>
+                                                                        <StepNumber n={vm.step(n.id) + 1} className="stepn" />
                                                                     )}
                                                                     <span className="nm">
                                                                         {n.title || n.id}

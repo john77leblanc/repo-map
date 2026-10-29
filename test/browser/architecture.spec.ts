@@ -159,7 +159,7 @@ test('sidebar supports pointer and keyboard resize, reset and persisted collapse
     await openMap(page);
     const resize = page.getByRole('separator', { name: 'Resize library' });
     const side = page.getByRole('complementary', { name: 'Repository library' });
-    await expect(resize).toHaveAttribute('aria-valuenow', '300');
+    await expect(resize).toHaveAttribute('aria-valuenow', '360');
     const handle = await resize.boundingBox();
     expect(handle).not.toBeNull();
     await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + 100);
@@ -176,7 +176,7 @@ test('sidebar supports pointer and keyboard resize, reset and persisted collapse
     await page.reload();
     await expect(resize).toHaveAttribute('aria-valuenow', '420');
     await resize.dblclick();
-    await expect(resize).toHaveAttribute('aria-valuenow', '300');
+    await expect(resize).toHaveAttribute('aria-valuenow', '360');
     const collapse = page.getByRole('button', { name: 'Collapse panel', exact: true });
     await collapse.click();
     await expect(page.locator('.app')).toHaveClass(/collapsed/);

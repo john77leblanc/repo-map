@@ -56,7 +56,9 @@ export class PlansViewModel {
         return this.trace?.plan;
     }
     isGenerating(trace: Trace) {
-        return this.busy && this.trace === trace;
+        // A library row (`key`) and the open trace (`_doc`) are different copies of one saved trace.
+        const id = (t: Trace) => t._doc || t.key;
+        return this.busy && !!this.trace && (this.trace === trace || (!!id(trace) && id(trace) === id(this.trace)));
     }
     async open(trace: Trace) {
         // Reopening a plan that is still generating just shows it again.

@@ -30,15 +30,15 @@ export class ShellViewModel {
             {}
         );
         this.width = this.clamp(
-            typeof saved.w === 'number' && Number.isFinite(saved.w) ? saved.w : 300,
+            typeof saved.w === 'number' && Number.isFinite(saved.w) ? saved.w : 360,
             viewport
         );
         this.collapsed = !!saved.c;
     }
     private clamp(width: number, viewport: number) {
         return Math.max(
-            260,
-            Math.min(Math.max(260, Math.min(760, Math.round(viewport * 0.6))), Math.round(width))
+            312,
+            Math.min(Math.max(312, Math.min(760, Math.round(viewport * 0.6))), Math.round(width))
         );
     }
     private save() {
@@ -72,7 +72,7 @@ export class ShellViewModel {
     resizeKey(key: string, viewport = 1280) {
         if (key === 'ArrowLeft' || key === 'ArrowRight')
             this.setWidth(this.width + (key === 'ArrowLeft' ? -20 : 20), viewport);
-        else if (key === 'Home' || key === 'Enter') this.setWidth(300, viewport);
+        else if (key === 'Home' || key === 'Enter') this.setWidth(360, viewport);
         else return false;
         return true;
     }

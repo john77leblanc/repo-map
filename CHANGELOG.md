@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- Flowchart step panel: the **Closer look** section is headed **Closer look**, or **Closer look inside <box>** on a step inside it (one line, cut short with … when long), with the step count right-aligned, then **Expand in chart** / **Collapse in chart** (was **Show in chart** / **Fold back**), **Look again** and **Delete**, then the explanation and the mini drawing. The mini drawing is always shown, outlines the selected step and is clickable: a step there draws the closer look in the chart and selects it (`openCloserStep`). The section has a purple left rail and tint, and a step inside a closer look gets the same rail on its rows instead of an **Inside: …** line. The panel's sticky title starts with the step's shape.
+
+- The trace sidebar groups its text into collapsible **Summary** (the summary and **Not shown clearly**) and **Proposed change** (proposals only: rationale, assumptions, open questions; the border legend is gone, the diagram key has it) sections, both closed by default,, styled like the Settings groups (`SettingsSection`). The step list is a third section, **Trace steps** (Architecture view, open by default, step count on the right; `SettingsSection` gained `count`); status lines and buttons stay below.
+
+- The implementation plan window has **Regenerate** (with **Stop** while writing) and **Copy** in its header, before **Close**, instead of below the plan.
+
+- While an implementation plan is being written, the trace's card in **Saved traces** shows a spinning **Planning…** chip (ink outline, announced as "Writing implementation plan") in place of **Proposal**, for the first plan and for **Regenerate**; it becomes **Plan** when done, or goes back to **Proposal** if it fails or is stopped. While a plan is written again, the open trace's button reads **Regenerating implementation plan…** and the plan window's **Regenerate** shows a spinner and **Regenerating…**. Fixed: the card never matched a saved trace being planned (its row and the open trace are separate copies).
+
+- Text inside Settings-style sections wraps instead of running past the panel (the section body grid could grow wider than the sidebar). The sidebar is now at least 312px wide (was 260px), with a default and reset width of 360px (was 300px).
+
+- Trace sidebar steps (Architecture view): step numbers are no longer italic and use the same pill as the map cards and the trace step card (shared `shared/ui/StepNumber.tsx`); proposed changes show as the New / Modified / Removed chip before the title instead of `[Modified]`; code references under a step no longer overlap their own text and sit inside the step's hover area, like the trace step card in the map's side panel.
+
+- **To** connection rows (flowchart **Connections**, sitemap **Navigation**) put the arrow first, then the connected item, so they read `── yes ──▶` / **Done**; the arrow line shows only when it has a label. **From** rows are unchanged (`ConnectionRow` `direction`).
+
+- Reference window: a path too long for the header drops leading folders (`.../folder/file.js#L4-L9`) instead of wrapping; **Copy path** still copies the full path (`shared/ui/trimPath.ts`).
+
 ## 0.17.0
 
 - **Trace only** on the architecture view. With a trace open, **Show** → **Trace only** (default) hides every card, group and column the trace doesn't touch and draws only the trace's own path; **Whole map** brings back the full, dimmed map. Opening a hidden card (from search or connections) shows it beside the trace until it is closed. The choice is remembered per browser. Traced cards inside a folded linked repo now count as its repo card.

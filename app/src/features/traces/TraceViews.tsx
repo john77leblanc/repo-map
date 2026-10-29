@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { ModalHeader } from '../../shared/ui/ModalHeader';
+import { StepNumber } from '../../shared/ui/StepNumber';
+import { SettingsSection } from '../../shared/ui/SettingsSection';
+import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import type { TraceJob } from './TraceJob';
 import type { TraceViewModel } from './TraceViewModel';
 import type { Trace, Workspace } from '../../models/types';
@@ -221,9 +224,9 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
                         >
                             <span className="trace-card-head">
                                 <span className="trace-card-title" title={trace.title}>{trace.title}</span>
-                                {trace.intent === 'proposal' && (
-                                    <span className="trace-badge">{trace.plan ? 'Plan' : 'Proposal'}</span>
-                                )}
+                                {trace.intent === 'proposal' && (vm.isPlanBusy(trace)
+                                    ? <span className="trace-badge busy" role="status" aria-label="Writing implementation plan">Planning…</span>
+                                    : <span className="trace-badge">{trace.plan ? 'Plan' : 'Proposal'}</span>)}
                             </span>
                             <span className="trace-prompt" title={trace.prompt || undefined}>
                                 {trace.prompt || 'No prompt saved.'}
@@ -321,14 +324,17 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
     if (!t) return null;
     return (
         <div className="tb">
-            {t.summary && <p className="rs">{t.summary}</p>}
+            {(t.summary || t.gaps) && (
+                <SettingsSection id="trace-summary" title="Summary" open={vm.sections.summary}
+                    onToggle={(open) => vm.setSection('summary', open)}>
+                    {t.summary && <p className="rs">{t.summary}</p>}
+                    {t.gaps && <p className="gaps">Not shown clearly: {t.gaps}</p>}
+                </SettingsSection>
+            )}
             {t.intent === 'proposal' && t.proposal && (
-                <section className="proposal-summary">
-                    <h3>Proposed change</h3>
-                    <p className="proposal-legend" hidden={vm.workspace === 'sitemap'}>
-                        New: dashed border · Modified: bold border · Removed: dotted border and
-                        struck-through label. Proposed changes are not implemented code.
-                    </p>
+                <SettingsSection id="trace-proposal" title="Proposed change" open={vm.sections.proposal}
+                    onToggle={(open) => vm.setSection('proposal', open)}>
+                <div className="proposal-summary">
                     <p>{t.proposal.rationale}</p>
                     {(['assumptions', 'questions'] as const).map(
                         (k) =>
@@ -345,7 +351,8 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                                 </div>
                             )
                     )}
-                </section>
+                </div>
+                </SettingsSection>
             )}
             {vm.workspace === 'architecture' && vm.unlinkedRepos(t).length > 0 && (
                 <p className="hint" id="trace-unlinked">
@@ -353,6 +360,8 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                 </p>
             )}
             {vm.workspace === 'architecture' && (
+                <SettingsSection id="trace-steps" title="Trace steps" count={t.steps.length} open={vm.sections.steps}
+                    onToggle={(open) => vm.setSection('steps', open)}>
                 <ol className="steps">
                     {t.steps.map((step, i) => {
                         const change = t.proposal?.nodes.find((n) => n.id === step.id);
@@ -360,11 +369,12 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                         return (
                             <li key={step.id}>
                                 <button type="button" onClick={() => vm.reveal(step.id)}>
-                                    <i className="n">{i + 1}</i>
+                                    <StepNumber n={i + 1} className="n" />
                                     <b>
+                                        {change?.status && (
+                                            <span className={'proposal-badge ' + change.status}>{CHANGE_LABELS[change.status]}</span>
+                                        )}
                                         {title}
-                                        {change?.status &&
-                                            ` [${{ new: 'New', modified: 'Modified', removed: 'Removed' }[change.status]}]`}
                                     </b>
                                     <span>{step.note}</span>
                                 </button>
@@ -385,6 +395,7 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                         );
                     })}
                 </ol>
+                </SettingsSection>
             )}
             {t.refs.length > 0 && (
                 <div className="codestat">
@@ -399,7 +410,6 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
                     <span className="status">Traced with {t.used.label}</span>
                 </div>
             )}
-            {t.gaps && <p className="gaps">Not shown clearly: {t.gaps}</p>}
             <TraceActions key={t._doc || t.title} vm={vm} trace={t} />
         </div>
     );
@@ -433,7 +443,7 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
                         aria-busy={vm.planBusy}
                         onClick={() => vm.selected && vm.openPlan(vm.selected)}>
                         {vm.planBusy
-                            ? 'Creating implementation plan…'
+                            ? vm.selected.plan ? 'Regenerating implementation plan…' : 'Creating implementation plan…'
                             : vm.selected.plan ? 'View implementation plan' : 'Create implementation plan'}
                     </button>
                 )}

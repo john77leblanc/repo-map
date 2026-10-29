@@ -42,6 +42,10 @@ it('keeps generating after close and reopening resumes the same request', async 
     vm.close();
     expect(vm.isOpen).toBe(false);
     expect(vm.isGenerating(t)).toBe(true);
+    // its library row (a separate copy, identified by key) counts too; other traces don't
+    t._doc = 'doc-1';
+    expect(vm.isGenerating({ ...t, _doc: undefined, key: 'doc-1' })).toBe(true);
+    expect(vm.isGenerating({ ...t, _doc: undefined, key: 'doc-2' })).toBe(false);
     await vm.open(t);
     expect(vm.isOpen).toBe(true);
     expect(services.api.stream).toHaveBeenCalledOnce();
