@@ -10,12 +10,13 @@ export interface ModalHeaderProps {
     closeId?: string;
 }
 
-/** The standard modal header: one row with the title and a Close button. Every modal uses it. */
+/** The standard modal header: one row with the title (two lines at most) and a Close button kept top-right. Every modal uses it. */
 export function ModalHeader({ titleId, title, subtitle, actions, onClose, closeId }: ModalHeaderProps) {
     return (
         <div className="fhead">
             <div className="fhead-title">
-                <h2 id={titleId}>{title}</h2>
+                {/* long titles stop at two lines; the tooltip has the rest */}
+                <h2 id={titleId} title={typeof title === 'string' ? title : undefined}>{title}</h2>
                 {subtitle && <p>{subtitle}</p>}
             </div>
             <div className="acts">

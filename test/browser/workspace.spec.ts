@@ -81,8 +81,8 @@ test('a linked repo collapses into one card that keeps its seam, and expands fro
 test('settings list linked repos and refuse a bad link name', async ({ page }) => {
     await page.goto('/');
     await page.locator('#tab-map').click();
-    const section = page.locator('#linked-repos');
-    await section.locator('summary').click();
+    await page.locator('#settings-links-tab').click();
+    const section = page.locator('#settings-links');
     await expect(section.locator('[data-link="api"]')).toContainText('Shop API');
     await expect(section.locator('[data-link="api"]')).toContainText('../shop-api');
     await page.locator('#link-name').fill('home');
@@ -107,8 +107,8 @@ test('a linked repo can be left out of the workspace from Settings', async ({ pa
     await page.goto('/');
     await expect(page.locator('#arch-scope-ws')).toBeVisible();
     await page.locator('#tab-map').click();
-    const section = page.locator('#linked-repos');
-    await section.locator('summary').click();
+    await page.locator('#settings-links-tab').click();
+    const section = page.locator('#settings-links');
     const toggle = section.locator('[data-link-on="api"]');
     await expect(toggle).toBeChecked();
     await toggle.click(); // checked state follows the server's answer

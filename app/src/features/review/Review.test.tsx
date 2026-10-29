@@ -5,7 +5,8 @@ import { SelectedTraceSidebar, TraceHome } from '../traces/TraceViews';
 import { fixture } from '../traces/testFixtures';
 import { decodeTrace, encodeTrace, hasChanges, normalizeTrace } from '../../models/trace';
 import { ReviewViewModel } from './ReviewViewModel';
-import { ReviewModal } from './ReviewModal';
+import { ComposerViewModel } from '../compose/ComposerViewModel';
+import { ComposerModal } from '../compose/ComposerModal';
 import type { Services } from '../../shared/services/contracts';
 
 beforeEach(() => {
@@ -70,7 +71,7 @@ it('runs a review as a job, saves it, opens it and checks whether it is current'
     expect(job.prompt).toBe('Review feature against main');
     expect(vm.startReview({ pr: '3' })).toBeNull();
     await waitFor(() => expect(job.state).toBe('completed'));
-    expect(vi.mocked(services.api.stream).mock.calls[0][1]).toEqual({ base: 'main', head: 'feature', agent: 'api' });
+    expect(vi.mocked(services.api.stream).mock.calls[0][1]).toEqual({ base: 'main', head: 'feature', flow: true, sitemap: false, agent: 'api' });
     expect(vm.selected?.review?.headSha).toBe(HEAD);
     expect(vm.selected?.outputs.architecture).toBe(true);
     await waitFor(() => expect(vm.reviewState(vm.selected!)?.state).toBe('stale'));
@@ -101,7 +102,8 @@ it('re-running a review replaces the saved one', async () => {
     vm.dispose();
 });
 
-it('the review window starts reviews from the form and from repo-map review', async () => {
+
+it('the New trace window starts reviews from its review tabs and from repo-map review', async () => {
     const { deps, services, repo } = fixture();
     repo.bootstrap!.config.defaultBranch = 'main';
     repo.bootstrap!.repo.branch = 'feature';
@@ -109,25 +111,46 @@ it('the review window starts reviews from the form and from repo-map review', as
     vi.mocked(services.api.stream).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
     const traces = new TraceViewModel(deps);
     const vm = new ReviewViewModel({ repo, traces, getPickLabel: () => 'Test' });
-    render(<><TraceHome vm={traces} onReview={vm.openNew} /><ReviewModal vm={vm} /></>);
-    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
+    const composer = new ComposerViewModel({ traces, review: vm });
+    render(<><TraceHome vm={traces} onNewTrace={composer.openNew} composerOpen={composer.open} /><ComposerModal vm={composer} /></>);
+    fireEvent.click(screen.getByRole('button', { name: 'New trace' }));
+    expect(screen.getByRole('tab', { name: 'Describe' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Branches' }));
     expect(screen.getByLabelText('Changes on')).toHaveValue('feature');
     expect(screen.getByLabelText('Compared with')).toHaveValue('main');
+    // a review always draws the map; the other outputs are a choice
+    act(() => composer.toggleOutputs(true));
+    expect(screen.getByLabelText('Code architecture')).toBeChecked();
+    expect(screen.getByLabelText('Code architecture')).toBeDisabled();
+    expect(screen.getByText('Reviews always show changes on the map.')).toBeVisible();
+    expect(document.querySelector('#trace-outputs .settings-section-count')?.textContent).toBe('2');
     fireEvent.click(screen.getByRole('tab', { name: 'Pull request' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(screen.getByText('Pick or enter a pull request.')).toBeVisible();
-    act(() => vm.close());
+    act(() => composer.close());
+    // the window opens on the last tab used
+    act(() => composer.openNew());
+    expect(screen.getByRole('tab', { name: 'Pull request' })).toHaveAttribute('aria-selected', 'true');
+    act(() => composer.close());
 
-    act(() => vm.fromQuery({ review: 'pr', pr: '12' }));
-    expect(vm.open).toBe(true);
-    expect(vi.mocked(services.api.stream).mock.calls[0][1]).toEqual({ pr: '12', agent: 'api' });
+    act(() => traces.setOutput('flowchart', false));
+    act(() => composer.fromQuery({ review: 'pr', pr: '12' }));
+    expect(composer.open).toBe(true);
+    expect(vi.mocked(services.api.stream).mock.calls[0][1]).toEqual({ pr: '12', flow: false, sitemap: false, agent: 'api' });
+    // the progress screen: Stop, and each requested output waiting
+    expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.getByRole('button', { name: 'Stop' })).toBeVisible();
+    const outputs = screen.getByRole('list', { name: 'Outputs' });
+    expect([...outputs.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['Code architectureWaiting']);
     await act(async () => finish({ trace: reviewRaw }));
-    await waitFor(() => expect(vm.open).toBe(false));
+    await waitFor(() => expect(composer.open).toBe(false));
     expect(traces.selected?.intent).toBe('review');
+    expect(traces.selected?.outputs).toEqual({ architecture: true, flowchart: false });
+    composer.dispose();
     vm.dispose();
     traces.dispose();
 });
+
 
 const NOW = 2_000_000_000;
 const refList = (aheadOf: string) => ({
@@ -153,7 +176,8 @@ function pickerFixture() {
     }) as Services['api']['get']);
     const traces = new TraceViewModel(deps);
     const vm = new ReviewViewModel({ repo, traces, getPickLabel: () => 'Test', now: () => NOW });
-    return { vm, traces, services, gets };
+    const composer = new ComposerViewModel({ traces, review: vm });
+    return { vm, traces, services, gets, composer };
 }
 
 it('lists branches and tags with their age and how far ahead they are, greying out ones with nothing to review', async () => {
@@ -196,10 +220,11 @@ it('reloads the counts when the base settles, and warns when the head has nothin
     }
 });
 
+
 it('pull request mode lists open pull requests; Fetch refreshes the lists', async () => {
-    const { vm, traces, services, gets } = pickerFixture();
-    render(<ReviewModal vm={vm} />);
-    act(() => vm.openNew());
+    const { vm, traces, services, gets, composer } = pickerFixture();
+    render(<ComposerModal vm={composer} />);
+    act(() => composer.openNew());
     fireEvent.click(screen.getByRole('tab', { name: 'Pull request' }));
     await waitFor(() => expect(vm.prBox.options).toHaveLength(1));
     expect(vm.prBox.options[0]).toMatchObject({ value: '7', label: '#7 Coupons', meta: 'sam · feature → main · draft' });
@@ -213,9 +238,11 @@ it('pull request mode lists open pull requests; Fetch refreshes the lists', asyn
     await waitFor(() => expect(screen.getByText('Fetched just now.')).toBeVisible());
     expect(vi.mocked(services.api.request).mock.calls.at(-1)?.[0]).toBe('/api/review/fetch');
     expect(gets.slice(before)).toEqual(expect.arrayContaining(['/api/review/prs', '/api/review/refs?base=main']));
+    composer.dispose();
     vm.dispose();
     traces.dispose();
 });
+
 
 it('says why pull requests are missing when gh is unavailable', async () => {
     const { vm, traces, services } = pickerFixture();
@@ -229,27 +256,42 @@ it('says why pull requests are missing when gh is unavailable', async () => {
     traces.dispose();
 });
 
-it('switches modes with tabs, and locks the other tabs while a review runs', async () => {
-    const { vm, traces, services } = pickerFixture();
+
+it('switches tabs, shows a running review as progress, and goes back to the form after Stop', async () => {
+    const { vm, traces, services, composer } = pickerFixture();
     vi.mocked(services.api.stream).mockImplementation(() => new Promise(() => {}));
-    render(<ReviewModal vm={vm} />);
-    act(() => vm.openNew());
-    const tabs = screen.getByRole('tablist', { name: 'What to review' });
-    expect(tabs).toBeVisible();
-    expect(screen.getByRole('tab', { name: 'Branches' })).toHaveAttribute('aria-selected', 'true');
+    render(<ComposerModal vm={composer} />);
+    act(() => composer.openNew());
+    expect(screen.getByRole('tablist', { name: 'What to trace' })).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Describe' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toContainElement(screen.getByLabelText('Question about the codebase'));
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Describe' }), { key: 'ArrowRight' });
+    expect(composer.tab).toBe('refs');
     expect(screen.getByRole('tabpanel')).toContainElement(screen.getByRole('combobox', { name: 'Changes on' }));
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Branches' }), { key: 'ArrowRight' });
     expect(vm.mode).toBe('pr');
-    expect(screen.getByRole('tab', { name: 'Pull request' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('combobox', { name: 'Pull request' })).toBeVisible();
     fireEvent.click(screen.getByRole('tab', { name: 'Local changes' }));
     expect(screen.queryByRole('combobox', { name: 'Changes on' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(vm.busy).toBe(true);
-    expect(screen.getByRole('tab', { name: 'Local changes' })).toBeEnabled();
-    expect(screen.getByRole('tab', { name: 'Branches' })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: 'Pull request' })).toBeDisabled();
-    act(() => vm.stop());
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getByText(/You can close this window; the review keeps running/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(screen.getByText('Stopped.')).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Outputs' })).toHaveTextContent('Not made');
+    expect(screen.getByRole('button', { name: 'Retry review' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to form' }));
+    expect(screen.getByRole('tab', { name: 'Local changes' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Describe' })).toBeEnabled();
+    // Retry on the progress screen replaces the stopped review
+    act(() => composer.showJob(traces.jobs[0]));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry review' }));
+    expect(traces.jobs).toHaveLength(1);
+    expect(traces.jobs[0].busy).toBe(true);
+    act(() => composer.stop());
+    composer.dispose();
     vm.dispose();
     traces.dispose();
 });

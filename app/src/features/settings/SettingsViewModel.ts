@@ -106,9 +106,9 @@ export class SettingsViewModel {
     busy = false;
     redrawArmed = false;
     dismissed = '';
-    /** Settings groups that are expanded; all start collapsed. */
-    openSections = new Set<SettingsSectionId>();
-    /** Section the view should scroll to once, set by reveal(). */
+    /** Settings tab shown; kept between openings so Settings reopens where it was left. */
+    activeTab: SettingsSectionId = 'map';
+    /** Tab the view should focus once, set by reveal(). */
     revealed: SettingsSectionId | null = null;
     traceDefaultStatus = '';
     traceDefaultError = false;
@@ -141,16 +141,12 @@ export class SettingsViewModel {
                 (info?.dirty ? ' (uncommitted changes)' : ''),
         };
     }
-    isOpen(id: SettingsSectionId) {
-        return this.openSections.has(id);
+    setTab(id: SettingsSectionId) {
+        this.activeTab = id;
     }
-    setOpen(id: SettingsSectionId, open: boolean) {
-        if (open) this.openSections.add(id);
-        else this.openSections.delete(id);
-    }
-    /** Expand a section and ask the view to scroll it into sight. */
+    /** Show a tab and ask the view to focus it. */
     reveal(id: SettingsSectionId) {
-        this.openSections.add(id);
+        this.activeTab = id;
         this.revealed = id;
     }
     clearRevealed() {

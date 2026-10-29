@@ -90,7 +90,7 @@ export class ShellViewModel {
         this.deps.onWorkspaceChange?.(workspace);
         this.deps.onLayoutChange?.();
     }
-    /** Open Settings, optionally expanded and scrolled to one section. */
+    /** Open Settings, optionally on one tab (otherwise the last one shown). */
     openSettings(section?: SettingsSectionId) {
         if (section) this.deps.onOpenSettings?.(section);
         this.settingsOpen = true;

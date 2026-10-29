@@ -38,6 +38,7 @@ test('edit replaces a saved trace only after all requested outputs arrive and pr
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(page.locator('#trace-prompt')).toBeFocused();
     await page.locator('#trace-prompt').fill('How does checkout handle failures?');
+    await page.locator('#trace-outputs > summary').click();
     await page.locator('#withflow').check();
     await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
     await expect(page.locator('#status')).toContainText('Not all requested outputs');

@@ -7,7 +7,7 @@ import { ArchitectureWorkspace } from '../features/architecture/ArchitectureWork
 import { FlowchartWorkspace } from '../features/flowchart/FlowchartWorkspace';
 import { TraceHome, SelectedTraceSidebar } from '../features/traces/TraceViews';
 import { PlanModal } from '../features/plans/PlanModal';
-import { ReviewModal } from '../features/review/ReviewModal';
+import { ComposerModal } from '../features/compose/ComposerModal';
 import { ReferenceModal } from '../shared/ui/ReferenceModal';
 import { CodeReference } from '../shared/ui/CodeReference';
 import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
@@ -43,13 +43,7 @@ export const App = observer(function App() {
                 }
                 sidebar={
                     <>
-                        <TraceHome
-                            vm={app.traces}
-                            onRefreshAgents={() => {
-                                void app.settings.loadCatalog(true);
-                            }}
-                            onReview={app.review.openNew}
-                        />
+                        <TraceHome vm={app.traces} onNewTrace={app.composer.openNew} composerOpen={app.composer.open} />
                         <SelectedTraceSidebar vm={app.traces} />
                     </>
                 }
@@ -72,7 +66,7 @@ export const App = observer(function App() {
                 }
             />
             <PlanModal vm={app.plans} />
-            <ReviewModal vm={app.review} />
+            <ComposerModal vm={app.composer} onRefreshAgents={() => { void app.settings.loadCatalog(true); }} />
             <ReferenceModal vm={app.repo.references} />
         </>
     );

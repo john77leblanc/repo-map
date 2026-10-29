@@ -127,6 +127,7 @@ test('creating a Sitemap-only trace requires a base and preserves the question',
     await page.goto('/');
     await page.getByRole('button', { name: 'New trace', exact: true }).click();
     await page.locator('#prompt').fill('Add guest checkout');
+    await page.locator('#trace-outputs > summary').click();
     await page.locator('#witharchitecture').uncheck();
     await page.locator('#withflow').uncheck();
     await page.locator('#withsitemap').check();
@@ -161,6 +162,7 @@ test('a missing Sitemap tab is marked and can be regenerated through Edit withou
     await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toHaveClass(/missing/);
     await expect(page.getByRole('tab', { name: 'Architecture', exact: true })).not.toHaveClass(/missing/);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.locator('#trace-outputs > summary').click();
     await expect(page.locator('#withsitemap')).toBeChecked();
     await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
     await expect(page.locator('#status')).toHaveText('Provider unavailable');

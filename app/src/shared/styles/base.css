@@ -137,8 +137,8 @@ details.grp.nbr>summary{background:var(--soft);box-shadow:inset 3px 0 0 var(--fo
 .side h2{font-family:var(--f-head);font-weight:600;font-size:15px;letter-spacing:.02em;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
 .side h2 .gc{font-family:var(--f-mono);font-weight:400;font-size:11.5px;color:var(--muted)}
 .hint{color:var(--muted);font-size:12.5px;margin:0 0 10px}
-.side textarea{width:100%;font:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical;min-height:84px}
-.side textarea:focus{outline:2px solid var(--http);outline-offset:1px}
+.side textarea,#trace-dialog textarea{width:100%;font:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical;min-height:84px}
+.side textarea:focus,#trace-dialog textarea:focus{outline:2px solid var(--http);outline-offset:1px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:500}
 .btn.primary:disabled{opacity:.5;cursor:default}
@@ -168,6 +168,7 @@ button.ref .fu{font-family:var(--f-mono);font-size:11px;color:var(--muted);overf
 #ref-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(900px,calc(100vw - 32px));max-height:min(90dvh,calc(100dvh - 32px));padding:0;box-shadow:0 16px 64px #0003}
 #ref-dialog::backdrop{background:rgba(0,0,0,.35)}
 #ref-dialog a.btn{text-decoration:none}
+#ref-dialog .fhead{flex-wrap:wrap}#ref-dialog .fhead .acts{flex:0 1 auto}
 #ref-dialog .fhead .acts{flex-wrap:nowrap;min-width:0;max-width:100%}
 #ref-dialog .fhead .acts>:not(.ref-path){flex:none}
 #ref-dialog .ref-path{all:unset;position:relative;cursor:copy;flex:0 1 auto;min-width:0;max-width:52ch;padding:2px 4px;border-radius:4px;color:var(--muted)}
@@ -196,6 +197,8 @@ button.ref .fu{font-family:var(--f-mono);font-size:11px;color:var(--muted);overf
 .path a:hover{color:var(--http)}
 .gaps{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;margin:10px 0 0}
 .gaps:empty{display:none}
+.trace-filters{display:flex;gap:6px;margin:0 0 8px}.trace-filters select,.trace-filters input{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:4px 6px;min-width:0}.trace-filters input{flex:1}
+.trace-filter-empty{display:flex;align-items:center;gap:8px}
 .trace-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .ti{border:1px solid var(--line);border-radius:7px;background:var(--bg)}
 .ti.cur{border-color:var(--ink)}
@@ -236,7 +239,6 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .opt{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;margin-right:auto}
 .opt input{margin:0;accent-color:var(--http)}
 /* AI tool / model / effort pickers in Settings */
-#run{margin-left:auto}
 .pick{display:flex;gap:6px;align-items:center;flex:1 1 200px;min-width:0}
 .pick select,.pickin{font:inherit;font-size:12.5px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);min-width:0}
 .pick select:focus-visible,.pickin:focus-visible{outline:2px solid var(--http);outline-offset:1px}
@@ -275,10 +277,12 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .flowbtn{display:inline-flex;align-items:center;gap:6px}
 .flowbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
 /* flowchart workspace */
-.fhead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--line)}
-.fhead h2{font-family:var(--f-head);font-size:19px;font-weight:600;margin:0}
+.fhead{display:flex;flex-wrap:nowrap;gap:8px 16px;align-items:flex-start;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+/* a long title shrinks and stops at two lines, so the buttons stay top-right */
+.fhead-title{flex:1 1 auto;min-width:0}
+.fhead h2{font-family:var(--f-head);font-size:19px;font-weight:600;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .fhead p{margin:2px 0 0;font-size:12.5px;color:var(--muted);max-width:70ch}
-.fhead .acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fhead .acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:none}
 .fmain{display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:0}
 .fcanvas{position:relative;overflow:auto;background:var(--bg);min-height:0}
 .fcanvas .fc{display:block;margin:0 auto}
@@ -317,15 +321,40 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .trace-outputs{margin-top:12px}
 .trace-actions{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;min-width:0;margin-top:18px}
 .trace-actions>.btn,.trace-actions>.iconbtn{flex:none}
-.trace-actions .status{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* status under the trace and review buttons: progress stays on one line, errors wrap in full */
+.trace-status{margin:8px 0 0;min-height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trace-status.err{white-space:normal;overflow-wrap:anywhere}
 #trace-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(560px,calc(100vw - 32px));max-height:90vh;max-height:min(90dvh,calc(100dvh - 32px));padding:0;box-shadow:0 16px 64px #0003}
 #trace-dialog[open]{display:flex;flex-direction:column;overflow:hidden}
 #trace-dialog::backdrop{background:rgba(0,0,0,.4)}
 #trace-dialog>.fhead{flex:none}
-#trace-dialog #composer{padding:24px;overflow:auto;min-height:0}
+/* the New trace window: tabs stay put, the tab panel (or the progress screen) scrolls */
+#trace-dialog .composer-tabs{flex:none;margin:0;padding:0 24px}
+#trace-dialog .modal-body{padding:20px 24px 24px;overflow:auto;min-height:0}
 #trace-dialog #prompt{min-height:140px}
 #trace-dialog details.imp{margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
-#trace-dialog .trace-outputs{margin-top:18px}
+#trace-dialog .trace-outputs{margin-top:14px;border-top:1px solid var(--line)}
+.trace-outputs .settings-section h2{font-size:14px;margin:0}
+.trace-outputs .settings-section>summary{padding:10px 0}
+.trace-outputs .settings-section-body{gap:10px;padding:0 0 12px 18px}
+.trace-outputs .settings-section{border-bottom:1px solid var(--line)}
+.output-note{margin:-4px 0 0 26px;font-size:12px}
+.composer-prompt{margin:0 0 12px;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.composer-progress .progress-line.err .progress-text{white-space:normal;overflow-wrap:anywhere}
+/* as much space under Stop / Retry as above them */
+.composer-progress>.hint{margin:18px 0 0}
+.output-progress{list-style:none;margin:14px 0 0;padding:0;border:1px solid var(--line);border-radius:8px}
+.output-progress li{display:flex;align-items:center;gap:10px;padding:9px 12px}
+.output-progress li+li{border-top:1px solid var(--line)}
+.output-progress-label{flex:1;min-width:0}
+.output-progress-state{font-size:12px;color:var(--muted)}
+.output-progress-mark{flex:none;box-sizing:border-box;width:12px;height:12px;border-radius:50%;border:1.6px solid var(--line)}
+.output-progress .s-waiting .output-progress-mark{border-color:var(--muted);border-right-color:transparent;animation:rm-spin .8s linear infinite}
+.output-progress .s-done .output-progress-mark{border-color:var(--sync);background:var(--sync)}
+.output-progress .s-done .output-progress-state{color:var(--sync)}
+.output-progress .s-missing .output-progress-mark{border-color:var(--event)}
+.output-progress .s-missing .output-progress-state{color:var(--event)}
+@media (prefers-reduced-motion: reduce){.output-progress .s-waiting .output-progress-mark{animation:none}}
 .arch-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden}
 .arch-stage.details-open{grid-template-columns:minmax(0,1fr) 360px}
 .arch-stage>.scroller{min-height:0;min-width:0;overflow:auto;padding-top:20px}
@@ -369,14 +398,14 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .fdlg{background:var(--bg);color:var(--ink)}.fhead{padding:18px 24px}.fmain{min-height:65vh;height:calc(100vh - 260px)}.fcanvas{min-height:400px}
 .fmain.details-closed{grid-template-columns:minmax(0,1fr)}
 .flegend{display:block}.flegend>div{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:8px}
-#settings-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(680px,calc(100vw - 32px));max-height:90vh;max-height:min(90dvh,calc(100dvh - 32px));padding:0}
-#settings-dialog::backdrop{background:rgba(0,0,0,.35)}#pane-map{padding:8px 24px 16px;display:grid;gap:0}#pane-map h2{font-size:16px;margin:0}#pane-map h3{font-size:14px;margin:0 0 6px}.fside{font-size:13px}
+#settings-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(680px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));height:min(640px,calc(100dvh - 32px));max-height:90vh;max-height:min(90dvh,calc(100dvh - 32px));padding:0}
+#settings-dialog::backdrop{background:rgba(0,0,0,.35)}#pane-map{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}#pane-map h2{font-size:16px;margin:0}#pane-map h3{font-size:14px;margin:0 0 6px}.fside{font-size:13px}
 @media(max-width:1000px){
  .app,.app.collapsed{grid-template-columns:312px minmax(0,1fr)}.side{position:sticky;order:0;border-top:0}.side-in{height:100vh}.app.collapsed{grid-template-columns:44px minmax(0,1fr)}
  .app.collapsed .side-bar{flex-direction:column}.app.collapsed .side-bar .lbl{writing-mode:vertical-rl}.top{padding:18px;flex-wrap:wrap}.arch-stage{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:760px){
- .app,.app.collapsed{display:flex;flex-direction:column}.side{position:static;width:100%;border-right:0;border-bottom:1px solid var(--line)}.side-in{height:auto;max-height:55vh} .app.collapsed .side-in{padding:10px 16px}.app.collapsed .side-bar{flex-direction:row}.app.collapsed .side-bar .lbl{writing-mode:horizontal-tb}.main{width:100%}.fmain{height:75vh}.fhead{flex-wrap:wrap;padding:16px}.fside{max-height:35vh}
+ .app,.app.collapsed{display:flex;flex-direction:column}.side{position:static;width:100%;border-right:0;border-bottom:1px solid var(--line)}.side-in{height:auto;max-height:55vh} .app.collapsed .side-in{padding:10px 16px}.app.collapsed .side-bar{flex-direction:row}.app.collapsed .side-bar .lbl{writing-mode:horizontal-tb}.main{width:100%}.fmain{height:75vh}.fhead{padding:16px}.fside{max-height:35vh}
 }
 .trace-card{padding:12px}
 .trace-card h3{font-family:var(--f-head);font-size:15px;line-height:1.35;margin:0 0 6px;overflow-wrap:anywhere}
@@ -622,12 +651,7 @@ dialog.modal>.fhead{flex:none}
 .view-tabs [aria-selected="true"].missing{border-style:dashed}
 .view-divider{width:1px;align-self:stretch;margin:4px 0;background:var(--line);flex:none}.view-tabs .seg{flex:none}
 .seg .btn:disabled{opacity:.5;cursor:default}
-/* Review changes: the window, the review header in the trace sidebar, and changed files by card */
-#review-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(560px,calc(100vw - 32px));max-height:min(90dvh,calc(100dvh - 32px));padding:0;box-shadow:0 16px 64px #0003}
-#review-dialog::backdrop{background:rgba(0,0,0,.4)}
-#review-dialog .review-form{padding:20px 24px;overflow:auto;min-height:0}
-#review-changes{margin-top:8px;width:100%}
-.review-mode-tabs{margin:0 0 12px}
+/* Reviews: the review tabs of the New trace window, the review header in the trace sidebar, and changed files by card */
 .review-fields{display:grid;gap:6px;border:0;padding:0;margin:8px 0 14px;min-width:0}
 .review-fields label{font-size:12.5px;font-weight:600;margin-top:6px}
 .review-fields input{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0}
@@ -659,3 +683,9 @@ dialog.modal>.fhead{flex:none}
 .review-fetch{display:flex;align-items:center;gap:8px;margin-top:8px;min-width:0}
 .review-fetch .status{font-size:12px;min-width:0}
 .hint.err{color:var(--event)}
+
+/* Settings: fixed height; the Map / Agents / Linked repos tabs stay put and only the tab panel scrolls */
+.settings-tabs{flex:none;margin:8px 24px 0}
+.settings-panel{padding:4px 24px 16px}
+.settings-tab{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.settings-tab>*{min-width:0}

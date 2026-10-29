@@ -49,6 +49,7 @@ test('traces run concurrently behind closed modals, receive early titles and nev
     await page.goto('/');
     await page.getByRole('button', { name: 'New trace', exact: true }).click();
     await page.locator('#prompt').fill('Explain checkout');
+    await page.locator('#trace-outputs > summary').click();
     await page.locator('#withflow').uncheck();
     await page.getByRole('button', { name: 'Create trace', exact: true }).click();
     await page.locator('#trace-dialog').getByRole('button', { name: 'Close', exact: true }).click();
@@ -59,18 +60,25 @@ test('traces run concurrently behind closed modals, receive early titles and nev
     await expect(first.locator('.trace-card-title')).toHaveText('Checkout journey');
     await expect(first.locator('.trace-title-skeleton')).toHaveCount(0);
     await expect(first.locator('.status.busy')).toBeVisible();
+    // a running job opens on its progress screen: the question, the progress line, each output, Stop
     await first.getByRole('button').click();
-    await expect(page.locator('#prompt')).toHaveValue('Explain checkout');
-    await expect(page.locator('#prompt')).toBeDisabled();
     await expect(page.locator('#new-trace-title')).toHaveText('Checkout journey');
+    await expect(page.locator('.composer-prompt')).toHaveText('Explain checkout');
+    await expect(page.locator('#prompt')).toHaveCount(0);
+    await expect(page.getByRole('tablist', { name: 'What to trace' })).toHaveCount(0);
+    await expect(page.locator('.output-progress li')).toHaveText([/Code architecture\s*Waiting/]);
     const longProgress = 'Reading a very long repository path and following callers through many related services and shared modules';
     await emit(0, { type: 'progress', text: longProgress });
     await expect(page.locator('#status')).toContainText(longProgress);
+    // the history of progress messages opens from the line
+    await page.locator('.progress-line summary').click();
+    await expect(page.locator('.progress-history li')).toHaveCount(2);
+    await page.locator('.progress-line summary').click();
     await page.setViewportSize({ width: 390, height: 844 });
-    const [create, refresh, progress] = await Promise.all(['#run', '#pick-refresh', '#status'].map(selector => page.locator(selector).boundingBox()));
-    expect(create!.x + create!.width).toBeLessThanOrEqual(refresh!.x);
-    expect(refresh!.x + refresh!.width).toBeLessThanOrEqual(progress!.x);
-    expect(progress!.y + progress!.height / 2).toBeCloseTo(create!.y + create!.height / 2, 0);
+    const [progress, outputs, stop] = await Promise.all(['#status', '.output-progress', '#stop'].map(selector => page.locator(selector).boundingBox()));
+    // progress on one line, then the outputs, then Stop
+    expect(outputs!.y).toBeGreaterThanOrEqual(progress!.y + progress!.height);
+    expect(stop!.y).toBeGreaterThanOrEqual(outputs!.y + outputs!.height);
     const style = await page.locator('#status').evaluate(element => ({
         whiteSpace: getComputedStyle(element).whiteSpace, overflow: getComputedStyle(element).overflow,
         textOverflow: getComputedStyle(element).textOverflow, clipped: element.scrollWidth > element.clientWidth,

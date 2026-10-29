@@ -95,7 +95,12 @@ test('a streamed trace displays progress and preserves the prompt after cancella
     await expect(page.locator('#status')).toContainText('Starting');
     await page.locator('#stop').click();
     await expect(page.locator('#status')).toHaveText('Stopped.');
+    await expect(page.locator('.composer-prompt')).toHaveText('How does checkout work?');
+    await expect(page.locator('.output-progress li')).toHaveText([/Code architecture\s*Not made/, /Flowchart\s*Not made/]);
+    // Back to form keeps the question for another try
+    await page.getByRole('button', { name: 'Back to form', exact: true }).click();
     await expect(page.locator('#prompt')).toHaveValue('How does checkout work?');
+    await expect(page.getByRole('button', { name: 'Retry trace', exact: true })).toBeEnabled();
     release();
 });
 
@@ -119,4 +124,20 @@ test('one view row serves the map and traces: Flowchart on the map explains, a t
     await page.getByRole('button', { name: 'Back to all traces', exact: true }).click();
     await expect(tab('Architecture')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.view-context')).toHaveText('Map');
+});
+test('the saved trace list filters by type and search', async ({ page }) => {
+    const proposal = { ...trace, key: 'trace-87654321', intent: 'proposal', title: 'Coupons', prompt: 'Add coupons', proposal: { rationale: 'Validate coupon codes.', nodes: [], edges: [] } };
+    await page.route('**/api/traces', route => route.fulfill({ json: { traces: [trace, proposal] } }));
+    await page.goto('/');
+    await expect(page.locator('#trace-list li')).toHaveCount(2);
+    await page.getByLabel('Trace type').selectOption('proposal');
+    await expect(page.locator('#trace-list li')).toHaveCount(1);
+    await expect(page.locator('#trace-list')).toContainText('Coupons');
+    await page.getByLabel('Trace type').selectOption('all');
+    await page.getByLabel('Search traces').fill('checkout');
+    await expect(page.locator('#trace-list li')).toHaveCount(1);
+    await expect(page.locator('#trace-list')).toContainText('Checkout test');
+    await page.getByLabel('Search traces').fill('nothing like this');
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await expect(page.locator('#trace-list li')).toHaveCount(2);
 });

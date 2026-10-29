@@ -46,19 +46,17 @@ const catalog: Catalog = {
 };
 afterEach(() => vi.useRealTimers());
 describe('SettingsViewModel', () => {
-    it('starts with every section collapsed and reveals one on request', () => {
+    it('starts on the Map tab, keeps the chosen tab and reveals one on request', () => {
         const vm = new SettingsViewModel(fixture());
-        expect(['map', 'agents', 'links'].map((id) => vm.isOpen(id as never))).toEqual([false, false, false]);
-        vm.setOpen('links', true);
-        expect(vm.isOpen('links')).toBe(true);
-        vm.setOpen('links', false);
-        expect(vm.isOpen('links')).toBe(false);
+        expect(vm.activeTab).toBe('map');
+        vm.setTab('links');
+        expect(vm.activeTab).toBe('links');
         vm.reveal('agents');
-        expect(vm.isOpen('agents')).toBe(true);
+        expect(vm.activeTab).toBe('agents');
         expect(vm.revealed).toBe('agents');
         vm.clearRevealed();
         expect(vm.revealed).toBe(null);
-        expect(vm.isOpen('agents')).toBe(true);
+        expect(vm.activeTab).toBe('agents');
         vm.dispose();
     });
 

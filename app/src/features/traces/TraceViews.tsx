@@ -1,90 +1,78 @@
 import { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
-import { ModalHeader } from '../../shared/ui/ModalHeader';
 import { StepNumber } from '../../shared/ui/StepNumber';
 import { SettingsSection } from '../../shared/ui/SettingsSection';
 import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { reviewLabel } from '../../../../lib/review-data.mjs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
+import { OutputsSection } from './OutputsSection';
 import type { TraceJob } from './TraceJob';
-import type { TraceViewModel } from './TraceViewModel';
+import type { TraceKindFilter, TraceViewModel } from './TraceViewModel';
 import type { Trace, Workspace } from '../../models/types';
 export interface TraceViewProps {
     vm: TraceViewModel;
 }
 export interface TraceHomeProps extends TraceViewProps {
-    onRefreshAgents?: () => void;
-    /** Open the "Review changes" window. */
-    onReview?: () => void;
+    /** Open the New trace window (Describe, or a review tab). */
+    onNewTrace?: () => void;
+    /** Whether that window is open, for the button's aria-expanded. */
+    composerOpen?: boolean;
 }
-function OutputOption({ id, label, description, checked, onChange }: {
-    id: string;
-    label: string;
-    description: string;
-    checked: boolean;
-    onChange(value: boolean): void;
-}) {
-    const [helpOpen, setHelpOpen] = useState(false);
+const outputCount = (vm: TraceViewModel) => Number(vm.architecture) + Number(vm.flowchart) + Number(vm.sitemap);
+/** The question box of the New trace window's Describe tab. */
+export const DescribeFields = observer(function DescribeFields({ vm, onSubmit }: TraceViewProps & { onSubmit(): void }) {
     return (
-        <div className="output-option">
-            <label className="opt" htmlFor={id}>
-                <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-                {label}
-            </label>
-            <span className="output-help" onMouseEnter={() => setHelpOpen(true)} onMouseLeave={() => setHelpOpen(false)}>
-                <button className="output-help-button" type="button" aria-label={'About ' + label}
-                    aria-describedby={id + '-help'} onFocus={() => setHelpOpen(true)} onBlur={() => setHelpOpen(false)}
-                    onClick={() => setHelpOpen(true)} onKeyDown={(e) => {
-                        if (e.key === 'Escape' && helpOpen) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setHelpOpen(false);
-                        }
-                    }}>
-                    <span aria-hidden="true">?</span>
-                </button>
-                <span id={id + '-help'} className="output-tooltip" role="tooltip" hidden={!helpOpen}>{description}</span>
-            </span>
-        </div>
-    );
-}
-export const TraceComposer = observer(function TraceComposer({
-    vm,
-    onRefreshAgents,
-    inline = false,
-}: TraceHomeProps & { inline?: boolean }) {
-    const prompt = useRef<HTMLTextAreaElement>(null);
-    useEffect(() => {
-        if (inline && vm.editing) prompt.current?.focus();
-    }, [inline, !!vm.editing]);
-    return (
-        <section id={inline ? 'trace-editor' : 'composer'} className={inline ? undefined : 'modal-body'} hidden={!inline && !vm.composerOpen}>
-            {!inline && <>
-                <p className="hint" id="trace-hint">
-                    Ask how a process works or where a new feature would fit. {vm.deps.getPickLabel()}{' '}
-                    reads the map and local code to explain and illustrate the answer.
-                </p>
-                <div className="noai" id="noai" hidden={vm.repo.aiAvailable}>
-                    <b>Tracing is off on this machine.</b>{' '}
-                    <span id="noai-why">{vm.repo.bootstrap?.ai.reason}</span> Run{' '}
-                    <code>repo-map doctor</code> to see your options, or set one up with the package's SETUP.md.
-                    You can still <a href="#importbox" onClick={(e) => {
-                        e.preventDefault();
-                        const box = document.getElementById('importbox');
-                        const details = box?.closest('details');
-                        if (details) details.open = true;
-                        box?.focus();
-                    }}>import a trace code</a> shared by a teammate.
-                </div>
-            </>}
+        <>
+            <p className="hint" id="trace-hint">
+                Ask how a process works or where a new feature would fit. {vm.deps.getPickLabel()}{' '}
+                reads the map and local code to explain and illustrate the answer.
+            </p>
+            <div className="noai" id="noai" hidden={vm.repo.aiAvailable}>
+                <b>Tracing is off on this machine.</b>{' '}
+                <span id="noai-why">{vm.repo.bootstrap?.ai.reason}</span> Run{' '}
+                <code>repo-map doctor</code> to see your options, or set one up with the package's SETUP.md.
+                You can still <a href="#importbox" onClick={(e) => {
+                    e.preventDefault();
+                    const box = document.getElementById('importbox');
+                    const details = box?.closest('details');
+                    if (details) details.open = true;
+                    box?.focus();
+                }}>import a trace code</a> shared by a teammate.
+            </div>
             <textarea
-                ref={prompt}
-                id={inline ? 'trace-prompt' : 'prompt'}
+                id="prompt"
                 maxLength={4000}
                 disabled={!vm.repo.aiAvailable || vm.busy}
-                aria-label={inline ? 'Trace prompt' : 'Question about the codebase'}
-                aria-describedby={inline ? undefined : 'trace-hint'}
+                aria-label="Question about the codebase"
+                aria-describedby="trace-hint"
+                placeholder="e.g. How does checkout work? Where would coupon support fit?"
+                value={vm.prompt}
+                onChange={(e) => vm.setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        onSubmit();
+                    }
+                }}
+            />
+        </>
+    );
+});
+/** Edit a saved trace's question and outputs in the sidebar, then regenerate it. */
+export const TraceComposer = observer(function TraceComposer({ vm }: TraceViewProps) {
+    const prompt = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        if (vm.editing) prompt.current?.focus();
+    }, [!!vm.editing]);
+    return (
+        <section id="trace-editor">
+            <textarea
+                ref={prompt}
+                id="trace-prompt"
+                maxLength={4000}
+                disabled={!vm.repo.aiAvailable || vm.busy}
+                aria-label="Trace prompt"
                 placeholder="e.g. How does checkout work? Where would coupon support fit?"
                 value={vm.prompt}
                 onChange={(e) => vm.setPrompt(e.target.value)}
@@ -95,51 +83,27 @@ export const TraceComposer = observer(function TraceComposer({
                     }
                 }}
             />
-            {(!inline || vm.editing) && <>
-                {inline && <p className="hint">Regeneration replaces this trace when all requested outputs are ready. Its implementation plan will be cleared.</p>}
-                <div className="trace-outputs">
-                    <fieldset className="output-options" disabled={!vm.repo.aiAvailable || vm.busy}>
-                        <legend>Outputs</legend>
-                        <OutputOption id="witharchitecture" label="Code architecture" checked={vm.architecture}
-                            description="Highlights the process on the repository map."
-                            onChange={(value) => vm.setOutput('architecture', value)} />
-                        <OutputOption id="withflow" label="Flowchart" checked={vm.flowchart}
-                            description="Shows decisions and outcomes in the process."
-                            onChange={(value) => vm.setOutput('flowchart', value)} />
-                        <OutputOption id="withsitemap" label="Sitemap" checked={vm.sitemap}
-                            description="Follows screens and navigation, including proposed changes."
-                            onChange={(value) => vm.setOutput('sitemap', value)} />
-                        {vm.sitemap && !vm.deps.sitemap?.sitemap && <div>
-                            <p>Generate the repository sitemap before tracing screens. Your question will stay here.</p>
-                            <button className="btn" type="button" disabled={vm.deps.sitemap?.busy || vm.deps.sitemap?.loading}
-                                onClick={() => void vm.deps.sitemap?.generate()}>Generate sitemap</button>
-                            {vm.deps.sitemap?.busy && <button className="btn" type="button" onClick={vm.deps.sitemap.stop}>Stop sitemap generation</button>}
-                            <p role="status">{vm.deps.sitemap?.message}</p>
-                        </div>}
-                    </fieldset>
-                </div>
+            {vm.editing && <>
+                <p className="hint">Regeneration replaces this trace when all requested outputs are ready. Its implementation plan will be cleared.</p>
+                <OutputsSection vm={vm} open={vm.sections.outputs} onToggle={(open) => vm.setSection('outputs', open)}
+                    count={outputCount(vm)} disabled={!vm.repo.aiAvailable || vm.busy} />
                 <div className="trace-actions">
                     <button className="btn primary" id="run" type="button"
                         disabled={vm.busy || !vm.repo.aiAvailable || (vm.sitemap && (vm.deps.sitemap?.loading || vm.deps.sitemap?.busy))}
                         onClick={() => void vm.runTrace()}>
-                        {vm.editing ? 'Regenerate' : vm.activeJob ? (vm.activeJob.busy ? 'Creating trace...' : 'Retry trace') : 'Create trace'}
+                        Regenerate
                     </button>
-                    {onRefreshAgents && <button className="iconbtn" id="pick-refresh" type="button"
-                        title="Look for AI tools and models again" aria-label="Look for AI tools and models again" onClick={onRefreshAgents}>
-                        <svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" /></svg>
-                    </button>}
-                    <span className={'status' + (vm.busy ? ' busy' : '') + (vm.error ? ' err' : '')} id="status" aria-live="polite" title={vm.status}>
-                        {vm.status}
-                    </span>
-                    {vm.editing && <button className="btn" type="button" disabled={vm.savingRevision} onClick={vm.cancelEdit}>Cancel</button>}
+                    <button className="btn" type="button" disabled={vm.savingRevision} onClick={vm.cancelEdit}>Cancel</button>
                     <button className="btn" disabled={vm.saving} id="stop" type="button" hidden={!vm.busy} onClick={vm.stop}>Stop</button>
                 </div>
+                <p className={'status trace-status' + (vm.busy ? ' busy' : '') + (vm.error ? ' err' : '')} id="status" aria-live="polite" title={vm.status}>
+                    {vm.status}
+                </p>
             </>}
-            {!inline && <TraceImport vm={vm} />}
         </section>
     );
 });
-const TraceImport = observer(function TraceImport({ vm }: TraceViewProps) {
+export const TraceImport = observer(function TraceImport({ vm }: TraceViewProps) {
     return (
         <details className="imp">
             <summary>Import a trace code</summary>
@@ -170,28 +134,7 @@ const TraceImport = observer(function TraceImport({ vm }: TraceViewProps) {
         </details>
     );
 });
-const NewTraceModal = observer(function NewTraceModal({ vm, onRefreshAgents }: TraceHomeProps) {
-    const dialog = useRef<HTMLDialogElement>(null);
-    const open = vm.composerOpen && !vm.editing && !vm.selected;
-    useEffect(() => {
-        const element = dialog.current;
-        if (!element) return;
-        if (open && !element.open) {
-            element.showModal();
-            element.querySelector<HTMLTextAreaElement>('#prompt')?.focus();
-        } else if (!open && element.open) element.close();
-    }, [open]);
-    return (
-        <dialog ref={dialog} id="trace-dialog" className="modal" aria-labelledby="new-trace-title"
-            onCancel={(e) => { e.preventDefault(); vm.closeComposer(); }}
-            onClose={() => { if (open) vm.closeComposer(); }}>
-            <ModalHeader titleId="new-trace-title" onClose={vm.closeComposer} title={vm.activeJob
-                ? vm.activeJob.title || <span className="trace-title-skeleton">Preparing title...</span>
-                : 'New trace'} />
-            {!vm.selected && !vm.editing && <TraceComposer vm={vm} onRefreshAgents={onRefreshAgents} />}
-        </dialog>
-    );
-});
+const KIND_OPTIONS: [Trace['intent'], string][] = [['description', 'Traces'], ['proposal', 'Proposals'], ['review', 'Reviews']];
 const TraceJobCard = observer(function TraceJobCard({ vm, job }: TraceViewProps & { job: TraceJob }) {
     return (
         <li className="ti trace-card trace-job" data-job-id={job.id}>
@@ -217,9 +160,24 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
             <p className="hint" id="store-note">
                 {vm.storeNote}
             </p>
+            {(vm.showFilters || vm.rows.length + vm.jobRows.length > 1) && (
+                <div className="trace-filters">
+                    {vm.showFilters && (
+                        <select aria-label="Trace type" value={vm.activeKind}
+                            onChange={(e) => vm.setKindFilter(e.target.value as TraceKindFilter)}>
+                            <option value="all">All ({vm.rows.length + vm.jobRows.length})</option>
+                            {KIND_OPTIONS.map(([kind, label]) => (
+                                <option key={kind} value={kind} disabled={!vm.kindCounts[kind]}>{label} ({vm.kindCounts[kind]})</option>
+                            ))}
+                        </select>
+                    )}
+                    <input type="search" aria-label="Search traces" placeholder="Search" value={vm.query}
+                        onChange={(e) => vm.setQuery(e.target.value)} />
+                </div>
+            )}
             <ul className="trace-list" id="trace-list">
-                {vm.jobRows.map((job) => <TraceJobCard key={job.id} vm={vm} job={job} />)}
-                {vm.rows.map((trace, i) => (
+                {vm.filteredJobRows.map((job) => <TraceJobCard key={job.id} vm={vm} job={job} />)}
+                {vm.filteredRows.map((trace, i) => (
                     <li className="ti trace-card" key={trace.key || trace._doc || i}>
                         <button
                             className="trace-open"
@@ -243,6 +201,12 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
                     </li>
                 ))}
             </ul>
+            {vm.filtering && vm.rows.length + vm.jobRows.length > 0 && vm.filteredRows.length + vm.filteredJobRows.length === 0 && (
+                <p className="empty trace-filter-empty">
+                    No traces match.{' '}
+                    <button className="btn sm" type="button" onClick={vm.clearFilters}>Clear</button>
+                </p>
+            )}
             <p className="empty" id="saved-empty" hidden={vm.rows.length + vm.jobRows.length > 0}>
                 No saved traces yet. Create a trace, or import one from a teammate.
             </p>
@@ -252,8 +216,8 @@ export const TraceLibrary = observer(function TraceLibrary({ vm }: TraceViewProp
 });
 export const TraceHome = observer(function TraceHome({
     vm,
-    onRefreshAgents,
-    onReview,
+    onNewTrace,
+    composerOpen,
 }: TraceHomeProps) {
     return (
         <div id="sidebar-home" hidden={!!vm.selected}>
@@ -265,25 +229,18 @@ export const TraceHome = observer(function TraceHome({
                 id="new-trace"
                 hidden={!!vm.editing}
                 type="button"
-                aria-expanded={vm.composerOpen}
+                aria-expanded={composerOpen ?? vm.composerOpen}
                 aria-haspopup="dialog"
                 aria-controls="trace-dialog"
-                onClick={vm.toggleComposer}
+                title="Ask about the code, or review a branch, pull request or your local changes"
+                onClick={onNewTrace ?? vm.openComposer}
             >
                 New trace
             </button>
-            {onReview && (
-                <button className="btn" id="review-changes" hidden={!!vm.editing} type="button" aria-haspopup="dialog"
-                    aria-controls="review-dialog" onClick={onReview}
-                    title="See what a pull request, branch or your local changes do, on the map">
-                    Review changes
-                </button>
-            )}
             <hr className="trace-library-divider" hidden={!!vm.editing} />
             <div className="pane" id="pane-traces">
                 {!vm.editing && <TraceLibrary vm={vm} />}
             </div>
-            <NewTraceModal vm={vm} onRefreshAgents={onRefreshAgents} />
         </div>
     );
 });
@@ -529,7 +486,7 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
     return (
         <section ref={section} id="sidebar-trace" hidden={!vm.selected} aria-label="Selected trace">
             <h2 id="trace-title">{vm.selected?.title}</h2>
-            {vm.editing ? <TraceComposer vm={vm} inline /> : <>
+            {vm.editing ? <TraceComposer vm={vm} /> : <>
                 <p id="trace-prompt">{vm.selected?.prompt || 'No prompt saved.'}</p>
                 {vm.selected?.review && <ReviewHeader vm={vm} trace={vm.selected} />}
                 {vm.selected && <TracePromptActions key={vm.selected._doc || vm.selected.title} vm={vm} trace={vm.selected} />}

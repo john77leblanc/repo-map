@@ -268,7 +268,8 @@ export class ReviewViewModel {
         void this.loadRefs();
         if (this.mode === 'pr' && !this.prs) void this.loadPrs();
     }
-    openNew() {
+    openNew(mode: ReviewMode = this.mode) {
+        if (MODES.includes(mode)) this.mode = mode;
         this.job = null;
         this.message = '';
         if (!this.base) this.baseBox.setValue(this.defaultBranch);
@@ -324,12 +325,43 @@ export class ReviewViewModel {
             return;
         }
         this.message = '';
+        // a failed or stopped review run again from the form takes its place
+        if (this.canDelete) this.deps.traces.discardJob(this.job!);
         const job = this.deps.traces.startReview(request);
         if (job) this.job = job;
         else this.message = this.deps.traces.status || 'Couldn\'t start the review.';
     }
     stop() {
         if (this.job) this.deps.traces.stopJob(this.job);
+    }
+    /** Run a failed or stopped review again with what it compared and its outputs; it takes the old one's place. */
+    retry() {
+        const old = this.job;
+        if (!old?.review || old.busy) return;
+        if (!this.aiAvailable) {
+            this.message = 'Reviews need an AI tool. Pick one in Settings.';
+            return;
+        }
+        if (!old.result) this.deps.traces.discardJob(old);
+        const job = this.deps.traces.startReview(old.review, old.outputs);
+        if (job) this.job = job;
+        else this.message = this.deps.traces.status || 'Couldn\'t start the review.';
+    }
+    /** Leave a finished job's progress for the form, keeping what it compared. */
+    backToForm() {
+        if (this.busy) return;
+        this.job = null;
+        this.message = '';
+    }
+    /** A review that failed or was stopped can be deleted; it was never saved. */
+    get canDelete() {
+        return !!this.job && !this.job.busy && !this.job.result;
+    }
+    /** Delete the failed review from the trace list and close the window. */
+    discard() {
+        if (!this.job || !this.canDelete) return;
+        this.deps.traces.discardJob(this.job);
+        this.close();
     }
     /**
      * `repo-map review` opens the page with ?review=pr|refs|local plus pr, base and head.

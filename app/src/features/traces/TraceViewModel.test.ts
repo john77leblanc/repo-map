@@ -1,6 +1,7 @@
 ﻿import { describe, expect, it, vi } from 'vitest';
 import { autorun, runInAction } from 'mobx';
 import { TraceViewModel } from './TraceViewModel';
+import { TraceJob } from './TraceJob';
 import { decodeTrace, encodeTrace, normalizeTrace } from '../../models/trace';
 import { fixture, flow, raw } from './testFixtures';
 describe('trace normalization and persistence', () => {
@@ -248,6 +249,32 @@ it('restores canceled controls when stream rejects and saves nothing', async () 
     expect(vm.status).toBe('Stopped.');
     expect(vm.prompt).toBe('Question');
     expect(vm.busy).toBe(false);
+    expect(services.api.request).not.toHaveBeenCalled();
+    vm.dispose();
+});
+
+it('deletes a failed trace job from the list without a server call', async () => {
+    const { deps, services } = fixture();
+    vi.mocked(services.api.stream).mockImplementation(
+        (_url, _body, signal) =>
+            new Promise((_resolve, reject) =>
+                signal.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')))
+            )
+    );
+    const vm = new TraceViewModel(deps);
+    vm.setPrompt('Question');
+    const pending = vm.runTrace();
+    expect(vm.canDeleteJob).toBe(false); // still running
+    vm.stop();
+    await pending;
+    const job = vm.activeJob!;
+    expect(vm.jobRows).toContain(job);
+    expect(vm.canDeleteJob).toBe(true);
+    vm.discardJob(job);
+    expect(vm.jobRows).not.toContain(job);
+    expect(vm.activeJob).toBe(null);
+    expect(vm.composerOpen).toBe(false);
+    expect(vm.status).toBe('');
     expect(services.api.request).not.toHaveBeenCalled();
     vm.dispose();
 });
@@ -671,4 +698,40 @@ it('says Copied! on the copied trace only, for two seconds', async () => {
     } finally {
         vi.useRealTimers();
     }
+});
+describe('sidebar filters', () => {
+    it('filters saved traces and running jobs by kind and text', () => {
+        const { deps, repo } = fixture();
+        const vm = new TraceViewModel(deps);
+        const plain = normalizeTrace({ ...raw, title: 'Checkout flow', prompt: 'How does checkout work?' }, repo.map);
+        const proposal = normalizeTrace({ ...raw, title: 'Coupons', prompt: 'Add coupons', intent: 'proposal' }, repo.map);
+        runInAction(() => { vm.items = [plain]; });
+        // one kind: filter hidden and ignored
+        vm.setKindFilter('proposal');
+        expect(vm.showFilters).toBe(false);
+        expect(vm.activeKind).toBe('all');
+        expect(vm.filteredRows.map((t) => t.title)).toEqual([plain].map((t) => t.title));
+        runInAction(() => { vm.items = [plain, proposal]; });
+        expect(vm.showFilters).toBe(true);
+        expect(vm.kindCounts).toEqual({ description: 1, proposal: 1, review: 0 });
+        expect(vm.filteredRows.map((t) => t.title)).toEqual([proposal].map((t) => t.title));
+        const job = new TraceJob('Explain carts', { architecture: true, flowchart: true }, {} as never, 'Test', 'architecture');
+        const review = new TraceJob('Review feature', { architecture: true, flowchart: true }, {} as never, 'Test', 'architecture');
+        review.review = { base: 'main', head: 'feature' };
+        runInAction(() => { vm.jobs = [job, review]; });
+        expect(vm.kindCounts.review).toBe(1);
+        expect(vm.filteredJobRows).toEqual([job]);
+        vm.setKindFilter('review');
+        expect(vm.filteredJobRows).toEqual([review]);
+        expect(vm.filteredRows.map((t) => t.title)).toEqual([]);
+        vm.setKindFilter('all');
+        vm.setQuery('  CHECKOUT ');
+        expect(vm.filteredRows.map((t) => t.title)).toEqual([plain].map((t) => t.title));
+        expect(vm.filteredJobRows).toEqual([]);
+        expect(vm.filtering).toBe(true);
+        vm.clearFilters();
+        expect(vm.filtering).toBe(false);
+        expect(vm.filteredRows.map((t) => t.title)).toEqual([plain, proposal].map((t) => t.title));
+        vm.dispose();
+    });
 });

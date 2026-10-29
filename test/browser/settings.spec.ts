@@ -46,20 +46,19 @@ async function mockSettings(page: Page) {
     });
     return state;
 }
-/** Expand Settings sections (all start collapsed) that aren't open yet. */
-async function expand(page: Page, ...ids: string[]) {
-    for (const id of ids.length ? ids : ['settings-map', 'settings-agents']) {
-        const section = page.locator('#' + id);
-        if (!(await section.evaluate((el) => (el as HTMLDetailsElement).open))) await section.locator('summary').click();
-        await expect(section).toHaveAttribute('open', '');
-    }
+/** Show one Settings tab. */
+async function show(page: Page, tab: 'map' | 'agents' | 'links') {
+    const button = page.locator(`#settings-${tab}-tab`);
+    await button.click();
+    await expect(button).toHaveAttribute('aria-selected', 'true');
 }
 async function openSettings(page: Page) {
     await page.goto('/');
     await page.locator('#tab-map').click();
     await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+    await show(page, 'agents');
     await expect(page.locator('#mpick-agent')).toContainText('Codex CLI');
-    await expand(page);
+    await show(page, 'map');
 }
 
 test('custom trace model and effort persist, and map settings use the generate API', async ({ page }) => {
@@ -68,18 +67,19 @@ test('custom trace model and effort persist, and map settings use the generate A
     await expect(page.locator('#settings-dialog #repo-name')).toHaveText('local repo');
     await expect(page.locator('#settings-dialog #stat')).toContainText('1 service');
     await expect(page.locator('#settings-dialog #repoinfo')).toHaveText('reading main @ bbbbbbbbb');
-    // the library divider follows the sidebar's buttons (New trace, then Review changes)
-    const button = await page.locator('#review-changes').boundingBox();
+    // the library divider follows the sidebar's New trace button
+    const button = await page.locator('#new-trace').boundingBox();
     const divider = await page.locator('.trace-library-divider').boundingBox();
     const library = await page.locator('#pane-traces').boundingBox();
     expect(divider!.y - button!.y - button!.height).toBeLessThanOrEqual(12);
     expect(library!.y - divider!.y - divider!.height).toBeLessThanOrEqual(12);
+    await show(page, 'agents');
     await page.locator('#tpick-agent').selectOption(JSON.stringify(['codex', '*']));
     await page.locator('#tpick-custom').fill('gpt-custom');
     await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null')?.model, namespace + 'pick')).toBe('gpt-custom');
     await page.locator('#tpick-effort').selectOption('high');
     await expect.poll(() => page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), namespace + 'pick')).toEqual({ agent: 'codex', model: 'gpt-custom', effort: 'high' });
-    await page.reload(); await page.locator('#tab-map').click(); await expand(page);
+    await page.reload(); await page.locator('#tab-map').click(); await show(page, 'agents');
     await expect(page.locator('#tpick-custom')).toHaveValue('gpt-custom');
     await expect(page.locator('#tpick-effort')).toHaveValue('high');
     await page.locator('#mpick-agent').selectOption(JSON.stringify(['codex', '*']));
@@ -89,7 +89,7 @@ test('custom trace model and effort persist, and map settings use the generate A
     await page.locator('#mpick-effort').selectOption('low');
     await expect.poll(() => state.saves.at(-1)).toEqual({ agent: 'codex', model: 'map-custom', effort: 'low' });
     await expect(page.locator('#mpick-status')).toContainText('Saved for you');
-    await page.reload(); await page.locator('#tab-map').click(); await expand(page);
+    await page.reload(); await page.locator('#tab-map').click(); await show(page, 'agents');
     await expect(page.locator('#mpick-custom')).toHaveValue('map-custom');
     await expect(page.locator('#mpick-effort')).toHaveValue('low');
     await page.locator('#mpick-agent').selectOption('');
@@ -104,11 +104,11 @@ test('notice dismissal preserves the legacy key and a new issue notifies again',
     const key = JSON.stringify({ state: 'stale', commit: 'aaaaaaaaaaaa', reason: '', changed: 1, files: ['src/checkout.ts'], docs: null });
     await expect.poll(() => page.evaluate(key => localStorage.getItem(key), namespace + 'dismissed-map-notice')).toBe(key);
     await expect(page.locator('#tab-map-dot')).toBeHidden();
-    await page.reload(); await page.locator('#tab-map').click(); await expand(page);
+    await page.reload(); await page.locator('#tab-map').click(); await show(page, 'map');
     await expect(page.locator('#tab-map-dot')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Dismiss notification' })).toBeHidden();
     state.status.changed = 2; state.status.files.push('src/payment.ts');
-    await page.reload(); await page.locator('#tab-map').click(); await expand(page);
+    await page.reload(); await page.locator('#tab-map').click(); await show(page, 'map');
     await expect(page.locator('#tab-map-dot')).toBeVisible();
     await expect(page.locator('#tab-map')).toHaveAttribute('aria-label', 'Settings: map needs attention');
     await expect(page.locator('#ms-text')).toContainText('2 files');
@@ -157,7 +157,7 @@ test('catalog off disables tracing even after a tool was available', async ({ pa
     await page.locator('#settings-close').click(); await page.locator('#new-trace').click();
     await expect(page.locator('#prompt')).toBeEnabled();
     await page.locator('#trace-dialog').getByRole('button', { name: 'Close', exact: true }).click();
-    await page.locator('#tab-map').click(); state.off = true;
+    await page.locator('#tab-map').click(); await show(page, 'agents'); state.off = true;
     await page.locator('#tpick-refresh').click();
     await expect(page.locator('#tpick')).toBeHidden();
     await page.locator('#settings-close').click();
@@ -184,26 +184,38 @@ test('server jobs block map actions for every active job kind', async ({ page })
     expect(state.jobs).toEqual([]); expect(state.unexpected).toEqual([]);
 });
 
-test('sections start collapsed, and the map notice opens Settings on Map', async ({ page }) => {
+test('settings open on Map, remember the last tab, and the map notice opens Map', async ({ page }) => {
     const state = await mockSettings(page);
     state.status = { ...initialStatus(), state: 'current', changed: 0, files: [] };
     await page.goto('/');
     await page.locator('#tab-map').click();
-    for (const id of ['settings-map', 'settings-agents', 'linked-repos']) await expect(page.locator('#' + id)).not.toHaveAttribute('open', '');
-    await expect(page.locator('#mpick-agent')).toBeHidden();
-    await page.locator('#settings-agents summary').press('Enter');
+    await expect(page.locator('#settings-map-tab')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#mpick-agent')).toHaveCount(0);
+    // fixed height across tabs; the tab row stays put while the panel scrolls
+    const dialog = page.locator('#settings-dialog');
+    const mapHeight = (await dialog.boundingBox())!.height;
+    const tabTop = (await page.locator('#settings-map-tab').boundingBox())!.y;
+    await page.locator('#settings-map').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    expect((await page.locator('#settings-map-tab').boundingBox())!.y).toBe(tabTop);
+    await page.locator('#settings-map-tab').press('ArrowRight');
+    expect((await dialog.boundingBox())!.height).toBe(mapHeight);
+    await page.locator('#settings-agents-tab').press('ArrowLeft');
+    await page.locator('#settings-map-tab').press('ArrowRight');
+    await expect(page.locator('#settings-agents-tab')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#mpick-agent')).toBeVisible();
+    await page.locator('#settings-close').click();
+    await page.locator('#tab-map').click();
+    await expect(page.locator('#settings-agents-tab')).toHaveAttribute('aria-selected', 'true');
     await page.locator('#settings-close').click();
     state.status = initialStatus();
     await page.reload(); await page.locator('#tab-map').click();
-    await expect(page.locator('#settings-map')).toHaveAttribute('open', '');
-    await expect(page.locator('#settings-agents')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#settings-map-tab')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#ms-update')).toBeVisible();
     expect(state.unexpected).toEqual([]);
 });
 
 test('Use in every repo saves the trace pick as the global default', async ({ page }) => {
-    const state = await mockSettings(page); await openSettings(page);
+    const state = await mockSettings(page); await openSettings(page); await show(page, 'agents');
     await page.locator('#tpick-default').click();
     await expect.poll(() => state.traceDefaults.at(-1)).toEqual(pick);
     await expect(page.locator('#tpick-default-status')).toContainText('Default for every repo');

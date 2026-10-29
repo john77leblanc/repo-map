@@ -12,7 +12,7 @@ import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 
 /** A collapsible section of the trace sidebar. */
-export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps';
+export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps' | 'outputs';
 export interface TraceDependencies {
     repo: RepositoryModel;
     services: Services;
@@ -56,8 +56,16 @@ function reviewPrompt(request: ReviewRequest) {
     if (request.local) return 'Review local changes' + (request.base ? ' against ' + request.base : '');
     return 'Review ' + (request.head || 'this branch') + (request.base ? ' against ' + request.base : '');
 }
+/** Sidebar type filter: every trace, or one intent. */
+export type TraceKindFilter = 'all' | Trace['intent'];
+const KINDS: Trace['intent'][] = ['description', 'proposal', 'review'];
+const matches = (query: string, ...texts: (string | undefined)[]) =>
+    !query || texts.some((t) => (t || '').toLowerCase().includes(query));
 export class TraceViewModel {
     selected: Trace | null = null;
+    /** Sidebar list filters (not saved). */
+    kindFilter: TraceKindFilter = 'all';
+    query = '';
     editing: Trace | null = null;
     private editDefaults: { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
     private editWorkspace: Workspace = 'architecture';
@@ -81,7 +89,7 @@ export class TraceViewModel {
     importMessage = '';
     code = '';
     /** Which trace sidebar sections are open (kept while switching traces). */
-    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, review: true, files: false, steps: true };
+    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, review: true, files: false, steps: true, outputs: false };
     /** Review status checks, by review (see reviewKey). */
     reviewStates: Record<string, ReviewState> = {};
     /** Which card groups of a review's changed files are open, by card id ('' = other files). */
@@ -189,6 +197,46 @@ export class TraceViewModel {
             ? [this.temp, ...this.items.filter((t) => t.key !== this.temp?._doc)]
             : this.items;
     }
+    /** Saved traces (and running reviews) of each intent. */
+    get kindCounts(): Record<Trace['intent'], number> {
+        const counts = { description: 0, proposal: 0, review: 0 };
+        for (const t of this.rows) counts[t.intent]++;
+        for (const job of this.jobRows) if (job.review) counts.review++;
+        return counts;
+    }
+    /** The type filter only shows when the list holds more than one kind. */
+    get showFilters() {
+        return KINDS.filter((k) => this.kindCounts[k] > 0).length > 1;
+    }
+    /** The filter in effect: 'all' while the filter is hidden. */
+    get activeKind(): TraceKindFilter {
+        return this.showFilters ? this.kindFilter : 'all';
+    }
+    get filteredRows() {
+        const kind = this.activeKind;
+        const query = this.query.trim().toLowerCase();
+        return this.rows.filter((t) => (kind === 'all' || t.intent === kind) && matches(query, t.title, t.prompt));
+    }
+    /** Running jobs: reviews are known; other jobs' kind is known only once done, so they stay under Traces and Proposals. */
+    get filteredJobRows() {
+        const kind = this.activeKind;
+        const query = this.query.trim().toLowerCase();
+        return this.jobRows.filter((job) => (kind === 'all' || (job.review ? kind === 'review' : kind !== 'review')) &&
+            matches(query, job.title, job.prompt));
+    }
+    get filtering() {
+        return this.activeKind !== 'all' || !!this.query.trim();
+    }
+    setKindFilter(kind: TraceKindFilter) {
+        this.kindFilter = kind;
+    }
+    setQuery(value: string) {
+        this.query = value;
+    }
+    clearFilters() {
+        this.kindFilter = 'all';
+        this.query = '';
+    }
     setPrompt(value: string) {
         this.prompt = value;
     }
@@ -251,10 +299,34 @@ export class TraceViewModel {
     toggleComposer() {
         if (this.editing) return;
         if (this.composerOpen) { this.closeComposer(); return; }
+        this.openComposer();
+    }
+    /** Open the composer on a new trace (a no-op while it is open). */
+    openComposer() {
+        if (this.editing || this.composerOpen) return;
         if (this.selected) this.clear();
         this.message = '';
         this.statusError = false;
         this.composerOpen = true;
+    }
+    /** A trace that failed or was stopped can be deleted; it was never saved. */
+    get canDeleteJob() {
+        return !!this.activeJob && !this.activeJob.busy && !this.activeJob.result;
+    }
+    /**
+     * Remove a failed or stopped job (trace or review) from the list. Nothing was saved,
+     * so there is no server call; a saved review it was re-running stays as it was.
+     */
+    discardJob(job: TraceJob) {
+        if (this.disposed || job.busy || job.result) return;
+        this.jobs = this.jobs.filter((j) => j !== job);
+        if (this.activeJob !== job) return;
+        if (this.jobDefaults) Object.assign(this, this.jobDefaults);
+        this.jobDefaults = null;
+        this.activeJob = null;
+        this.message = '';
+        this.statusError = false;
+        this.composerOpen = false;
     }
     private releaseJob() {
         if (!this.activeJob) return;
@@ -536,7 +608,7 @@ export class TraceViewModel {
      * job in the trace list and is saved as a trace with intent 'review'. `replace`
      * is a saved review being re-run: the result takes its place.
      */
-    startReview(request: ReviewRequest, replace: Trace | null = null): TraceJob | null {
+    startReview(request: ReviewRequest, outputs: Trace['outputs'] = this.reviewOutputs, replace: Trace | null = null): TraceJob | null {
         if (this.disposed || !this.repo.aiAvailable) return null;
         if (this.jobs.some((job) => job.review && job.busy)) {
             // said in the review window; the trace composer stays closed
@@ -544,18 +616,25 @@ export class TraceViewModel {
             this.statusError = true;
             return null;
         }
-        const outputs = { architecture: true, flowchart: true };
-        const job = new TraceJob(reviewPrompt(request), outputs, { ...this.deps.getPick() }, this.deps.getPickLabel(), 'architecture');
+        // a review always shows the change on the map: its changed files are grouped by card
+        const wanted = { architecture: true, flowchart: !!outputs.flowchart, ...(outputs.sitemap ? { sitemap: true } : {}) };
+        const job = new TraceJob(reviewPrompt(request), wanted, { ...this.deps.getPick() }, this.deps.getPickLabel(), 'architecture');
         job.review = { ...request };
         job.replaces = replace?._doc || '';
         this.jobs.unshift(job);
-        void this.runJob(job, '/api/review', { ...request, ...job.pick }, replace);
+        void this.runJob(job, '/api/review', { ...request, flow: wanted.flowchart, sitemap: !!wanted.sitemap, ...job.pick }, replace);
         return job;
     }
-    /** Re-run a saved review on the code as it is now; the result replaces it. */
+    /** The outputs picked in the composer, as a review asks for them (always with the map). */
+    get reviewOutputs(): Trace['outputs'] {
+        return { architecture: true, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) };
+    }
+    /** Re-run a saved review on the code as it is now, with the outputs it has; the result replaces it. */
     rerunReview(trace: Trace) {
         if (!trace.review) return null;
-        return this.startReview(reviewRequest(trace.review), trace);
+        const outputs = { architecture: true, flowchart: trace.outputs.flowchart || trace.pendingFlow,
+            ...(trace.outputs.sitemap || trace.pendingSitemap ? { sitemap: true } : {}) };
+        return this.startReview(reviewRequest(trace.review), outputs, trace);
     }
     /** Ask whether the selected review still matches its branch or pull request. */
     async checkReview(trace: Trace) {
@@ -621,6 +700,7 @@ export class TraceViewModel {
         this.controllers.add(job.controller);
         const current = () => !this.disposed && !signal.aborted;
         let last = 'Starting ' + job.agentLabel + '...';
+        job.progress.start(last);
         const tick = () => {
             if (current() && job.state === 'running') runInAction(() => {
                 job.status = last + ' - ' + Math.round((Date.now() - job.createdAt) / 1000) + 's';
@@ -635,7 +715,7 @@ export class TraceViewModel {
                 if (!this.deps.sitemap?.sitemap) throw new Error('Generate the repository sitemap before tracing screens. Your question has been kept.');
             }
             const result = await this.deps.services.api.stream<StreamResult>(url, body,
-                signal, (text) => { last = text; tick(); },
+                signal, (text) => { last = text; if (current()) job.progress.push(text); tick(); },
                 (title) => { if (current() && job.state === 'running') runInAction(() => { job.title = title.trim().slice(0, 80); }); });
             if (!current()) return;
             job.clearTicker();
@@ -643,8 +723,6 @@ export class TraceViewModel {
             const trace = observable(this.normalize({ ...(result.trace as object), outputs, used: result.used }, job.review ? undefined : job.prompt));
             trace.createdAt = replace?.createdAt || job.createdAt;
             if (replace?._doc) trace._doc = replace._doc;
-            // a review draws its sitemap changes only when the repo has a sitemap
-            if (job.review && trace.sitemap) outputs.sitemap = true;
             trace.outputs = {
                 architecture: outputs.architecture && trace.steps.length > 0,
                 flowchart: outputs.flowchart && !!trace.flow,
@@ -667,7 +745,9 @@ export class TraceViewModel {
                     job.status = 'Changes could not be saved. Open the trace to retry saving before reloading.';
                     job.error = true;
                 } else if (trace.pendingFlow || trace.pendingSitemap) {
-                    job.status = trace.pendingSitemap
+                    job.status = job.review
+                        ? 'The review was kept, but ' + (trace.pendingSitemap ? 'Sitemap' : 'the flowchart') + ' was missing. Re-run the review to try again.'
+                        : trace.pendingSitemap
                         ? 'Other outputs were kept, but Sitemap was missing. Use Edit to select Sitemap and regenerate.'
                         : 'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.';
                     job.error = true;

@@ -15,6 +15,8 @@ export interface TabsProps<T extends string> {
     active: T;
     onChange: (tab: T) => void;
     className?: string;
+    /** Class for the panel, e.g. `modal-body` to make it the scrolling part under fixed tabs. */
+    panelClassName?: string;
     children: (active: T) => ReactNode;
 }
 
@@ -40,7 +42,7 @@ function onArrow(e: KeyboardEvent<HTMLButtonElement>) {
  * Underlined tabs with roving focus and arrow keys, and one panel for the active
  * tab: From/To connections (with counts; empty tabs are disabled) and the review modes.
  */
-export function Tabs<T extends string>({ idPrefix, label, tabs, active: requested, onChange, className = '', children }: TabsProps<T>) {
+export function Tabs<T extends string>({ idPrefix, label, tabs, active: requested, onChange, className = '', panelClassName, children }: TabsProps<T>) {
     const active = shownTab(tabs, requested);
     const panel = `${idPrefix}-${active}`;
     return (
@@ -54,7 +56,7 @@ export function Tabs<T extends string>({ idPrefix, label, tabs, active: requeste
                     </button>
                 ))}
             </div>
-            <div role="tabpanel" id={panel} aria-labelledby={`${idPrefix}-${active}-tab`}>
+            <div role="tabpanel" className={panelClassName} id={panel} aria-labelledby={`${idPrefix}-${active}-tab`}>
                 {children(active)}
             </div>
         </>

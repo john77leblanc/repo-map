@@ -170,6 +170,26 @@ test('runReview turns the AI reply into a review trace and repairs a bad format 
     assert.equal(trace.prompt, 'Review feature against main');
 });
 
+test('runReview leaves the flowchart out when it was not asked for', async () => {
+    const map = { groups: [{ id: 'g-api', col: 0, title: 'API' }], nodes: [{ id: 'orders-client', group: 'g-api', kind: 'service' }], edges: [] };
+    const source = { kind: 'refs', base: 'main', head: 'feature', baseSha: 'a'.repeat(40), headSha: 'b'.repeat(40), mergeBase: 'a'.repeat(40), title: 'feature → main', commits: [] };
+    const diff = { files: [{ path: 'src/api/orders.js', status: 'M', additions: 1, deletions: 0 }], stat: '', patch: '+x', skipped: [] };
+    const reply = { title: 'Orders', summary: 'Tweaks orders.', risks: [], questions: [], gaps: '',
+        steps: [{ id: 'orders-client', note: 'changed', refs: [] }], edges: [],
+        changes: { nodes: [{ id: 'orders-client', status: 'modified' }], edges: [] },
+        files: [{ path: 'src/api/orders.js', cards: ['orders-client'], note: '' }] };
+    const requests = [];
+    const runner = runReview({ readRoot: '.', config: withDefaults({}), map, source, diff, flow: false, selection: { agent: { id: 'command' }, label: 'Test' },
+        run: (_, request) => { requests.push(request); return { kill() {}, promise: Promise.resolve({ text: JSON.stringify(reply) }) }; } });
+    const { trace } = await runner.promise;
+    assert.equal(requests.length, 1, 'a reply without a flow matches the contract');
+    assert.doesNotMatch(requests[0].prompt, /"flow":\{"nodes"/);
+    assert.match(requests[0].prompt, /No flowchart was asked for/);
+    assert.ok(!requests[0].responseSchema.required.includes('flow'));
+    assert.equal(trace.flow, null);
+    assert.deepEqual(trace.steps.map((s) => s.id), ['orders-client']);
+});
+
 test('review API: streams a review read at the head, pins refs, reads files and diffs at commits, and reports staleness', async (t) => {
     const dir = shopRepo(t);
     const prompts = [];

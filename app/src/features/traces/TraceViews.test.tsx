@@ -5,18 +5,30 @@ import { TraceViewModel } from './TraceViewModel';
 import { SelectedTraceSidebar, TraceBackButton, TraceHome, TraceLibrary } from './TraceViews';
 import { fixture, raw, flow } from './testFixtures';
 import { normalizeTrace } from '../../models/trace';
+import { ReviewViewModel } from '../review/ReviewViewModel';
+import { ComposerViewModel } from '../compose/ComposerViewModel';
+import { ComposerModal } from '../compose/ComposerModal';
 beforeEach(() => {
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     HTMLDialogElement.prototype.close = function () { this.open = false; };
 });
 it('renders composer outputs and imports errors with legacy classes', async () => {
-    const { deps } = fixture();
+    const { deps, repo } = fixture();
     const vm = new TraceViewModel(deps);
-    render(<TraceHome vm={vm} onRefreshAgents={vi.fn()} />);
+    const composer = new ComposerViewModel({ traces: vm, review: new ReviewViewModel({ repo, traces: vm, getPickLabel: () => 'Test' }) });
+    render(<><TraceHome vm={vm} onNewTrace={composer.openNew} /><ComposerModal vm={composer} onRefreshAgents={vi.fn()} /></>);
     fireEvent.click(screen.getByRole('button', { name: 'New trace' }));
     expect(screen.getByLabelText('Question about the codebase')).toHaveFocus();
+    // Outputs is a collapsible section, closed at first, counting what is selected
+    const outputs = document.querySelector<HTMLDetailsElement>('details.settings-section#trace-outputs')!;
+    expect(outputs.open).toBe(false);
+    expect(outputs.querySelector('.settings-section-count')?.textContent).toBe('2');
+    outputs.open = true;
+    fireEvent(outputs, new Event('toggle'));
+    expect(vm.sections.outputs).toBe(true);
     fireEvent.click(screen.getByLabelText('Code architecture'));
     expect(vm.architecture).toBe(false);
+    expect(outputs.querySelector('.settings-section-count')?.textContent).toBe('1');
     expect(screen.getByRole('dialog', { name: 'New trace' })).toBeVisible();
     expect(screen.getByRole('dialog', { name: 'New trace' })).toContainElement(document.getElementById('importbox'));
     fireEvent.click(screen.getByText('Import a trace code'));
@@ -25,6 +37,7 @@ it('renders composer outputs and imports errors with legacy classes', async () =
     expect(await screen.findByText("That isn't a valid trace code.")).toHaveClass('err');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(vm.composerOpen).toBe(false);
+    composer.dispose();
     vm.dispose();
 });
 it('keeps node details out of the trace sidebar and shows the inferred warning in Flowchart view', () => {
@@ -123,5 +136,27 @@ it('supports copy fallback and confirmed deletion, with no output tabs in the si
             expect.objectContaining({ method: 'DELETE' })
         )
     );
+    vm.dispose();
+});
+it('filters the saved trace list by type and search, with a way to clear', () => {
+    const { deps, repo } = fixture();
+    const vm = new TraceViewModel(deps);
+    const plain = normalizeTrace({ ...raw, title: 'Checkout flow', prompt: 'How does checkout work?' }, repo.map);
+    runInAction(() => { vm.items = [plain]; });
+    const { container } = render(<TraceLibrary vm={vm} />);
+    expect(container.querySelector('.trace-filters')).toBeNull();
+    const proposal = normalizeTrace({ ...raw, title: 'Coupons', prompt: 'Add coupons', intent: 'proposal' }, repo.map);
+    act(() => { runInAction(() => { vm.items = [plain, proposal]; }); });
+    const select = screen.getByLabelText('Trace type') as HTMLSelectElement;
+    expect([...select.options].map((o) => [o.textContent, o.disabled])).toEqual([
+        ['All (2)', false], ['Traces (1)', false], ['Proposals (1)', false], ['Reviews (0)', true]]);
+    fireEvent.change(select, { target: { value: 'proposal' } });
+    expect(container.querySelectorAll('#trace-list li')).toHaveLength(1);
+    expect(screen.getByText('Coupons')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Search traces'), { target: { value: 'checkout' } });
+    expect(container.querySelectorAll('#trace-list li')).toHaveLength(0);
+    expect(screen.getByText('No traces match.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(container.querySelectorAll('#trace-list li')).toHaveLength(2);
     vm.dispose();
 });

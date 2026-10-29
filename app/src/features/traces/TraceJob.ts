@@ -1,4 +1,5 @@
 import { makeAutoObservable, observableRef } from 'mobx';
+import { ProgressLog } from '../../models/ProgressLog';
 import type { AgentPick, ReviewRequest, Trace, Workspace } from '../../models/types';
 
 let nextJob = 0;
@@ -8,6 +9,8 @@ class TraceJob {
     readonly id = `trace-job-${Date.now()}-${++nextJob}`;
     readonly createdAt = Date.now();
     readonly controller = new AbortController();
+    /** Every progress message, for the progress screen's history. */
+    readonly progress = new ProgressLog();
     title = '';
     status = '';
     error = false;
@@ -29,6 +32,7 @@ class TraceJob {
     ) {
         makeAutoObservable(this, {
             controller: false,
+            progress: false,
             ticker: false,
             result: observableRef,
         }, { autoBind: true });

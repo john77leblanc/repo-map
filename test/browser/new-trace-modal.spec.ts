@@ -19,6 +19,10 @@ test('New trace opens a modal with stacked outputs, accessible tooltips and a re
     await expect(modal).toBeVisible();
     await expect(page.locator('#prompt')).toBeFocused();
     await page.locator('#prompt').fill('How does checkout handle failures?');
+    // Outputs starts collapsed, with the count of selected outputs
+    await expect(modal.getByRole('checkbox', { name: 'Flowchart' })).toBeHidden();
+    await expect(page.locator('#trace-outputs .settings-section-count')).toHaveText('2');
+    await page.locator('#trace-outputs > summary').click();
     const boxes = await modal.getByRole('checkbox').all();
     expect(boxes).toHaveLength(3);
     const bounds = await Promise.all(boxes.map(box => box.boundingBox()));
