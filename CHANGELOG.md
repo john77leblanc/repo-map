@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.21.0
 
 - **Components** in the Sitemap view: **More > Generate components** maps the app's own UI components and what renders what (an AI pass after the sitemap, saved to `.repo-map/components.json`, sharing the sitemap job slot). A **Screens | Components** switch shows them as a diagram (screens on top, then their components; shared ones read `· N screens`), scoped by a **Screen** picker or **All screens**. A component's panel has **About**, **Screens**, **Connections** (**Rendered by** / **Renders**) and **References**; a screen's panel lists its component tree, with hover lighting up every screen that shows a component and **Show** opening it on the diagram. New routes: `GET /api/components`, `POST /api/components/generate`. Traces and reviews do not use components yet.
 
