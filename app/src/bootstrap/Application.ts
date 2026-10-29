@@ -36,7 +36,7 @@ export class Application {
         this.sitemap = new SitemapViewModel({ repo, services,
             getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace) });
         this.shell = new ShellViewModel({ repo, services, onWorkspaceChange: (workspace) => {
-            if (workspace === 'sitemap') void this.sitemap.load();
+            if (workspace === 'sitemap') { void this.sitemap.load(); void this.sitemap.loadComponents(); }
         }, onOpenSettings: (section) => this.settings.reveal(section) });
         this.workspace = new WorkspaceModel(services);
         this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace });

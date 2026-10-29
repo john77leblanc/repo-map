@@ -22,7 +22,7 @@ export interface MapStatus {
     commitsSince?: number;
     tooBig?: boolean;
     job?: JobKind | null;
-    sitemapJob?: 'sitemap' | null;
+    sitemapJob?: 'sitemap' | 'components' | null;
     updating?: boolean;
     docs?: {
         linked?: boolean;

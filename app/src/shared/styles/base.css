@@ -487,6 +487,15 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 .diagram-toolbar.flow-tools,#architecture-workspace>header.top{border-bottom:1px solid var(--line)}
 .diagram-toolbar .flow-zoom,.diagram-toolbar .flow-actions{min-width:0;max-width:100%}
 .diagram-toolbar label{max-width:100%}.diagram-toolbar select{max-width:100%}
+/* One row: progress text sits inline before the actions, truncated; its history opens as a popover. */
+.diagram-toolbar .flow-zoom .btn{font-size:12px;padding:4px 8px}
+.diagram-toolbar .flow-actions{flex:1 1 auto;justify-content:flex-end;flex-wrap:nowrap}
+.diagram-toolbar .flow-actions>*{flex:none}
+.diagram-toolbar .flow-actions .status{flex:0 1 auto;min-width:0;max-width:40ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.diagram-toolbar .flow-actions .status.err{white-space:normal;max-width:60ch}
+.diagram-toolbar .flow-actions details.progress-line{overflow:visible;position:relative}
+.diagram-toolbar .progress-history{position:absolute;right:0;top:100%;z-index:20;width:min(420px,80vw)}
+@media(max-width:760px){.diagram-toolbar .flow-actions{flex-wrap:wrap;justify-content:flex-start}.diagram-toolbar .flow-actions .status{flex-basis:100%;max-width:none}}
 .diagram-more{position:relative}
 .diagram-more-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:10;width:180px;max-width:calc(100vw - 32px);padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px #0002}
 .diagram-more-panel .btn{display:block;width:100%;text-align:left;border-color:transparent;margin:2px 0}
@@ -559,6 +568,8 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* Sitemap screen panel: proposed navigation and navigation code, under their own sub-headings */
 .sitemap-nav-changes{margin-top:12px}.sitemap-nav-changes p{margin:0 0 6px}.sitemap-nav-changes .proposal-badge{font-size:10px;font-weight:600}
 .sitemap-nav-refs{margin-top:12px}.sitemap-nav-refs .hint{margin:6px 0 4px}
+.component-tree,.component-tree ul{list-style:none;margin:0;padding:0}.component-tree ul{padding-left:14px;border-left:1px solid var(--line);margin-left:4px}.component-tree li{margin:4px 0}.component-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;font-size:13px}.component-tag{font-size:10px;padding:0 5px;border-radius:8px;background:var(--soft);color:var(--muted)}.component-tree .refs{margin:2px 0 0}
+.component-row .component-show{margin-left:auto;padding:0 6px;font-size:11px}.component-screens{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .disclosure-body .flow-conn{margin-top:0}
 
 .trace-title-skeleton{display:inline-block;width:70%;min-width:130px;max-width:260px;height:1em;border-radius:4px;color:transparent;background:linear-gradient(100deg,var(--soft) 20%,var(--line) 45%,var(--soft) 70%);background-size:220% 100%;animation:trace-shimmer 1.4s ease-in-out infinite;vertical-align:middle}

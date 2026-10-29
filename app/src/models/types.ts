@@ -243,6 +243,40 @@ export interface SitemapResult {
     sitemap: Sitemap | null;
     status: { state: string; dirty?: boolean; dirtyAtGeneration?: boolean };
 }
+export type ComponentTag = 'state' | 'fetches' | 'context' | 'routing' | 'form';
+export interface UiComponent {
+    id: string;
+    label: string;
+    detail: string;
+    tags: ComponentTag[];
+    card?: string;
+    refs: CodeRef[];
+}
+/** `.repo-map/components.json`: the components that build each sitemap screen. */
+export interface ComponentMap {
+    version: number;
+    applicability: 'applicable' | 'none' | 'incomplete';
+    summary: string;
+    components: UiComponent[];
+    uses: { from: string; to: string }[];
+    screens: { screen: string; root: string }[];
+    gaps: string[];
+    commit?: string;
+    generatedAt?: string;
+    dirtyAtGeneration?: boolean;
+}
+export interface ComponentsResult {
+    components: ComponentMap | null;
+    status: { state: string; dirty?: boolean; dirtyAtGeneration?: boolean };
+}
+/** One row of a screen's component tree (`componentTree` in lib/components-data.mjs). */
+export interface ComponentNode {
+    id: string;
+    component: UiComponent;
+    children: ComponentNode[];
+    repeat?: boolean;
+    more: number;
+}
 export interface SitemapTrace {
     version: number;
     base: Sitemap;

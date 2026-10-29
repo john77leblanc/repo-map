@@ -27,6 +27,9 @@ const fixtures = {
     update: { summary: 'No changes' }, docs: { links: [{ node: 'checkout', path: 'README.md', start: 1, end: 4, title: 'Checkout', why: 'Overview', kind: 'doc' }] },
     sitemap: { version: 1, applicability: 'none', summary: 'Backend only', applications: [], screens: [], navigation: [], gaps: [] },
     sitemapTrace: { sitemap: sitemapTrace },
+    components: { version: 1, applicability: 'applicable', summary: 'Pages.', gaps: [],
+        components: [{ id: 'page', label: 'Page', detail: '', tags: ['state'], card: '', refs: [{ path: 'src/a.jsx', start: 1, end: 9 }] }],
+        uses: [], screens: [{ screen: 'home', root: 'page' }] },
     seams: { seams: [{ from: 'checkout', to: 'api:orders', type: 'http', label: 'POST /orders', why: 'Posts the order', refs: [{ path: 'src/order.mjs', start: 1, end: 5 }] }] },
 };
 

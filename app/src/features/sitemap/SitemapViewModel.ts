@@ -1,9 +1,10 @@
 import { makeAutoObservable, observableRef, runInAction } from 'mobx';
 import { ProgressLog } from '../../models/ProgressLog';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { Sitemap, SitemapNavigation, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
+import type { ComponentMap, ComponentNode, ComponentsResult, Sitemap, SitemapNavigation, SitemapResult, SitemapTrace, Trace, AgentPick, StreamResult, ChangeStatus } from '../../models/types';
 import { plain } from '../../models/trace';
 import { normalizeSitemapTrace, composeSitemapTrace } from '../../../../lib/sitemap-trace.mjs';
+import { componentTree, componentUsage, rootsFor } from '../../../../lib/components-data.mjs';
 import type { Services } from '../../shared/services/contracts';
 import { anchorBranchCaptions, fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
@@ -12,11 +13,14 @@ import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { SITEMAP_CSS } from './styles';
 import { CopyFeedback } from '../../models/CopyFeedback';
+import { ComponentGraphViewModel } from './ComponentGraphViewModel';
 
 type SitemapScope = 'trace' | 'nearby' | 'app';
+/** Which diagram the repository sitemap shows. */
+type SitemapMode = 'screens' | 'components';
 type ConnectionTab = 'from' | 'to';
 /** Collapsible sections of the screen panel. */
-type ScreenSection = 'about' | 'nav' | 'refs';
+type ScreenSection = 'about' | 'components' | 'nav' | 'refs';
 type NavEdge = SitemapNavigation & { status?: ChangeStatus; rationale?: string; index?: number };
 /** One navigation link seen from a screen: `other` is the screen at the far end. */
 interface Connection { edge: NavEdge; nav: number; other: string; journey: boolean; original: SitemapNavigation | null }
@@ -29,7 +33,12 @@ class SitemapViewModel {
     /** The screen panel: closed until a screen is picked. */
     detailsOpen = false;
     /** Open screen sections; kept while moving between screens. */
-    sections: Record<ScreenSection, boolean> = { about: false, nav: false, refs: false };
+    sections: Record<ScreenSection, boolean> = { about: false, components: false, nav: false, refs: false };
+    /** The repository component map (components.json), built from the sitemap. */
+    components: ComponentMap | null = null;
+    componentsFreshness: ComponentsResult['status'] = { state: 'missing' };
+    mode: SitemapMode = 'screens';
+    readonly componentGraph = new ComponentGraphViewModel({ sitemap: () => this.sitemap, components: () => this.components });
     actionsOpen = false;
     keyOpen = false;
     readonly copy = new CopyFeedback();
@@ -57,13 +66,59 @@ class SitemapViewModel {
 
     constructor(readonly deps: { repo: RepositoryModel; services: Services; getPick?: () => AgentPick; saveTrace?: (trace: Trace) => Promise<void> }) {
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
-            deps: false, focus: false, copy: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
+            deps: false, focus: false, copy: false, componentGraph: false, sitemap: observableRef, components: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
             copyRevision: false,
         }, { autoBind: true });
     }
     /** The Export button reads "Copied!" for a moment after Copy Mermaid. */
     get copied() { return this.copy.copied; }
     get repo() { return this.deps.repo; }
+    /** The Components diagram is for the repository sitemap (not traces), once components are mapped. */
+    get componentsAvailable() { return !this.trace && !!this.components?.components.length; }
+    get showingComponents() { return this.mode === 'components' && this.componentsAvailable; }
+    setMode(mode: SitemapMode) {
+        if (mode === this.mode) return;
+        this.resetCopy();
+        this.mode = mode;
+        this.highlightIds = null;
+        this.focus.reset();
+        this.componentGraph.focus.reset();
+    }
+    /** From a screen's component tree: the Components diagram for that screen, with the component open. */
+    showComponent(screenId: string, componentId: string) {
+        this.setMode('components');
+        this.componentGraph.show(screenId, componentId);
+    }
+    /** From the component panel: back to the screens diagram with that screen open. */
+    openScreen(id: string) {
+        this.setMode('screens');
+        this.select(id);
+    }
+    /** What zoom, fit and export act on. */
+    get activeLayout() { return this.showingComponents ? this.componentGraph.layout : this.layout; }
+    zoomActive(factor: number) { if (this.showingComponents) this.componentGraph.zoom(factor); else this.zoom(factor); }
+    fitActive(width: number, height: number) { if (this.showingComponents) this.componentGraph.fit(width, height); else this.fit(width, height); }
+    /** Component id → screen ids that show it. */
+    get componentUsage(): Map<string, string[]> { return this.components ? componentUsage(this.components) : new Map(); }
+    /** The component trees at the top of a screen. */
+    componentTrees(screenId: string): ComponentNode[] {
+        const map = this.components;
+        if (!map) return [];
+        return rootsFor(map, screenId).map((root: string) => componentTree(map, root) as ComponentNode | null).filter((n: ComponentNode | null): n is ComponentNode => !!n);
+    }
+    /** Light up every screen that shows a component. */
+    hoverComponent(id: string | null) {
+        const screens = id ? this.componentUsage.get(id) || [] : [];
+        this.highlightIds = screens.length ? { nodes: screens, navs: [], primary: screens } : null;
+    }
+    get componentsLabel() {
+        const map = this.components;
+        if (!map) return '';
+        if (map.applicability === 'none') return 'No UI components found.';
+        const stale = this.componentsFreshness.state === 'stale' ? ' Code changed since then.' : '';
+        const partial = map.applicability === 'incomplete' ? ' (incomplete)' : '';
+        return `${map.components.length} components mapped${partial}.${stale}`;
+    }
     get output() { return this.trace?.sitemap; }
     get displayed(): Sitemap | null { return this.output ? composeSitemapTrace(this.output) as Sitemap : this.trace ? null : this.sitemap; }
     get applications() { return this.displayed?.applications || []; }
@@ -87,6 +142,8 @@ class SitemapViewModel {
     setTrace(trace: Trace | null) {
         if (this.trace === trace) return;
         this.stop();
+        this.mode = 'screens';
+        this.componentGraph.reset();
         this.resetCopy();
         this.actionsOpen = false;
         this.message = '';
@@ -220,11 +277,13 @@ class SitemapViewModel {
         this.copy.reset();
     }
     async copyMermaid() {
-        if (!this.layout || this.disposed) return;
+        if (!this.activeLayout || this.disposed) return;
         this.resetCopy();
         const revision = this.copyRevision;
         try {
-            await this.deps.services.browser.copy(flowToMermaid(this.graph, this.exportTitle));
+            await this.deps.services.browser.copy(this.showingComponents
+                ? flowToMermaid(this.componentGraph.graph, this.exportTitle.replace(/Sitemap$/, 'Components'))
+                : flowToMermaid(this.graph, this.exportTitle));
             if (this.disposed || revision !== this.copyRevision) return;
             this.copy.flash();
         } catch {
@@ -235,10 +294,13 @@ class SitemapViewModel {
         }
     }
     downloadSvg(resolve: (variable: string) => string) {
-        if (!this.layout || this.disposed) return;
-        const svg = standaloneSvg(renderFlowSvg(this.layout, { title: this.exportTitle }), FC_CSS + SITEMAP_CSS, resolve);
+        const layout = this.activeLayout;
+        if (!layout || this.disposed) return;
+        const kind = this.showingComponents ? 'components' : 'sitemap';
+        const title = this.showingComponents ? this.exportTitle.replace(/Sitemap$/, 'Components') : this.exportTitle;
+        const svg = standaloneSvg(renderFlowSvg(layout, { title }), FC_CSS + SITEMAP_CSS, resolve);
         const name = diagramFilename(this.exportName, '');
-        this.deps.services.browser.download((name ? name + '-sitemap' : 'sitemap') + '.svg', svg, 'image/svg+xml');
+        this.deps.services.browser.download((name ? name + '-' + kind : kind) + '.svg', svg, 'image/svg+xml');
     }
     get freshnessLabel() {
         const labels: Record<string, string> = {
@@ -334,6 +396,48 @@ class SitemapViewModel {
             if (this.controller === controller) runInAction(() => { this.busy = false; this.controller = null; });
         }
     }
+    async loadComponents() {
+        if (this.disposed) return;
+        try {
+            const result = await this.deps.services.api.get<ComponentsResult>('/api/components');
+            if (!this.disposed) runInAction(() => {
+                this.components = result?.components ?? null;
+                this.componentsFreshness = result?.status ?? { state: 'missing' };
+            });
+        } catch {
+            // Optional: the sitemap works without a component map.
+        }
+    }
+    async generateComponents() {
+        if (this.busy || this.loading || this.disposed || !this.sitemap?.screens.length) return;
+        const controller = new AbortController();
+        this.controller = controller;
+        this.busy = true;
+        this.error = false;
+        this.message = 'Starting component analysis…';
+        this.log.start(this.message);
+        try {
+            const result = await this.deps.services.api.stream<ComponentsResult>('/api/components/generate', {}, controller.signal, (message) => {
+                if (!controller.signal.aborted && !this.disposed) runInAction(() => { this.message = message; this.log.push(message); });
+            });
+            if (!result?.components) throw new Error('The AI tool ended without a component map.');
+            if (!controller.signal.aborted && !this.disposed) runInAction(() => {
+                this.components = result.components;
+                this.componentsFreshness = result.status;
+                this.message = 'Component map saved.';
+                this.log.push(this.message);
+            });
+        } catch (error) {
+            if (!controller.signal.aborted && !this.disposed) runInAction(() => {
+                this.error = true;
+                this.message = error instanceof Error ? error.message : 'Component generation failed.';
+                this.log.push(this.message);
+            });
+            else if (controller.signal.aborted) this.log.push('Stopped.');
+        } finally {
+            if (this.controller === controller) runInAction(() => { this.busy = false; this.controller = null; });
+        }
+    }
     async generateTrace() {
         if (!this.trace || this.busy || this.loading || this.disposed || !this.repo.aiAvailable) return;
         const trace = this.trace;
@@ -384,4 +488,4 @@ class SitemapViewModel {
 }
 
 export { SitemapViewModel };
-export type { SitemapScope, ConnectionTab, Connection };
+export type { SitemapScope, SitemapMode, ConnectionTab, Connection };
