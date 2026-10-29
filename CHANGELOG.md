@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.19.0
 
 - **Review changes**: see what a pull request, a branch or your local changes do, in the views traces use. Start it from **Review changes** under **New trace**, or with `repo-map review [base..head] [--pr <n|url>] [--local] [--base <ref>]`. The trace AI tool reads the diff, the pull request's description and commits, and the changed code (from a temporary git worktree of the head, so your checkout is untouched), and returns the change as **New** / **Modified** / **Removed** cards and connections on the architecture map, a flowchart of the process it alters, sitemap changes when the repo has a sitemap, risks, questions for the author and every changed file mapped to its cards. Reviews are saved with traces (intent `review`, badge **PR #12** / **Changes** / **Local changes**); opening one checks whether the branch or pull request moved on and offers **Re-run review**. Changed files open as diffs in the reference window, and code references open the file at the reviewed commit. Pull requests use the `gh` CLI (`REPO_MAP_GH` to point at another). New routes: `POST /api/review` (streamed), `POST /api/review/status`, `GET /api/diff`, and `GET /api/file?rev=`. Closer looks, flowchart redraws and sitemap outputs on a review read the reviewed commit too.
 
