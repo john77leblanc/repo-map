@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.0
 
 - **Saved traces** can be filtered: a type dropdown (**All**, **Traces**, **Proposals**, **Reviews**, with counts; proposals with a plan count as proposals) shows once the list holds more than one kind, and a search box (title and question) shows once there are two or more. Running reviews count as reviews; other running traces stay under **Traces** and **Proposals** until they finish. When nothing matches, **Clear** resets both. Filters reset on reload.
 
