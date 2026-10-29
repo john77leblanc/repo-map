@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0
 
 - Flowchart step panel: the **Closer look** section is headed **Closer look**, or **Closer look inside <box>** on a step inside it (one line, cut short with … when long), with the step count right-aligned, then **Expand in chart** / **Collapse in chart** (was **Show in chart** / **Fold back**), **Look again** and **Delete**, then the explanation and the mini drawing. The mini drawing is always shown, outlines the selected step and is clickable: a step there draws the closer look in the chart and selects it (`openCloserStep`). The section has a purple left rail and tint, and a step inside a closer look gets the same rail on its rows instead of an **Inside: …** line. The panel's sticky title starts with the step's shape.
 
