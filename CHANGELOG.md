@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The reference window shows the file path (click to copy) on its own row under the title and buttons, so long paths no longer push the buttons onto a new line. The **Copy path** / **Copied!** hint sits beside the path instead of over the code. `ModalHeader` takes an optional `meta` row.
+
 ## 0.20.0
 
 - **Saved traces** can be filtered: a type dropdown (**All**, **Traces**, **Proposals**, **Reviews**, with counts; proposals with a plan count as proposals) shows once the list holds more than one kind, and a search box (title and question) shows once there are two or more. Running reviews count as reviews; other running traces stay under **Traces** and **Proposals** until they finish. When nothing matches, **Clear** resets both. Filters reset on reload.

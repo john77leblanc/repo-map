@@ -100,6 +100,15 @@ describe('ModalHeader', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         expect(onClose).toHaveBeenCalled();
         expect(screen.getByRole('button', { name: 'Close' })).toHaveAttribute('id', 'x-close');
+        expect(row.querySelector('.fhead-meta')).toBeNull();
+    });
+
+    it('adds a meta row under the title and buttons', () => {
+        const { container } = render(<ModalHeader titleId="x-title" title="Things" meta={<code>a/b.ts</code>} onClose={() => {}} />);
+        const row = container.querySelector('.fhead.has-meta')!;
+        expect(row.lastElementChild).toHaveClass('fhead-meta');
+        expect(row.querySelector('.acts .fhead-meta')).toBeNull();
+        expect(row.querySelector('.fhead-meta')).toHaveTextContent('a/b.ts');
     });
 });
 

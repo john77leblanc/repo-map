@@ -62,21 +62,21 @@ export const ReferenceModal = observer(function ReferenceModal({ vm }: { vm: Ref
             {r && <>
                 <ModalHeader titleId="ref-title" closeId="ref-close" onClose={vm.close}
                     title={(vm.isDocument && r.title) || r.path.split('/').pop()}
-                    actions={<>
-                        {/* The path copies itself; its tooltip says so, then confirms. */}
+                    actions={vm.href && (
+                        <a className="btn" id="ref-github" href={vm.href} target="_blank" rel="noopener"
+                            title={vm.exact ? 'Open on GitHub' : 'Open on GitHub (lines may differ from your checkout)'}>
+                            GitHub ↗
+                        </a>
+                    )}
+                    meta={
+                        /* The path copies itself; the hint beside it says so, then confirms. */
                         <button className={'ref-path' + (vm.copy.copied ? ' copied' : '')} id="ref-copy" type="button"
                             data-tip={vm.copy.copied ? 'Copied!' : 'Copy path'}
                             aria-label={(vm.copy.copied ? 'Copied: ' : 'Copy path: ') + `${r.path}#L${r.start}-L${r.end}`}
                             onClick={() => void vm.copyPath()}>
                             <FittedPath path={r.path} suffix={vm.isDiff ? '' : `#L${r.start}-L${r.end}`} />
                         </button>
-                        {vm.href && (
-                            <a className="btn" id="ref-github" href={vm.href} target="_blank" rel="noopener"
-                                title={vm.exact ? 'Open on GitHub' : 'Open on GitHub (lines may differ from your checkout)'}>
-                                GitHub ↗
-                            </a>
-                        )}
-                    </>} />
+                    } />
                 <div className="modal-body" ref={body}>
                     {r.why && <p className="ref-why">{r.why}</p>}
                     <div className="code" role="region" aria-label={r.path} tabIndex={0}>
