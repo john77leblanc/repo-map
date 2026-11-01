@@ -13,6 +13,7 @@ import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { SITEMAP_CSS } from './styles';
 import { CopyFeedback } from '../../models/CopyFeedback';
+import { SearchModel, pinFirst, type SearchSection } from '../../shared/search/SearchModel';
 
 type SitemapScope = 'trace' | 'nearby' | 'app';
 type ConnectionTab = 'from' | 'to';
@@ -65,13 +66,15 @@ class SitemapViewModel {
         selected: () => this.selectedId,
         override: () => this.panelHighlight,
     });
+    /** Search over the screens on the diagram, in the side panel. */
+    readonly search = new SearchModel({ sections: () => this.searchSource });
     private controller: AbortController | null = null;
     private disposed = false;
     private copyRevision = 0;
 
     constructor(readonly deps: SitemapDeps) {
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
-            deps: false, focus: false, copy: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
+            deps: false, focus: false, copy: false, search: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
             copyRevision: false,
         }, { autoBind: true });
     }
@@ -170,6 +173,54 @@ class SitemapViewModel {
     get hasNext() { const i = this.currentStep; return i >= 0 && i < (this.output?.steps.length ?? 0) - 1; }
     prevStep() { if (this.hasPrev) this.openStep(this.currentStep - 1); }
     nextStep() { if (this.hasNext) this.openStep(this.currentStep + 1); }
+    /** Screens on the diagram by application; in a trace, its journey first. */
+    get searchSource(): SearchSection[] {
+        const navigation = (this.displayed?.navigation || []) as NavEdge[];
+        const shown = this.graph.nodes.flatMap((node) => this.screen(node.id) || []);
+        const sections = this.applications.map((app) => ({
+            id: 'app-' + app.id,
+            title: app.label,
+            groups: [{
+                id: app.id,
+                title: '',
+                items: shown.filter((screen) => screen.app === app.id).map((screen) => ({
+                    id: screen.id,
+                    title: screen.label,
+                    names: [screen.id, screen.label, screen.route],
+                    desc: screen.detail,
+                    paths: [...screen.refs, ...navigation.filter((e) => e.from === screen.id || e.to === screen.id).flatMap((e) => e.refs)]
+                        .map((r) => r.path),
+                    kind: 'screen',
+                })),
+            }],
+        }));
+        const journey = this.output ? [...this.output.steps.map((step) => step.screen), ...this.involved] : [];
+        return pinFirst(sections, journey, this.trace?.intent === 'review' ? 'In this review' : 'In this trace');
+    }
+    get matched() { return this.search.matched; }
+    /** The side panel shows a screen, or the search results. */
+    get sideOpen() { return this.search.open || (this.detailsOpen && !!this.selected); }
+    openSearch() {
+        this.search.openSearch();
+        this.closeDetails();
+    }
+    /** Toolbar Search: closes the results when they are showing, else opens them. */
+    toggleSearch() {
+        if (this.search.open && !this.selected) this.dismiss();
+        else this.openSearch();
+    }
+    /** Escape: from a screen back to the results, else close the panel. False when nothing is open. */
+    escape() {
+        if (!this.search.open) return false;
+        if (this.selected) this.closeDetails();
+        else this.dismiss();
+        return true;
+    }
+    /** Close the side panel: the screen and the search. */
+    dismiss() {
+        this.search.close();
+        this.closeDetails();
+    }
     /** The details panel's Close: hides it and clears the selection. Picking a screen opens it again. */
     closeDetails() {
         this.detailsOpen = false;

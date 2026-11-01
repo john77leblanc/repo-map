@@ -25,6 +25,8 @@ interface DiagramViewModel {
     marked?: string[];
     /** Select mode: plain clicks mark instead of opening a node. */
     markMode?: boolean;
+    /** Search matches, tinted on the diagram. */
+    matched?: ReadonlySet<string>;
     /** Lane heading fold buttons, when the diagram supports collapsing lanes. */
     toggleLane?(id: string): void;
     isLaneCollapsed?(id: string): boolean;
@@ -183,6 +185,11 @@ const DiagramSvg = observer(function DiagramSvg({
             node.appendChild(badge);
         });
     }, [svg, marked, layout]);
+    const matched = vm.matched;
+    useLayoutEffect(() => {
+        host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) =>
+            node.classList.toggle('match', !!matched?.has(node.dataset.id || '')));
+    }, [svg, matched]);
     const highlight = vm.highlight;
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');

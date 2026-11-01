@@ -50,7 +50,8 @@ class ComponentsViewModel {
     private copyRevision = 0;
 
     constructor(readonly deps: ComponentsDeps) {
-        this.graph = new ComponentGraphViewModel({ sitemap: deps.sitemap, components: () => this.displayed, output: () => this.output });
+        this.graph = new ComponentGraphViewModel({ sitemap: deps.sitemap, components: () => this.displayed, output: () => this.output,
+            review: () => this.trace?.intent === 'review' });
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
             deps: false, graph: false, copy: false, components: observableRef, trace: observableRef, controller: false, disposed: false, copyRevision: false,
         }, { autoBind: true });

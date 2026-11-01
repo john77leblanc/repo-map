@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { StepNumber } from '../../shared/ui/StepNumber';
@@ -9,7 +9,8 @@ import type { ArchitectureViewModel } from './ArchitectureViewModel';
 import { useArchitectureWires } from './useArchitectureWires';
 import { DocumentationReference } from './DocumentationReference';
 import { WorkspaceBar } from './WorkspaceBar';
-import { SearchIcon, SearchPanel } from './SearchPanel';
+import { BackToResults, SearchPanel, SearchToggle } from '../../shared/ui/SearchPanel';
+import { useSearchShortcut } from '../../shared/ui/useSearchShortcut';
 import { KeyToggle } from '../../shared/ui/KeyToggle';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { SidePanel } from '../../shared/ui/SidePanel';
@@ -41,29 +42,16 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
     const section = useRef<HTMLElement>(null);
     const geometry = useArchitectureWires(board, vm);
     const selected = vm.inspected;
-    useEffect(() => {
-        const listener = (e: KeyboardEvent) => {
-            if (document.querySelector('dialog:modal')) return;
-            if (e.key === 'Escape') {
-                if (!vm.sideOpen) return;
-                e.preventDefault();
-                if (vm.searchOpen && vm.inspected) vm.backToResults();
-                else vm.dismiss();
-                return;
-            }
-            // "/" or Ctrl/Cmd+K opens search (this view is only mounted while shown)
-            const shortcut = (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) ||
-                (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey);
-            if (!shortcut) return;
-            const t = e.target as HTMLElement | null;
-            if (e.key === '/' && t?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
-            e.preventDefault();
-            vm.openSearch();
-            requestAnimationFrame(() => section.current?.querySelector<HTMLInputElement>('#q')?.focus());
-        };
-        document.addEventListener('keydown', listener);
-        return () => document.removeEventListener('keydown', listener);
-    }, [vm]);
+    useSearchShortcut({
+        inputId: 'q',
+        open: vm.openSearch,
+        escape: () => {
+            if (!vm.sideOpen) return false;
+            if (vm.searchOpen && vm.inspected) vm.backToResults();
+            else vm.dismiss();
+            return true;
+        },
+    });
     useLayoutEffect(() => {
         if (!vm.revealId) return;
         const el = Array.from(board.current?.querySelectorAll<HTMLElement>('.node') || []).find(
@@ -127,18 +115,8 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                             </label>
                         )}
                         <KeyToggle id="architecture-key-toggle" controls="architecture-key" open={vm.keyOpen} onToggle={vm.toggleKey} />
-                        <button
-                            className="btn search-toggle"
-                            id="arch-search-toggle"
-                            type="button"
-                            title="Search (/ or Ctrl+K)"
-                            aria-expanded={vm.searchOpen}
-                            aria-controls="arch-details"
-                            onClick={() => (vm.searchOpen && !vm.inspected ? vm.dismiss() : vm.openSearch())}
-                        >
-                            <SearchIcon />
-                            Search
-                        </button>
+                        <SearchToggle id="arch-search-toggle" controls="arch-details" open={vm.searchOpen}
+                            onToggle={() => (vm.searchOpen && !vm.inspected ? vm.dismiss() : vm.openSearch())} />
                     </div>
                 </div>
             </header>
@@ -442,22 +420,21 @@ export const ArchitectureWorkspace = observer(function ArchitectureWorkspace({
                 </div>
                 {vm.sideOpen && (
                     <SidePanel
-                        className={'arch-side' + (selected ? '' : ' arch-search-side')}
+                        className={'arch-side' + (selected ? '' : ' search-side')}
                         id="arch-details"
                         aria-live={selected ? 'polite' : undefined}
                         data-id={selected?.id}
                         // The view's own Escape handler steps back from a card to the results first.
                         closeOnEscape={false}
                         onClose={vm.dismiss}
-                        before={selected && vm.searchOpen && (
-                            <button className="btn sm arch-back" type="button" id="arch-back-results" onClick={vm.backToResults}>
-                                ← Results
-                            </button>
-                        )}
+                        before={selected && vm.searchOpen && <BackToResults id="arch-back-results" onClick={vm.backToResults} />}
                         title={!selected ? 'Search' : selected.title || selected.id}
                         status={selected?.status}
                     >
-                        {!selected ? <SearchPanel vm={vm} /> : <>
+                        {!selected ? (
+                            <SearchPanel search={vm.search} prefix="arch" inputId="q" label="Find a node" listLabel="Matching nodes"
+                                empty="No nodes match." onPick={vm.inspect} onHover={vm.setHover} />
+                        ) : <>
                         {selected.collapsed ? (
                             <CollapsedRepoDetails vm={vm} id={selected.id} />
                         ) : (

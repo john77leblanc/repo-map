@@ -357,15 +357,12 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);
                         }}
                         onCopy={vm.copyMermaid} onDownload={vm.downloadSvg} onStop={() => vm.stop()}
-                        generation={{ label: hasFlow ? 'Redraw' : 'Draw flowchart',
-                            title: 'Ask the AI tool to draw this flowchart again', hidden: !vm.repo.aiAvailable,
-                            run: () => { if (vm.trace) void vm.generate(vm.trace); } }}
                     />
                     <FlowchartLegend open={vm.keyOpen} proposal={hasChanges(vm.trace)} review={vm.trace.intent === 'review'} />
                     {!hasFlow && (
                         <p id="flow-missing" className="hint">
-                            The supporting walkthrough was kept. Draw the flowchart to complete this
-                            output.
+                            The supporting walkthrough was kept. Draw the flowchart from the trace's
+                            Views to complete this output.
                         </p>
                     )}
                     <div

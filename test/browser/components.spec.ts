@@ -63,3 +63,59 @@ test('Components is its own view: generate, narrow to a screen, and move between
     await expect(page.getByRole('complementary', { name: 'Component details' }).getByRole('heading', { name: 'CheckoutPage', exact: true })).toBeVisible();
     expect(errors).toEqual([]);
 });
+
+test('search finds screens on the Sitemap and components on Components, in the side panel', async ({ page }) => {
+    await page.route('**/api/components', (route) => route.fulfill({ json: { components, status: { state: 'current' } } }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Sitemap', exact: true }).click();
+    await page.locator('#sitemap-search-toggle').click();
+    const sitemapSearch = page.getByRole('combobox', { name: 'Find a screen' });
+    await expect(sitemapSearch).toBeFocused();
+    await sitemapSearch.fill('/checkout');
+    await expect(page.locator('#sitemap-svgbox .fn.match')).toHaveCount(1);
+    await sitemapSearch.press('Enter');
+    await expect(page.getByRole('complementary', { name: 'Screen details' }).getByRole('heading', { name: 'Checkout', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox', { name: 'Matching screens' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#sitemap-details')).toHaveCount(0);
+
+    await page.getByRole('tab', { name: 'Components', exact: true }).click();
+    await page.getByLabel('Show', { exact: true }).selectOption('cart');
+    await page.keyboard.press('Control+k');
+    const search = page.getByRole('combobox', { name: 'Find a component' });
+    await expect(search).toBeFocused();
+    await expect(page.getByRole('listbox', { name: 'Matching components' }).locator('h4')).toHaveText(['Roots', 'Other components']);
+    await search.fill('order form');
+    await search.press('Enter');
+    // CheckoutPage is not on the Cart screen, so the diagram widens to show it
+    await expect(page.getByRole('complementary', { name: 'Component details' }).getByRole('heading', { name: 'CheckoutPage', exact: true })).toBeVisible();
+    await expect(page.locator('#components-svgbox [data-id="checkout-page"]')).toHaveCount(1);
+    await page.getByRole('button', { name: '← Results' }).click();
+    await expect(search).toHaveValue('order form');
+});
+
+test('regenerating the sitemap from Settings shows progress in the diagram area until Stop', async ({ page }) => {
+    await page.route('**/api/components', (route) => route.fulfill({ json: { components, status: { state: 'current' } } }));
+    // The job never answers, so it is still running when we look.
+    await page.route('**/api/sitemap/generate', () => {});
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Sitemap', exact: true }).click();
+    await expect(page.locator('#sitemap-svgbox .fn')).toHaveCount(2);
+    // no generation button on the toolbar; Search is last on the right
+    await expect(page.locator('#sitemap-redraw')).toHaveCount(0);
+    await expect(page.locator('#sitemap-workspace .flow-actions > :last-child')).toHaveId('sitemap-search-toggle');
+    await page.locator('#tab-map').click();
+    const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+    const row = settings.getByRole('region', { name: 'Sitemap' });
+    await row.getByRole('button', { name: 'Regenerate sitemap' }).click();
+    await row.getByRole('button', { name: 'Confirm regenerate' }).click();
+    await expect(row.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await settings.locator('#settings-close').click();
+    const progress = page.locator('#view-generating');
+    await expect(progress.getByRole('heading', { name: 'Regenerating the sitemap…' })).toBeVisible();
+    await expect(page.locator('#sitemap-workspace')).toHaveCount(0);
+    await progress.getByRole('button', { name: 'Stop' }).click();
+    await expect(page.locator('#sitemap-svgbox .fn')).toHaveCount(2);
+});

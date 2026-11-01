@@ -2,6 +2,7 @@ import { observer } from 'mobx-react-lite';
 import { CodeReference } from '../../shared/ui/CodeReference';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { SidePanel } from '../../shared/ui/SidePanel';
+import { BackToResults } from '../../shared/ui/SearchPanel';
 import { Tabs, type TabItem } from '../../shared/ui/Tabs';
 import { ConnectionRow } from '../flowchart/ConnectionRow';
 import { TraceStepCard } from '../../shared/ui/TraceStepCard';
@@ -33,7 +34,10 @@ const ComponentPanel = observer(function ComponentPanel({ vm }: { vm: Components
     ];
     return (
         <SidePanel id="component-details" aria-label="Component details" aria-live="polite" closeId="component-details-close"
-            onClose={graph.closeDetails} title={component.label} status={change?.status} kind="Component">
+            onClose={graph.dismiss} title={component.label} status={change?.status} kind="Component"
+            // While searching, the view's Escape handler steps back to the results.
+            closeOnEscape={!graph.search.open}
+            before={graph.search.open && <BackToResults id="components-back-results" onClick={graph.closeDetails} />}>
             {step && (
                 <TraceStepCard idPrefix="components" index={graph.stepIndex} total={output!.involved.length} note={step.note}
                     hasPrev={graph.hasPrev} hasNext={graph.hasNext} onPrev={graph.prevStep} onNext={graph.nextStep}>

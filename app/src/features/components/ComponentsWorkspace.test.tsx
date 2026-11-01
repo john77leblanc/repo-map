@@ -91,7 +91,9 @@ describe('Components', () => {
     it('generates components, keeps the old map on failure, and needs a sitemap', async () => {
         const { vm, services } = fixture();
         render(<ComponentsWorkspace vm={vm} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Generate components' }));
+        // generating lives in Settings → Map → Views now, not the toolbar
+        expect(screen.queryByRole('button', { name: /Generate components|Regenerate/ })).toBeNull();
+        await act(() => vm.generate());
         await waitFor(() => expect(vm.components).toBeTruthy());
         expect(services.api.stream).toHaveBeenLastCalledWith('/api/components/generate', {}, expect.anything(), expect.any(Function));
         expect(vm.message).toBe('Component map saved.');
@@ -102,7 +104,7 @@ describe('Components', () => {
         cleanup();
         const empty = fixture({ map: null });
         render(<ComponentsWorkspace vm={empty.vm} />);
-        expect((screen.getByRole('button', { name: 'Generate components' }) as HTMLButtonElement).disabled).toBe(true);
+        expect(empty.vm.canGenerate).toBe(false);
         expect(screen.getByText('Generate the sitemap first: components are mapped from its screens.')).toBeTruthy();
         await empty.vm.generate();
         expect(empty.services.api.stream).not.toHaveBeenCalled();
@@ -128,7 +130,7 @@ describe('Components', () => {
             ['home-page', undefined], ['chart', 'modified'], ['proposal-spark', 'new']]);
         expect(graph.graph.edges).toContainEqual({ from: 'home-page', to: 'proposal-spark', status: 'new' });
         expect((screen.getByLabelText('Show') as HTMLSelectElement).options[0].textContent).toBe('This trace');
-        expect(screen.getByRole('button', { name: 'Redraw' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Redraw' })).toBeNull();
         act(() => graph.pick('home-page'));
         const panel = screen.getByRole('complementary', { name: 'Component details' });
         expect(within(panel).getByRole('region', { name: 'Trace step' }).textContent).toContain('Shows the dashboard.');
@@ -172,5 +174,33 @@ describe('Components', () => {
         expect(services.browser.copy).toHaveBeenCalledWith(expect.stringContaining('PriceLine'));
         vm.downloadSvg(() => '#000');
         expect(vi.mocked(services.browser.download).mock.calls[0][0]).toBe('components.svg');
+    });
+});
+
+describe('Components search', () => {
+    it('lists roots then the rest, matches tags and paths, and widens the scope to show a pick', async () => {
+        const { vm } = fixture();
+        await vm.load();
+        const { container } = render(<ComponentsWorkspace vm={vm} />);
+        const graph = vm.graph;
+        act(() => graph.setScope('shop'));
+        fireEvent.click(screen.getByRole('button', { name: /Search/ }));
+        const results = screen.getByRole('listbox', { name: 'Matching components' });
+        expect([...results.querySelectorAll('section h4')].map((h) => h.textContent)).toEqual(['Roots', 'Other components']);
+        expect(graph.search.hits).toEqual(['home-page', 'shop-page', 'orphan', 'price', 'chart']);
+        const input = screen.getByRole('combobox', { name: 'Find a component' });
+        fireEvent.change(input, { target: { value: 'state' } });
+        expect(graph.search.hits).toEqual(['home-page']);
+        fireEvent.change(input, { target: { value: 'home.tsx' } });
+        expect(graph.search.hits).toHaveLength(5);
+        expect(container.querySelector('.fn[data-id="price"]')?.classList.contains('match')).toBe(true);
+        fireEvent.change(input, { target: { value: 'chart' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(graph.selectedId).toBe('chart');
+        expect(graph.scope).toBe(ROOTS);
+        expect(screen.getByRole('button', { name: '← Results' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(container.querySelector('#component-details')).toBe(null);
+        expect(graph.search.open).toBe(false);
     });
 });

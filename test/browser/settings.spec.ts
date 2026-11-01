@@ -27,6 +27,9 @@ async function mockSettings(page: Page) {
             agents: [{ id: 'codex', label: 'Codex CLI', available: true, defaultModel: pick.model, models: [{ id: pick.model, efforts: ['low', 'high'] }], efforts: ['low', 'high'] }],
         });
         if (path === '/api/map/status') return json(state.status);
+        // Map → Views reads the sitemap and component map
+        if (path === '/api/sitemap') return json({ sitemap: null, status: { state: 'missing' } });
+        if (path === '/api/components') return json({ components: null, status: { state: 'missing' } });
         if (path === '/api/workspace') return json({ workspace: { links: [], seams: [] }, repos: [], map: { groups: [], nodes: [], edges: [], repos: [], seams: [], replaced: {} } });
         if (path === '/api/settings/generate' && request.method() === 'PUT') {
             const body = request.postDataJSON() as Record<string, string>;

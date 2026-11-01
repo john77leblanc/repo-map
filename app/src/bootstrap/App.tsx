@@ -14,6 +14,7 @@ import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
 import { ComponentsWorkspace } from '../features/components/ComponentsWorkspace';
 import { StartView } from '../features/start/StartView';
 import { MissingView, ViewTabs } from '../features/shell/ViewTabs';
+import { GeneratingView } from '../shared/ui/GeneratingView';
 import { ScopeSwitch } from '../features/architecture/WorkspaceBar';
 
 export const ApplicationContext = createContext<Application | null>(null);
@@ -54,7 +55,9 @@ export const App = observer(function App() {
                             leading={app.workspace.linked && (
                                 <ScopeSwitch vm={app.architecture} disabled={app.shell.workspace !== 'architecture'} />
                             )} />
-                        {app.views.showMissing ? (
+                        {app.views.generating ? (
+                            <GeneratingView {...app.views.generating} onStop={app.views.generating.stop} />
+                        ) : app.views.showMissing ? (
                             <MissingView vm={app.views} />
                         ) : app.shell.workspace === 'components' ? (
                             <ComponentsWorkspace vm={app.components} />

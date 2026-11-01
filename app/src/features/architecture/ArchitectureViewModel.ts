@@ -6,6 +6,7 @@ import { proposalMap } from '../../../../lib/proposal.mjs';
 import { REPO_PREFIX, collapseRepos } from '../../../../lib/workspace-map.mjs';
 import type { WorkspaceModel } from '../../models/WorkspaceModel';
 import { neighborhood } from '../../shared/diagramFocus';
+import { SearchModel, pinFirst, type SearchSection } from '../../shared/search/SearchModel';
 
 export interface ArchitectureDependencies {
     repo: RepositoryModel;
@@ -20,30 +21,7 @@ export type MapScope = 'repo' | 'workspace';
 export type ConnectionDirection = 'from' | 'to';
 /** Collapsible sections of the card details panel. */
 export type CardSection = 'about' | 'docs' | 'files' | 'connections';
-/** Description text around a search hit, for results matched only by description. */
-export interface SearchSnippet {
-    before: string;
-    hit: string;
-    after: string;
-}
-export interface SearchSection {
-    col: number;
-    title: string;
-    groups: { id: string; title: string; repo?: string; nodes: { node: MapNode; snippet?: SearchSnippet }[] }[];
-}
-
-/** About `width` characters of `text` centred on the first match of `q` (lower-case). */
-function snippetOf(text: string, q: string, width = 70): SearchSnippet | undefined {
-    const at = text.toLowerCase().indexOf(q);
-    if (at < 0) return undefined;
-    const start = Math.max(0, at - Math.floor((width - q.length) / 2));
-    const end = Math.min(text.length, Math.max(start + width, at + q.length));
-    return {
-        before: (start > 0 ? '…' : '') + text.slice(start, at),
-        hit: text.slice(at, at + q.length),
-        after: text.slice(at + q.length, end) + (end < text.length ? '…' : ''),
-    };
-}
+const kinds: Record<string, string> = { service: 'svc', topic: 'topic', external: 'ext' };
 export interface CardConnection {
     edge: RepoMap['edges'][number];
     /** The card at the other end. */
@@ -54,16 +32,13 @@ export class ArchitectureViewModel {
     trace: Trace | null = null;
     groups: Record<string, boolean> = {};
     snapshot: Record<string, boolean> | null = null;
-    query = '';
     keyOpen = false;
     hidden: Record<string, boolean> = { http: false, event: false, sync: false };
     hover: string | null = null;
     pinned: string | null = null;
     selected: string | null = null;
-    /** Search results open in the side panel (a picked card shows over them). */
-    searchOpen = false;
-    /** Highlighted search result, an index into `searchHits`. */
-    searchCursor = 0;
+    /** Search results in the side panel (a picked card shows over them). */
+    readonly search = new SearchModel({ sections: () => this.searchSource, onQuery: () => this.openMatchedGroups() });
     /** Connection tab in card details; kept while moving between cards. */
     connectionTab: ConnectionDirection = 'from';
     /** Open card sections; kept while moving between cards. */
@@ -80,7 +55,7 @@ export class ArchitectureViewModel {
     /** With a trace open, draw only its cards and path (remembered per browser). */
     traceOnly = true;
     constructor(readonly deps: ArchitectureDependencies) {
-        makeAutoObservable(this, { deps: false, trace: observableRef }, { autoBind: true });
+        makeAutoObservable(this, { deps: false, trace: observableRef, search: false }, { autoBind: true });
         this.groups = deps.services.storage.get<Record<string, boolean>>(
             deps.repo.namespace + 'groups',
             {}
@@ -284,8 +259,7 @@ export class ArchitectureViewModel {
         );
     }
     matches(n: MapNode) {
-        const q = this.query.trim().toLowerCase();
-        return !!q && [n.id, n.title || '', n.desc || ''].some((s) => s.toLowerCase().includes(q));
+        return this.search.matched.has(n.id);
     }
     step(id: string) {
         return this.trace?.steps.findIndex((s) => s.id === id) ?? -1;
@@ -312,61 +286,56 @@ export class ArchitectureViewModel {
     toggleGroups() {
         this.expand(!this.allOpen);
     }
+    get query() {
+        return this.search.query;
+    }
+    get searchOpen() {
+        return this.search.open;
+    }
     setQuery(value: string) {
-        this.query = value;
-        this.searchCursor = 0;
+        this.search.setQuery(value);
+    }
+    /** Typing opens the groups holding matches. */
+    private openMatchedGroups() {
         this.map.nodes.filter(this.matches).forEach((n) => this.setGroup(n.group, true));
     }
-    /** Cards by column, then group; every card when the query is empty. */
-    get searchSections(): SearchSection[] {
-        const q = this.query.trim().toLowerCase();
+    /** Every card by column, then group; in a trace, its cards first. */
+    get searchSource(): SearchSection[] {
         const columns = this.repo.bootstrap?.config.columns || [];
-        return columns
-            .map((c, col) => ({
-                col,
-                title: c.title,
-                groups: this.map.groups
-                    .filter((g) => g.col === col)
-                    .map((g) => ({
-                        id: g.id,
-                        title: g.title,
-                        repo: g.id.startsWith(REPO_PREFIX) ? undefined : g.repo,
-                        nodes: this.map.nodes
-                            .filter((n) => n.group === g.id && (!q || this.matches(n)))
-                            .map((node) => ({
-                                node,
-                                snippet:
-                                    q && ![node.id, node.title || ''].some((s) => s.toLowerCase().includes(q))
-                                        ? snippetOf(node.desc || '', q)
-                                        : undefined,
-                            })),
-                    }))
-                    .filter((g) => g.nodes.length),
-            }))
-            .filter((c) => c.groups.length);
-    }
-    /** Result card ids in display order, for arrow keys. */
-    get searchHits(): string[] {
-        return this.searchSections.flatMap((c) => c.groups.flatMap((g) => g.nodes.map((n) => n.node.id)));
+        const sections = columns.map((c, col) => ({
+            id: 'col-' + col,
+            title: c.title,
+            groups: this.map.groups
+                .filter((g) => g.col === col)
+                .map((g) => ({
+                    id: g.id,
+                    title: g.title,
+                    tag: this.repoTitle(g.id.startsWith(REPO_PREFIX) ? undefined : g.repo) || undefined,
+                    items: this.map.nodes
+                        .filter((n) => n.group === g.id)
+                        .map((n) => ({
+                            id: n.id,
+                            title: n.title || n.id,
+                            names: [n.id, n.title || ''],
+                            desc: n.desc,
+                            paths: [n.path, n.suggestedPath].filter((p): p is string => !!p),
+                            kind: kinds[n.kind] || 'svc',
+                        })),
+                })),
+        }));
+        const visited = [...(this.trace?.steps || []).map((s) => this.drawn(s.id)), ...this.traceIds];
+        return pinFirst(sections, visited, this.trace?.intent === 'review' ? 'In this review' : 'In this trace');
     }
     /** The side panel shows a card, or the search results. */
     get sideOpen() {
-        return !!this.inspected || this.searchOpen;
+        return !!this.inspected || this.search.open;
     }
     openSearch() {
-        this.searchOpen = true;
-        this.searchCursor = 0;
+        this.search.openSearch();
         this.backToResults();
     }
-    moveCursor(by: number) {
-        const last = this.searchHits.length - 1;
-        this.searchCursor = Math.max(0, Math.min(last, this.searchCursor + by));
-    }
-    setCursor(index: number) {
-        this.searchCursor = index;
-    }
     searchEnter() {
-        const id = this.searchHits[this.searchCursor];
+        const id = this.search.current;
         if (id) this.inspect(id);
     }
     /** Leave the picked card, showing the search results again. */
@@ -407,9 +376,7 @@ export class ArchitectureViewModel {
     }
     /** Close the side panel: the card and the search. */
     dismiss() {
-        this.searchOpen = false;
-        this.query = '';
-        this.searchCursor = 0;
+        this.search.close();
         this.selected = null;
         this.stepAt = null;
         this.pinned = null;

@@ -6,6 +6,8 @@ import { ProgressLine } from '../../shared/ui/ProgressLine';
 import { Tabs, type TabItem } from '../../shared/ui/Tabs';
 import type { SettingsSectionId, SettingsViewModel } from './SettingsViewModel';
 import { LinkedRepos } from './LinkedRepos';
+import { ViewJobRow } from '../../shared/ui/ViewJobRow';
+import type { ProgressEntry } from '../../models/ProgressLog';
 
 export interface SettingsViewProps {
     vm: SettingsViewModel;
@@ -121,107 +123,46 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
                             <span id="stat">{vm.repositoryDetails.counts}</span>
                             <span id="repoinfo">{vm.repositoryDetails.revision}</span>
                         </p>
-                        <div>
-                            <p className="hint" id="ms-text">
-                                {freshness}
-                            </p>
-                            <p
-                                className="mfiles"
-                                id="ms-files"
-                                hidden={st?.state !== 'stale' || !st.files?.length}
-                            >
-                                {st?.files?.slice(0, 12).join('  ·  ')}
-                                {(st?.changed || 0) > 12 ? '  · …' : ''}
-                            </p>
-                            <p className="hint" id="ms-docs">
-                                {docs}
-                            </p>
-                            <div className="row">
-                                <button
-                                    className="btn sm primary"
-                                    id="ms-update"
-                                    type="button"
-                                    hidden={st?.state !== 'stale'}
+                        <section className="views-list" aria-labelledby="settings-views-title">
+                            <h3 id="settings-views-title">Views</h3>
+                            <p className="hint">Redraw a whole view of the repository. Uses the map agent (Agents tab).</p>
+                            <ViewJobRow id="view-architecture" title="Architecture"
+                                status={<>
+                                    <p id="ms-text">{freshness}</p>
+                                    <p className="mfiles" id="ms-files" hidden={st?.state !== 'stale' || !st.files?.length}>
+                                        {st?.files?.slice(0, 12).join('  ·  ')}
+                                        {(st?.changed || 0) > 12 ? '  · …' : ''}
+                                    </p>
+                                    {docs && <p id="ms-docs">{docs}</p>}
+                                </>}
+                                job={{ text: vm.jobStatus, entries: vm.busy || (vm.jobLog.last && vm.jobStatus.startsWith(vm.jobLog.last)) ? vm.jobLog.entries : [],
+                                    busy: vm.busy, error: vm.jobError, onStop: vm.stopJob, statusId: 'job-status', stopId: 'job-stop' }}>
+                                <button className="btn sm primary" id="ms-update" type="button" hidden={st?.state !== 'stale'}
                                     disabled={vm.jobsDisabled || !!st?.tooBig}
-                                    title={
-                                        st?.tooBig
-                                            ? 'Too many changes for a quick update: redraw the map instead.'
-                                            : vm.noAi || ''
-                                    }
-                                    onClick={() => void vm.runJob('update')}
-                                >
+                                    title={st?.tooBig ? 'Too many changes for a quick update: redraw the map instead.' : vm.noAi || ''}
+                                    onClick={() => void vm.runJob('update')}>
                                     Update map
                                 </button>
-                                <button
-                                    className="btn sm"
-                                    id="ms-mark"
-                                    type="button"
-                                    hidden={st?.state !== 'unrecorded'}
-                                    disabled={vm.busy || vm.serverBusy}
-                                    onClick={() => void vm.markCurrent()}
-                                >
+                                <button className="btn sm" id="ms-mark" type="button" hidden={st?.state !== 'unrecorded'}
+                                    disabled={vm.busy || vm.serverBusy} onClick={() => void vm.markCurrent()}>
                                     Mark as current
                                 </button>
-                                <button
-                                    className="btn sm"
-                                    id="ms-redraw"
-                                    type="button"
-                                    disabled={vm.jobsDisabled}
-                                    title={
-                                        vm.noAi ||
-                                        'Explore the whole repo again and replace map.json. The current map is kept as .repo-map/map.prev.json. Takes several minutes.'
-                                    }
-                                    onClick={vm.redraw}
-                                >
-                                    {vm.redrawArmed
-                                        ? 'Confirm redraw'
-                                        : vm.hasMap
-                                          ? 'Redraw map'
-                                          : 'Draw the full map'}
+                                <button className="btn sm" id="ms-redraw" type="button" disabled={vm.jobsDisabled}
+                                    title={vm.noAi || 'Explore the whole repo again and replace map.json. The current map is kept as .repo-map/map.prev.json. Takes several minutes.'}
+                                    onClick={vm.redraw}>
+                                    {vm.redrawArmed ? 'Confirm redraw' : vm.hasMap ? 'Redraw map' : 'Draw the full map'}
                                 </button>
-                                <button
-                                    className="btn sm"
-                                    id="ms-docs-go"
-                                    type="button"
-                                    hidden={!vm.hasMap}
-                                    disabled={vm.jobsDisabled}
-                                    title={
-                                        vm.noAi ||
-                                        "Read the repo's documentation, agent guidance and code comments again, and link them to the cards (.repo-map/docs.json)."
-                                    }
-                                    onClick={() => void vm.runJob('docs')}
-                                >
+                                <button className="btn sm" id="ms-docs-go" type="button" hidden={!vm.hasMap} disabled={vm.jobsDisabled}
+                                    title={vm.noAi || "Read the repo's documentation, agent guidance and code comments again, and link them to the cards (.repo-map/docs.json)."}
+                                    onClick={() => void vm.runJob('docs')}>
                                     {d.linked ? 'Relink docs' : 'Link docs'}
                                 </button>
-                                <button
-                                    className="btn sm"
-                                    id="ms-dismiss"
-                                    type="button"
-                                    hidden={!vm.notice}
-                                    onClick={vm.dismissNotice}
-                                >
+                                <button className="btn sm" id="ms-dismiss" type="button" hidden={!vm.notice} onClick={vm.dismissNotice}>
                                     Dismiss notification
                                 </button>
-                            </div>
-                            <div className="row">
-                                <ProgressLine
-                                    id="job-status"
-                                    text={vm.jobStatus}
-                                    entries={vm.busy || (vm.jobLog.last && vm.jobStatus.startsWith(vm.jobLog.last)) ? vm.jobLog.entries : []}
-                                    busy={vm.busy}
-                                    error={vm.jobError}
-                                />
-                                <button
-                                    className="btn sm"
-                                    id="job-stop"
-                                    type="button"
-                                    hidden={!vm.busy}
-                                    onClick={vm.stopJob}
-                                >
-                                    Stop
-                                </button>
-                            </div>
-                        </div>
+                            </ViewJobRow>
+                            <RootViewRows vm={vm} />
+                        </section>
                         </>}
                         {tab === 'agents' && <>
                         <section aria-labelledby="map-agent-title">
@@ -295,4 +236,38 @@ export const SettingsPanel = observer(function SettingsPanel({ vm }: { vm: Setti
             </Tabs>
         </div>
     );
+});
+
+/** Views → Sitemap and Components: what each is like now, Generate / Regenerate, and the running job. */
+const RootViewRows = observer(function RootViewRows({ vm }: { vm: SettingsViewModel }) {
+    const { sitemap, components } = vm.deps;
+    useEffect(() => { vm.loadViews(); }, [vm]);
+    if (!sitemap || !components) return null;
+    const job = (view: { busy: boolean; message: string; error: boolean; log: { entries: ProgressEntry[] }; stop(): void }, id: string) =>
+        !view.busy && !view.message ? undefined : { text: view.message, entries: view.log.entries, busy: view.busy, error: view.error, onStop: view.stop,
+            statusId: id + '-status', stopId: id + '-stop' };
+    const sitemapExists = !!sitemap.sitemap;
+    const componentsExist = !!components.components;
+    return <>
+        <ViewJobRow id="view-sitemap" title="Sitemap"
+            status={sitemap.loading ? 'Checking…' : sitemap.sitemap ? sitemap.freshnessLabel + '.' : 'Not generated yet.'}
+            job={job(sitemap, 'view-sitemap')}>
+            <button className="btn sm" id="view-sitemap-go" type="button" disabled={sitemap.busy || sitemap.loading}
+                title="Analyze the repository's screens and navigation again, and replace .repo-map/sitemap.json."
+                onClick={vm.redrawSitemap}>
+                {vm.armed === 'sitemap' ? 'Confirm regenerate' : sitemapExists ? 'Regenerate sitemap' : 'Generate sitemap'}
+            </button>
+        </ViewJobRow>
+        <ViewJobRow id="view-components" title="Components"
+            status={components.loading ? 'Checking…' : !components.canGenerate ? 'Needs the sitemap first: components are mapped from its screens.'
+                : components.components ? components.freshnessLabel + '.' : 'Not generated yet.'}
+            job={job(components, 'view-components')}>
+            <button className="btn sm" id="view-components-go" type="button"
+                disabled={components.busy || components.loading || !components.canGenerate}
+                title="Map the UI components that build each screen again, and replace .repo-map/components.json."
+                onClick={vm.redrawComponents}>
+                {vm.armed === 'components' ? 'Confirm regenerate' : componentsExist ? 'Regenerate components' : 'Generate components'}
+            </button>
+        </ViewJobRow>
+    </>;
 });

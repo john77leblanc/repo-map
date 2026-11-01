@@ -66,7 +66,7 @@ it('keeps the other outputs when Components comes back missing', async () => {
     await vm.runTrace();
     await vi.waitFor(() => expect(vm.selected?.pendingComponents).toBe(true));
     expect(vm.selected?.outputs.architecture).toBe(true);
-    expect(vm.status).toBe('Other outputs were kept, but Components was missing. Use Edit to select Components and regenerate.');
+    expect(vm.status).toBe('Other outputs were kept, but Components was missing. Use Views to draw it again.');
     vm.dispose();
     components.dispose();
 });

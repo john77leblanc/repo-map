@@ -30,6 +30,7 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fe-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke}
 .fc .fn:hover .fs{stroke-width:2.2}
 .fc .fn.mk .fs{fill:color-mix(in srgb,var(--http) 14%,var(--panel));stroke:var(--http);stroke-width:2.2}
+.fc .fn.match .fs{fill:color-mix(in srgb,var(--event) 28%,var(--panel))}
 .fc .mk-badge circle{fill:var(--http);stroke:var(--panel);stroke-width:2}
 .fc .mk-badge path{fill:none;stroke:var(--panel);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .fside-input{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;font-weight:600;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin:2px 0 10px}

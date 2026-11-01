@@ -134,17 +134,13 @@ describe('Sitemap', () => {
         expect((screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled).toBe(true);
         vm.dispose();
     });
-    it('keeps the generation button disabled alongside Stop while generating', async () => {
-        const { vm, services } = fixture();
+    it('has no generation button in the toolbar, and puts Search last on the right', async () => {
+        const { vm } = fixture();
         await vm.load();
-        let finish!: (value: SitemapResult) => void;
-        vi.mocked(services.api.stream).mockImplementationOnce(() => new Promise(resolve => { finish = resolve as typeof finish; }));
-        render(<SitemapWorkspace vm={vm} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
-        expect((screen.getByRole('button', { name: 'Regenerate' }) as HTMLButtonElement).disabled).toBe(true);
-        fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
-        await act(async () => { finish(result); });
-        expect((screen.getByRole('button', { name: 'Regenerate' }) as HTMLButtonElement).disabled).toBe(false);
+        const { container } = render(<SitemapWorkspace vm={vm} />);
+        expect(screen.queryByRole('button', { name: /Regenerate|Generate sitemap/ })).toBeNull();
+        expect(container.querySelector('#sitemap-redraw')).toBeNull();
+        expect(container.querySelector('.flow-actions')?.lastElementChild?.id).toBe('sitemap-search-toggle');
         vm.dispose();
     });
 
@@ -194,12 +190,12 @@ describe('Sitemap', () => {
     it('generates on demand and keeps the last sitemap after failed regeneration', async () => {
         const { vm, services } = fixture();
         render(<SitemapWorkspace vm={vm} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Generate sitemap' }));
+        await act(() => vm.generate());
         await waitFor(() => expect(document.querySelector('#sitemap-status')?.textContent).toBe('Sitemap saved.'));
         expect(services.api.stream).toHaveBeenCalledWith('/api/sitemap/generate', {}, expect.any(AbortSignal), expect.any(Function));
         const saved = vm.sitemap;
         vi.mocked(services.api.stream).mockRejectedValueOnce(new Error('AI unavailable'));
-        fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+        await act(() => vm.generate());
         await waitFor(() => expect(document.querySelector('#sitemap-status')?.textContent).toBe('AI unavailable'));
         expect(vm.sitemap).toBe(saved);
         vm.dispose();
@@ -272,5 +268,46 @@ describe('Sitemap', () => {
         expect(vm.appId).toBe('shop');
         expect(vm.selectedId).toBe('shop');
         expect(vm.detailsOpen).toBe(true);
+    });
+});
+
+describe('Sitemap search', () => {
+    it('finds screens on the diagram by application, opens one, and steps back with Escape', async () => {
+        const { vm } = fixture();
+        await vm.load();
+        const { container } = render(<SitemapWorkspace vm={vm} />);
+        fireEvent.click(screen.getByRole('button', { name: /Search/ }));
+        const results = screen.getByRole('listbox', { name: 'Matching screens' });
+        expect([...results.querySelectorAll('section h4')].map((h) => h.textContent)).toEqual(['Admin', 'Storefront']);
+        expect([...results.querySelectorAll('[role=option]')].map((o) => o.textContent)).toEqual(['Dashboard', 'Settings', 'Shop']);
+        const input = screen.getByRole('combobox', { name: 'Find a screen' });
+        fireEvent.change(input, { target: { value: 'products' } });
+        expect(vm.search.hits).toEqual(['shop']);
+        expect(container.querySelector('.fn[data-id="shop"]')?.classList.contains('match')).toBe(true);
+        expect(container.querySelector('.fn[data-id="home"]')?.classList.contains('match')).toBe(false);
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(vm.selectedId).toBe('shop');
+        expect(screen.getByRole('complementary', { name: 'Screen details' })).toBeTruthy();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(vm.selectedId).toBe(null);
+        expect(screen.getByRole('listbox', { name: 'Matching screens' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('option', { name: 'Shop' }));
+        fireEvent.click(screen.getByRole('button', { name: '← Results' }));
+        expect(screen.getByRole('listbox', { name: 'Matching screens' })).toBeTruthy();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(container.querySelector('#sitemap-details')).toBe(null);
+        expect(vm.search.query).toBe('');
+        vm.dispose();
+    });
+    it('opens with "/" and lists only screens that are drawn', async () => {
+        const { vm } = fixture();
+        await vm.load();
+        render(<SitemapWorkspace vm={vm} />);
+        act(() => vm.selectApp('shop'));
+        fireEvent.keyDown(document, { key: '/' });
+        expect(vm.search.open).toBe(true);
+        // Storefront draws Shop and Dashboard (which links to it); Settings is not on the diagram.
+        expect(vm.search.hits).toEqual(['home', 'shop']);
+        vm.dispose();
     });
 });

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { runInAction } from 'mobx';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryModel } from '../../models/RepositoryModel';
@@ -6,6 +6,8 @@ import type { Services } from '../../shared/services/contracts';
 import type { Trace } from '../../models/types';
 import { Application } from '../../bootstrap/Application';
 import { MissingView, ViewTabs } from './ViewTabs';
+import { GeneratingView } from '../../shared/ui/GeneratingView';
+import { SelectedTraceSidebar } from '../traces/TraceViews';
 
 afterEach(cleanup);
 
@@ -164,5 +166,51 @@ describe('ViewTabs', () => {
         expect(screen.getByRole('heading', { name: 'Flowcharts only exist for traces' })).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'New trace' }));
         expect(app.traces.composerOpen).toBe(true);
+    });
+});
+
+describe('a view being drawn', () => {
+    it('replaces the map while it is redrawn, but not for Update map, and Stop brings it back', () => {
+        const { views, app } = setup();
+        expect(views.generating).toBeNull();
+        act(() => void app.settings.runJob('update'));
+        expect(views.generating).toBeNull();
+        act(() => app.settings.stopJob());
+        runInAction(() => { app.settings.busy = false; });
+        act(() => void app.settings.runJob('generate'));
+        expect(views.generating).toMatchObject({ title: 'Drawing the map…' });
+        // only the Architecture view is replaced
+        views.show('sitemap');
+        expect(views.generating).toBeNull();
+    });
+    it('shows a progress panel for the sitemap and components, with Stop', () => {
+        const { views, app } = setup();
+        views.show('sitemap');
+        // showing the view starts a load that never answers here
+        act(() => app.sitemap.stop());
+        act(() => void app.sitemap.generate());
+        expect(views.generating).toMatchObject({ title: 'Generating the sitemap…' });
+        render(<>{views.generating && <GeneratingView {...views.generating} onStop={views.generating.stop} />}</>);
+        expect(screen.getByRole('heading', { name: 'Generating the sitemap…' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+        expect(app.sitemap.busy).toBe(false);
+        expect(views.generating).toBeNull();
+        views.show('components');
+        expect(views.generating).toBeNull();
+    });
+    it('draws a trace’s flowchart from the sidebar’s Views, on the Flowchart view', () => {
+        const { views, app, trace } = setup();
+        app.traces.select(trace());
+        render(<SelectedTraceSidebar vm={app.traces} />);
+        fireEvent.click(screen.getByText('Views'));
+        const row = screen.getByRole('region', { name: 'Flowchart' });
+        expect(row.textContent).toContain('Not drawn.');
+        fireEvent.click(within(row).getByRole('button', { name: 'Draw' }));
+        expect(app.shell.workspace).toBe('flowchart');
+        expect(views.generating).toMatchObject({ title: 'Drawing the flowchart…' });
+        expect(within(row).getByRole('button', { name: 'Drawing…' })).toBeDisabled();
+        // Sitemap and Components need the repository maps first
+        expect(within(screen.getByRole('region', { name: 'Sitemap' })).getByRole('button', { name: 'Add' })).toBeDisabled();
+        expect(screen.getByRole('region', { name: 'Components' }).textContent).toContain('Needs the repository component map');
     });
 });

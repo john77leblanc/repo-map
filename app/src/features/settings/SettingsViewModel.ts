@@ -4,6 +4,8 @@ import type { AgentData, AgentPick } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import { ProgressLog } from '../../models/ProgressLog';
 import type { WorkspaceModel } from '../../models/WorkspaceModel';
+import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
+import type { ComponentsViewModel } from '../components/ComponentsViewModel';
 
 export interface Catalog extends Omit<AgentData, 'default'> {
     default?: AgentPick | null;
@@ -33,6 +35,8 @@ export interface MapStatus {
     };
 }
 export type JobKind = 'update' | 'generate' | 'docs';
+/** A root view that Settings → Map → Views can redraw. */
+export type RootView = 'map' | 'sitemap' | 'components';
 /** The collapsible Settings groups. */
 export type SettingsSectionId = 'map' | 'agents' | 'links';
 export interface SettingsDeps {
@@ -42,6 +46,9 @@ export interface SettingsDeps {
     onJobComplete?: (kind: JobKind, result: JobResult) => void;
     /** Linked repos, edited in the Linked repos section. */
     workspace?: WorkspaceModel;
+    /** The repository sitemap and component map, redrawn from Views. */
+    sitemap?: SitemapViewModel;
+    components?: ComponentsViewModel;
 }
 interface Counts {
     links?: number;
@@ -104,7 +111,10 @@ export class SettingsViewModel {
     readonly jobLog = new ProgressLog();
     jobError = false;
     busy = false;
-    redrawArmed = false;
+    /** The map job running (or last run). */
+    jobKind: JobKind | null = null;
+    /** A redraw that replaces an existing view asks once more: the view whose button reads "Confirm". */
+    armed: RootView | null = null;
     dismissed = '';
     /** Settings tab shown; kept between openings so Settings reopens where it was left. */
     activeTab: SettingsSectionId = 'map';
@@ -124,6 +134,38 @@ export class SettingsViewModel {
     private tick?: ReturnType<typeof setInterval>;
     constructor(readonly deps: SettingsDeps) {
         makeAutoObservable(this, { deps: false }, { autoBind: true });
+    }
+    get redrawArmed() {
+        return this.armed === 'map';
+    }
+    /** First click arms the view's redraw for 3s; returns true when the redraw should run now. */
+    private confirm(view: RootView, exists: boolean) {
+        if (exists && this.armed !== view) {
+            clearTimeout(this.armTimer);
+            this.armed = view;
+            this.armTimer = setTimeout(() => runInAction(() => { if (this.armed === view) this.armed = null; }), 3000);
+            return false;
+        }
+        clearTimeout(this.armTimer);
+        this.armed = null;
+        return true;
+    }
+    /** Views → Sitemap: generate, or regenerate after a confirm. */
+    redrawSitemap() {
+        const sitemap = this.deps.sitemap;
+        if (!sitemap || sitemap.busy || sitemap.loading) return;
+        if (this.confirm('sitemap', !!sitemap.sitemap)) void sitemap.generate();
+    }
+    /** Views → Components: generate, or regenerate after a confirm (needs the sitemap). */
+    redrawComponents() {
+        const components = this.deps.components;
+        if (!components || components.busy || components.loading || !components.canGenerate) return;
+        if (this.confirm('components', !!components.components)) void components.generate();
+    }
+    /** Refresh what the Views rows say (the sitemap and component map load lazily). */
+    loadViews() {
+        void this.deps.sitemap?.load();
+        void this.deps.components?.load();
     }
     get repositoryDetails() {
         const { bootstrap, map } = this.deps.repo;
@@ -384,20 +426,7 @@ export class SettingsViewModel {
     }
     redraw() {
         if (this.jobsDisabled) return;
-        if (this.hasMap && !this.redrawArmed) {
-            this.redrawArmed = true;
-            this.armTimer = setTimeout(
-                () =>
-                    runInAction(() => {
-                        this.redrawArmed = false;
-                    }),
-                3000
-            );
-            return;
-        }
-        clearTimeout(this.armTimer);
-        this.redrawArmed = false;
-        void this.runJob('generate');
+        if (this.confirm('map', this.hasMap)) void this.runJob('generate');
     }
     stopJob() {
         this.jobCtl?.abort();
@@ -408,6 +437,7 @@ export class SettingsViewModel {
         const ctl = new AbortController();
         this.jobCtl = ctl;
         this.busy = true;
+        this.jobKind = kind;
         this.jobError = false;
         const start = Date.now();
         let last = 'Starting…';

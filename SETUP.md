@@ -339,7 +339,7 @@ repo-map update --check    # report only; exits 1 when the map is out of date (u
 repo-map update --mark     # record the current commit without changing the map
 ```
 
-For big refactors, redraw the whole map with **Redraw map** in the browser's Settings.
+For big refactors, redraw the whole map with **Redraw map** in the browser's **Settings → Map → Views**.
 
 After an update, review it with `git diff .repo-map/map.json` and commit it, so teammates get the same map. Maps made before 0.3 have no recorded commit: Settings offers **Mark as current**, which does the same as `update --mark`.
 
@@ -355,7 +355,7 @@ On the map, **Workspace** shows both repos. Connections whose `consumes`/`provid
 
 The sidebar's **Settings** button opens a dedicated panel for map maintenance and AI preferences. It has three collapsible sections, all collapsed when it opens; click a title (or focus it and press Enter) to expand it. When the map needs attention, Settings opens with **Map** expanded.
 
-- **Map**: the repository name, counts and Git revision; up to date or not, the files that changed, and whether documents changed since the docs were linked. **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**. One runs at a time.
+- **Map**: the repository name, counts and Git revision, then **Views**, one row per view. **Architecture**: up to date or not, the files that changed, and whether documents changed since the docs were linked; **Update map**, **Redraw map** (asks you to confirm; the old map is kept as `.repo-map/map.prev.json`) and **Relink docs**, each with progress and **Stop**; one runs at a time. **Sitemap** and **Components**: freshness and **Generate** / **Regenerate** (confirm before replacing), with progress and **Stop**. While a view is being drawn, its diagram area shows the progress instead.
 - **Agents**:
   - **Map agent**: the tool, model and effort that draw and update the map, link its docs and find seams between linked repos, from the same list as the trace menu. **Same as traces** follows your trace default. Changes are saved for you in this repo (`.repo-map/local.json`, git-ignored).
   - **Trace agent**: the tool, model and effort used for process architecture and flowcharts. Remembered in your browser for this repo and used for new traces and flowchart redraws. **Use in every repo** also saves it as your default trace tool (`~/.config/repo-map/ai.json`).
@@ -392,11 +392,11 @@ Pull requests need the [GitHub CLI](https://cli.github.com) installed and signed
 
 ### Sitemap and execution lanes
 
-At repository home, open **Sitemap**, then **Generate sitemap**. Configure the tool, model, and effort under **Settings → Map agent**; sitemap generation uses the same settings as architecture generation. There is no extra dependency or automatic AI run when switching views. Saved results live in `.repo-map/sitemap.json` and can be committed for teammates.
+At repository home, open **Sitemap**, then **Generate** (or **Settings → Map → Views → Generate sitemap**). Configure the tool, model, and effort under **Settings → Map agent**; sitemap generation uses the same settings as architecture generation. There is no extra dependency or automatic AI run when switching views. Saved results live in `.repo-map/sitemap.json` and can be committed for teammates.
 
 Use the application selector for repositories with multiple applications. Select a screen for route patterns, navigation conditions, and code references. **No user-facing screens found** is a valid backend-only result; **Analysis incomplete** lists gaps. If expected screens are absent, check that their code is included in `codeRoots` and accessible to the configured AI tool, then regenerate. Invalid or inaccessible evidence is omitted and disclosed. A failed run preserves the previous sitemap. **Stop** cancels generation. Map updates, redraws and docs linking run one at a time; sitemap generation has its own slot and can run alongside them.
 
-Open **More > Show info** for commit freshness, uncommitted changes, snapshot details, and analysis notes. Empty results show their explanation automatically. The screen panel opens when you click a screen and closes with **Close** or Escape. On a trace it starts with the journey step (**‹ Prev / Next ›** walks the journey), then collapsible **About** (route, detail, proposed screen and navigation changes), **Navigation** and **References** rows, as in the flowchart. **More > Refresh status** reloads the saved artifact; **Regenerate** performs another AI analysis. Escape or an outside click closes More.
+Open **More > Show info** for commit freshness, uncommitted changes, snapshot details, and analysis notes. Empty results show their explanation automatically. The screen panel opens when you click a screen and closes with **Close** or Escape. On a trace it starts with the journey step (**‹ Prev / Next ›** walks the journey), then collapsible **About** (route, detail, proposed screen and navigation changes), **Navigation** and **References** rows, as in the flowchart. **More > Refresh status** reloads the saved artifact; **Regenerate sitemap** in **Settings → Map → Views** performs another AI analysis. Escape or an outside click closes More.
 
 Sitemaps use the flowchart toolbar layout, with **Diagram key** and an **Export** menu (**Copy Mermaid**, **Download SVG**). Exports follow the application selection and **Show** scope, including journey numbers and proposed changes. SVG downloads include their own styling, theme colors, and dimmed context. Filenames use the trace or repository name followed by `-sitemap.svg`, falling back to `sitemap.svg`. Export controls are disabled when no diagram exists and work without an AI connection.
 
@@ -458,7 +458,7 @@ To share a trace, anyone who has an AI tool can run it, press **Copy trace code*
 
 Choose Sitemap when creating a trace, alone or alongside Architecture and Flowchart. It is off by default and the browser remembers your choice. If no repository sitemap exists, use Generate sitemap first; the entered question is preserved. Repository sitemap generation uses map-generation settings; journey and proposal tracing uses the selected trace agent. Stale or incomplete sitemaps retain their warnings and can still be used.
 
-Saved/shared Sitemap outputs contain their own snapshot and can be viewed without AI, even after the repository sitemap changes. Use **Add output**, **Retry**, or **Redraw** on a selected trace to analyze it against the currently saved repository sitemap. Failed or cancelled redraws keep the previous result. Implementation plans include proposed screen and navigation changes.
+Saved/shared Sitemap outputs contain their own snapshot and can be viewed without AI, even after the repository sitemap changes. Use **Add**, **Retry**, or **Redraw** in a selected trace's sidebar **Views** to analyze it against the currently saved repository sitemap. Failed or cancelled redraws keep the previous result. Implementation plans include proposed screen and navigation changes.
 
 ### Revising trace prompts
 

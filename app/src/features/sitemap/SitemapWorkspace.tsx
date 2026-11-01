@@ -16,6 +16,8 @@ import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { TraceStepCard } from '../../shared/ui/TraceStepCard';
 import { ConnectionRow } from '../flowchart/ConnectionRow';
 import { ComponentTreeModal, countNodes } from './ComponentTreeModal';
+import { BackToResults, SearchPanel, SearchToggle } from '../../shared/ui/SearchPanel';
+import { useSearchShortcut } from '../../shared/ui/useSearchShortcut';
 
 /** The selected screen's panel: trace step, then About, Navigation and References, like the flowchart's. */
 const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel }) {
@@ -36,7 +38,10 @@ const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel
     const navLabel = (c: Connection) => `${vm.screenLabel(c.edge.from)} → ${vm.screenLabel(c.edge.to)}`;
     return (
         <SidePanel id="sitemap-details" aria-label="Screen details" aria-live="polite" closeId="sitemap-details-close"
-            onClose={vm.closeDetails} title={vm.screenLabel(id)} status={change?.status} kind="Screen">
+            onClose={vm.dismiss} title={vm.screenLabel(id)} status={change?.status} kind="Screen"
+            // While searching, the view's Escape handler steps back to the results.
+            closeOnEscape={!vm.search.open}
+            before={vm.search.open && <BackToResults id="sitemap-back-results" onClick={vm.closeDetails} />}>
             {step && (
                 <TraceStepCard idPrefix="sitemap" index={vm.currentStep} total={vm.output!.steps.length} note={step.note}
                     hasPrev={vm.hasPrev} hasNext={vm.hasNext} onPrev={vm.prevStep} onNext={vm.nextStep}>
@@ -115,6 +120,17 @@ const ScreenPanel = observer(function ScreenPanel({ vm }: { vm: SitemapViewModel
     );
 });
 
+/** Search results in the side panel; picking a screen opens it. */
+const ScreenSearch = observer(function ScreenSearch({ vm }: { vm: SitemapViewModel }) {
+    return (
+        <SidePanel id="sitemap-details" className="search-side" closeId="sitemap-details-close" title="Search"
+            closeOnEscape={false} onClose={vm.dismiss}>
+            <SearchPanel search={vm.search} prefix="sitemap" label="Find a screen" listLabel="Matching screens"
+                empty="No screens on the diagram match." onPick={vm.select} onHover={vm.hoverScreen} />
+        </SidePanel>
+    );
+});
+
 /** Links arriving at (From) and leaving (To) the screen, as flowchart-style connection rows. */
 const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: SitemapViewModel; id: string }) {
     const nav = vm.navFor(id);
@@ -143,8 +159,10 @@ const ScreenNavigation = observer(function ScreenNavigation({ vm, id }: { vm: Si
 
 const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: SitemapViewModel }) {
     const root = useRef<HTMLElement>(null);
-    // Closed until a screen is picked, like the flowchart's step panel.
-    const panelOpen = vm.detailsOpen && !!vm.selected;
+    // Closed until a screen is picked or search opens, like the flowchart's step panel.
+    const panelOpen = vm.sideOpen;
+    const screenOpen = vm.detailsOpen && !!vm.selected;
+    useSearchShortcut({ inputId: 'sitemap-q', open: vm.openSearch, escape: vm.escape });
     return (
         <section className="sitemap-workspace" id="sitemap-workspace" aria-label="Sitemap" ref={root}>
             <style>{FC_CSS + UI_CSS + SITEMAP_CSS}</style>
@@ -175,12 +193,7 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                         disabled: !vm.layout, expanded: vm.infoOpen || !vm.layout, controls: 'sitemap-info' },
                     { label: 'Refresh status', run: () => void vm.load(), disabled: vm.loading || vm.busy },
                 ]} />}
-                generation={{
-                    label: vm.trace && vm.sitemap ? vm.output ? 'Redraw' : vm.trace.pendingSitemap ? 'Retry' : 'Add output' : vm.sitemap ? 'Regenerate' : 'Generate sitemap',
-                    title: vm.trace && vm.sitemap ? 'Ask the AI tool to draw this sitemap output again' : 'Analyze repository screens and navigation',
-                    disabled: vm.loading || (!!vm.trace && !!vm.sitemap && !vm.repo.aiAvailable),
-                    run: () => void (vm.trace && vm.sitemap ? vm.generateTrace() : vm.generate()),
-                }}
+                search={vm.layout && <SearchToggle id="sitemap-search-toggle" controls="sitemap-details" open={vm.search.open} onToggle={vm.toggleSearch} />}
             />
             <SitemapLegend open={vm.keyOpen} trace={!!vm.output} proposal={hasChanges(vm.trace)} review={vm.trace?.intent === 'review'} />
             <div className="sitemap-heading" hidden={!vm.infoOpen && !!vm.layout}>
@@ -210,7 +223,7 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
             </div>
             {vm.layout && <div className={'fmain sitemap-main' + (panelOpen ? '' : ' details-hidden')}>
                 <DiagramSvg vm={vm} prefix="sitemap" />
-                {panelOpen && <ScreenPanel vm={vm} />}
+                {panelOpen && (screenOpen ? <ScreenPanel vm={vm} /> : <ScreenSearch vm={vm} />)}
             </div>}
             <ComponentTreeModal vm={vm} />
         </section>

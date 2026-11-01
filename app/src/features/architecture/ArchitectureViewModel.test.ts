@@ -86,27 +86,27 @@ describe('ArchitectureViewModel', () => {
         repo.map.nodes[1].desc = 'Stores the shopping basket between visits';
         vm.openSearch();
         expect(vm.sideOpen).toBe(true);
-        expect(vm.searchSections.map((c) => [c.title, c.groups.map((g) => g.title)])).toEqual([['Code', ['Alpha', 'Beta']]]);
-        expect(vm.searchHits).toEqual(['one', 'two']);
+        expect(vm.search.sections.map((c) => [c.title, c.groups.map((g) => g.title)])).toEqual([['Code', ['Alpha', 'Beta']]]);
+        expect(vm.search.hits).toEqual(['one', 'two']);
         vm.setQuery('basket');
-        expect(vm.searchHits).toEqual(['two']);
-        expect(vm.searchSections[0].groups[0].nodes[0].snippet).toEqual({
+        expect(vm.search.hits).toEqual(['two']);
+        expect(vm.search.sections[0].groups[0].hits[0].snippet).toEqual({
             before: 'Stores the shopping ',
             hit: 'basket',
             after: ' between visits',
         });
         vm.setQuery('one');
-        expect(vm.searchSections[0].groups[0].nodes[0].snippet).toBeUndefined();
+        expect(vm.search.sections[0].groups[0].hits[0].snippet).toBeUndefined();
         vm.setQuery('nothing');
-        expect(vm.searchSections).toEqual([]);
+        expect(vm.search.sections).toEqual([]);
     });
     it('moves through results, opens one, goes back and closes', () => {
         const { vm } = fixture();
         vm.openSearch();
-        vm.moveCursor(-1);
-        expect(vm.searchCursor).toBe(0);
-        vm.moveCursor(5);
-        expect(vm.searchCursor).toBe(1);
+        vm.search.move(-1);
+        expect(vm.search.cursor).toBe(0);
+        vm.search.move(5);
+        expect(vm.search.cursor).toBe(1);
         vm.searchEnter();
         expect(vm.selected).toBe('two');
         expect(vm.searchOpen).toBe(true);

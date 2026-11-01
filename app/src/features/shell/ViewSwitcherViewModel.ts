@@ -8,6 +8,7 @@ import type { FlowchartViewModel } from '../flowchart/FlowchartViewModel';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 import type { ComponentsViewModel } from '../components/ComponentsViewModel';
 import type { SettingsViewModel } from '../settings/SettingsViewModel';
+import type { ProgressEntry } from '../../models/ProgressLog';
 
 export interface ViewSwitcherDeps {
     repo: RepositoryModel;
@@ -38,6 +39,14 @@ export interface MissingState {
     hint?: string;
     error?: string;
     action: MissingAction;
+}
+
+/** A job drawing the current view: shown in the diagram area instead of the view. */
+export interface GeneratingState {
+    title: string;
+    text: string;
+    entries: ProgressEntry[];
+    stop: () => void;
 }
 
 const VIEWS: View[] = ['architecture', 'flowchart', 'sitemap', 'components'];
@@ -83,6 +92,33 @@ export class ViewSwitcherViewModel {
     get showMissing() {
         const view = this.views.find((v) => v.id === this.current);
         return !!view && !view.exists && !view.busy;
+    }
+    /** The current view is being drawn (a repository redraw, or this trace's output): what to show meanwhile. */
+    get generating(): GeneratingState | null {
+        const { settings, flowchart, sitemap, components } = this.deps;
+        const view = this.current;
+        const trace = this.trace;
+        if (view === 'architecture') {
+            if (trace || !settings.busy || settings.jobKind !== 'generate') return null;
+            return { title: settings.hasMap ? 'Redrawing the map…' : 'Drawing the map…', text: settings.jobStatus,
+                entries: settings.jobLog.entries, stop: settings.stopJob };
+        }
+        if (view === 'flowchart') {
+            // Closer looks report beside their box and keep the chart.
+            if (!trace || !flowchart.busy || flowchart.trace !== trace || !flowchart.chartStatus) return null;
+            return { title: trace.flow ? 'Redrawing the flowchart…' : 'Drawing the flowchart…', text: flowchart.chartStatus,
+                entries: [], stop: () => flowchart.stop() };
+        }
+        if (view === 'sitemap') {
+            if (!sitemap.busy) return null;
+            const own = !!trace && !!sitemap.sitemap;
+            return { title: own ? 'Drawing this trace’s sitemap…' : sitemap.sitemap ? 'Regenerating the sitemap…' : 'Generating the sitemap…',
+                text: sitemap.message, entries: sitemap.log.entries, stop: sitemap.stop };
+        }
+        if (!components.busy) return null;
+        const own = !!trace && !!components.components;
+        return { title: own ? 'Drawing this trace’s components…' : components.components ? 'Regenerating the component map…' : 'Generating the component map…',
+            text: components.message, entries: components.log.entries, stop: components.stop };
     }
     get context() {
         if (this.trace) return 'Trace · ' + this.trace.title;

@@ -8,6 +8,9 @@ import { ComponentPanel } from './ComponentPanel';
 import { ROOTS, TRACE } from './ComponentGraphViewModel';
 import type { ComponentsViewModel } from './ComponentsViewModel';
 import { hasChanges } from '../../models/trace';
+import { SidePanel } from '../../shared/ui/SidePanel';
+import { SearchPanel, SearchToggle } from '../../shared/ui/SearchPanel';
+import { useSearchShortcut } from '../../shared/ui/useSearchShortcut';
 
 /** Diagram key: components and what renders what; in a trace, what its changes look like. */
 function ComponentsLegend({ open, proposal = false, review = false }: { open: boolean; proposal?: boolean; review?: boolean }) {
@@ -31,7 +34,9 @@ function ComponentsLegend({ open, proposal = false, review = false }: { open: bo
 const ComponentsWorkspace = observer(function ComponentsWorkspace({ vm }: { vm: ComponentsViewModel }) {
     const root = useRef<HTMLElement>(null);
     const graph = vm.graph;
-    const panelOpen = graph.detailsOpen && !!graph.selected;
+    const panelOpen = graph.sideOpen;
+    const componentOpen = graph.detailsOpen && !!graph.selected;
+    useSearchShortcut({ inputId: 'components-q', open: graph.openSearch, escape: graph.escape });
     const map = vm.components;
     const output = vm.output;
     const trace = vm.trace;
@@ -59,17 +64,7 @@ const ComponentsWorkspace = observer(function ComponentsWorkspace({ vm }: { vm: 
                         disabled: !graph.layout, expanded: vm.infoOpen || !graph.layout, controls: 'components-info' },
                     { label: 'Refresh status', run: () => void vm.load(), disabled: vm.loading || vm.busy },
                 ]} />}
-                generation={trace && map ? {
-                    label: output ? 'Redraw' : trace.pendingComponents ? 'Retry' : 'Add output',
-                    title: 'Ask the AI tool to draw this Components output again',
-                    disabled: vm.loading || !vm.canRedraw,
-                    run: () => void vm.generateTrace(),
-                } : {
-                    label: map ? 'Regenerate' : 'Generate components',
-                    title: vm.canGenerate ? 'Map the UI components that build each screen' : 'Generate the sitemap first: components are mapped from its screens',
-                    disabled: vm.loading || !vm.canGenerate,
-                    run: () => void vm.generate(),
-                }}
+                search={graph.layout && <SearchToggle id="components-search-toggle" controls="component-details" open={graph.search.open} onToggle={graph.toggleSearch} />}
             />
             <ComponentsLegend open={vm.keyOpen} proposal={!!output && hasChanges(trace)} review={trace?.intent === 'review'} />
             <div className="sitemap-heading" hidden={!vm.infoOpen && !!graph.layout}>
@@ -92,7 +87,13 @@ const ComponentsWorkspace = observer(function ComponentsWorkspace({ vm }: { vm: 
             </div>
             {graph.layout && <div className={'fmain sitemap-main' + (panelOpen ? '' : ' details-hidden')}>
                 <DiagramSvg vm={graph} prefix="components" />
-                {panelOpen && <ComponentPanel vm={vm} />}
+                {panelOpen && (componentOpen ? <ComponentPanel vm={vm} /> : (
+                    <SidePanel id="component-details" className="search-side" closeId="component-details-close" title="Search"
+                        closeOnEscape={false} onClose={graph.dismiss}>
+                        <SearchPanel search={graph.search} prefix="components" label="Find a component" listLabel="Matching components"
+                            empty="No components match." onPick={graph.select} onHover={graph.hoverHit} />
+                    </SidePanel>
+                ))}
             </div>}
         </section>
     );

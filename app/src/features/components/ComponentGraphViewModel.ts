@@ -3,6 +3,7 @@ import { anchorBranchCaptions, fitCaptions, layoutFlow, renderFlowSvg } from '..
 import { componentUsage, rootsFor } from '../../../../lib/components-data.mjs';
 import { componentsTouched } from '../../../../lib/components-trace.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
+import { SearchModel, pinFirst, type SearchSection } from '../../shared/search/SearchModel';
 import type { ComponentChange, ComponentMap, ComponentsTrace, ComponentUseChange, Sitemap, UiComponent } from '../../models/types';
 
 /** Every component, starting from the ones nothing else renders. */
@@ -35,8 +36,11 @@ class ComponentGraphViewModel {
         override: () => this.hoverIds && this.layout ? { nodes: this.hoverIds, edges: [], primary: this.hoverIds } : null,
     });
 
-    constructor(private readonly source: { sitemap: () => Sitemap | null; components: () => ComponentMap | null; output?: () => ComponentsTrace | null }) {
-        makeAutoObservable<this, 'source'>(this, { source: false, focus: false, hoverIds: observableRef }, { autoBind: true });
+    /** Search over every component, in the side panel. */
+    readonly search = new SearchModel({ sections: () => this.searchSource });
+
+    constructor(private readonly source: { sitemap: () => Sitemap | null; components: () => ComponentMap | null; output?: () => ComponentsTrace | null; review?: () => boolean }) {
+        makeAutoObservable<this, 'source'>(this, { source: false, focus: false, search: false, hoverIds: observableRef }, { autoBind: true });
     }
     get map() { return this.source.components(); }
     /** Sitemap screens that have components, in sitemap order. */
@@ -157,6 +161,45 @@ class ComponentGraphViewModel {
         else this.closeDetails();
     }
     closeDetails() { this.detailsOpen = false; this.selectedId = null; }
+    /** Roots, then the rest; in a trace, the components it involves first. */
+    get searchSource(): SearchSection[] {
+        const roots = new Set(this.roots);
+        const item = (c: UiComponent) => ({ id: c.id, title: c.label, names: [c.id, c.label, ...c.tags], desc: c.detail,
+            paths: c.refs.map((r) => r.path), kind: 'component' });
+        const all = this.map?.components || [];
+        const sections = [
+            { id: 'roots', title: 'Roots', groups: [{ id: 'roots', title: '', items: all.filter((c) => roots.has(c.id)).map(item) }] },
+            { id: 'other', title: 'Other components', groups: [{ id: 'other', title: '', items: all.filter((c) => !roots.has(c.id)).map(item) }] },
+        ];
+        const involved = this.output ? [...this.output.involved.map((i) => i.id), ...this.touched] : [];
+        return pinFirst(sections, involved, this.source.review?.() ? 'In this review' : 'In this trace');
+    }
+    get matched() { return this.search.matched; }
+    /** The side panel shows a component, or the search results. */
+    get sideOpen() { return this.search.open || (this.detailsOpen && !!this.selected); }
+    openSearch() {
+        this.search.openSearch();
+        this.closeDetails();
+    }
+    /** Toolbar Search: closes the results when they are showing, else opens them. */
+    toggleSearch() {
+        if (this.search.open && !this.selected) this.dismiss();
+        else this.openSearch();
+    }
+    /** Escape: from a component back to the results, else close the panel. False when nothing is open. */
+    escape() {
+        if (!this.search.open) return false;
+        if (this.selected) this.closeDetails();
+        else this.dismiss();
+        return true;
+    }
+    /** Close the side panel: the component and the search. */
+    dismiss() {
+        this.search.close();
+        this.closeDetails();
+    }
+    /** Hovering a search result keeps that component bright. */
+    hoverHit(id: string | null) { this.hover(id ? [id] : null); }
     setSection(name: ComponentSection, open: boolean) { this.sections[name] = open; }
     setConnectionTab(tab: ComponentTab) { this.connectionTab = tab; }
     zoom(factor: number) { this.scale = Math.max(0.15, Math.min(2.5, this.scale * factor)); }

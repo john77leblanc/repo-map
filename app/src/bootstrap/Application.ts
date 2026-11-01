@@ -54,7 +54,7 @@ export class Application {
             if (workspace === 'sitemap' || workspace === 'components') { void this.sitemap.load(); void this.components.load(); }
         }, onOpenSettings: (section) => this.settings.reveal(section) });
         this.workspace = new WorkspaceModel(services);
-        this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace });
+        this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace, sitemap: this.sitemap, components: this.components });
         this.architecture = new ArchitectureViewModel({ repo, services, workspace: this.workspace });
         this.start = new StartViewModel({ repo, services, settings: this.settings, sitemap: this.sitemap });
         const getPick = () => this.settings.currentPick();
@@ -79,6 +79,7 @@ export class Application {
             workspaceReady: () => when(() => this.workspace.loaded),
             sitemap: this.sitemap,
             components: this.components,
+            flowchart: this.flowchart,
             onSelect: (trace, workspace) => this.showTrace(trace, workspace),
             onClear: () => {
                 this.flowchart.setTrace(null);
