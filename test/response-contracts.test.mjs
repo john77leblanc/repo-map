@@ -10,7 +10,7 @@ import { runClaude } from '../lib/ai/claude.mjs';
 import { runAi } from '../lib/ai/index.mjs';
 import { withDefaults } from '../lib/config.mjs';
 import { generateMap } from '../lib/generate.mjs';
-import { RESPONSE_SCHEMAS, parseResponse, responsePrompt, schemaErrors, traceSchema } from '../lib/response-contracts.mjs';
+import { RESPONSE_SCHEMAS, parseResponse, responsePrompt, reviewSchema, schemaErrors, traceSchema } from '../lib/response-contracts.mjs';
 
 const trace = { intent: 'description', title: 'Checkout', summary: 'Place an order', steps: [
     { id: 'checkout', note: 'Submit order', refs: [{ path: 'src/order.mjs', start: 1, end: 5 }] },
@@ -18,6 +18,10 @@ const trace = { intent: 'description', title: 'Checkout', summary: 'Place an ord
 const flow = { nodes: [{ id: 'start', type: 'start', label: 'Begin' }, { id: 'end', type: 'end', label: 'Finish' }],
     edges: [{ from: 'start', to: 'end' }] };
 const sitemapTrace = { applicability: 'none', summary: 'No screens apply', steps: [], navigation: [], gaps: [], changes: { screens: [], navigation: [] } };
+const componentsTrace = { version: 1, applicability: 'relevant', summary: 'Checkout form', gaps: [],
+    involved: [{ id: 'checkout-page', note: 'Hosts the form', refs: [] }],
+    changes: { components: [{ id: 'proposal-coupon', label: 'Coupon', tags: ['form'], status: 'new', rationale: 'Coupons' }],
+        uses: [{ from: 'checkout-page', to: 'proposal-coupon', status: 'new' }] } };
 const fixtures = {
     classify: { intent: 'description', title: 'Checkout' }, flow: { flow },
     expand: { summary: 'Charges the card', gaps: '', nodes: [{ id: 'x1', type: 'process', label: 'Build request', refs: [{ path: 'src/pay.mjs', start: 1, end: 5 }] },
@@ -30,6 +34,7 @@ const fixtures = {
     components: { version: 1, applicability: 'applicable', summary: 'Pages.', gaps: [],
         components: [{ id: 'page', label: 'Page', detail: '', tags: ['state'], card: '', refs: [{ path: 'src/a.jsx', start: 1, end: 9 }] }],
         uses: [], screens: [{ screen: 'home', root: 'page' }] },
+    componentsTrace: { components: componentsTrace },
     seams: { seams: [{ from: 'checkout', to: 'api:orders', type: 'http', label: 'POST /orders', why: 'Posts the order', refs: [{ path: 'src/order.mjs', start: 1, end: 5 }] }] },
 };
 
@@ -54,6 +59,12 @@ test('trace contracts require requested outputs, proposal data, exact pairs and 
     assert.throws(() => parseResponse(JSON.stringify(trace), traceSchema({ intent: 'proposal' })), /invalid JSON response/);
     assert.equal(schemaErrors({ ...trace, flow, sitemap: sitemapTrace }, traceSchema({ flow: true, sitemap: {} })).length, 0);
     assert.equal(schemaErrors({ ...trace, intent: 'proposal', proposal: { nodes: [], edges: [] } }, schema).length, 0);
+    assert.throws(() => parseResponse(JSON.stringify(trace), traceSchema({ components: {} })), /\$\.components: required/);
+    assert.equal(schemaErrors({ ...trace, components: componentsTrace }, traceSchema({ components: {} })).length, 0);
+    assert.equal(schemaErrors({ ...trace, components: { ...componentsTrace, changes: { components: [], uses: [{ from: 'a', to: 'b', status: 'modified' }] } } }, traceSchema()).length, 1);
+    const review = { title: 'R', summary: 'S', risks: [], questions: [], steps: [], edges: [], gaps: '', changes: { nodes: [], edges: [] }, files: [] };
+    assert.equal(schemaErrors(review, reviewSchema({ flow: false })).length, 0);
+    assert.deepEqual(schemaErrors(review, reviewSchema({ flow: false, components: true })), ['$.components: required']);
 });
 
 test('all contract keywords are covered by the dependency-free validator', () => {

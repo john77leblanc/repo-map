@@ -568,8 +568,11 @@ details.grp.trg>summary{box-shadow:inset 3px 0 0 var(--ink)}
 /* Sitemap screen panel: proposed navigation and navigation code, under their own sub-headings */
 .sitemap-nav-changes{margin-top:12px}.sitemap-nav-changes p{margin:0 0 6px}.sitemap-nav-changes .proposal-badge{font-size:10px;font-weight:600}
 .sitemap-nav-refs{margin-top:12px}.sitemap-nav-refs .hint{margin:6px 0 4px}
-.component-tree,.component-tree ul{list-style:none;margin:0;padding:0}.component-tree ul{padding-left:14px;border-left:1px solid var(--line);margin-left:4px}.component-tree li{margin:4px 0}.component-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;font-size:13px}.component-tag{font-size:10px;padding:0 5px;border-radius:8px;background:var(--soft);color:var(--muted)}.component-tree .refs{margin:2px 0 0}
-.component-row .component-show{margin-left:auto;padding:0 6px;font-size:11px}.component-screens{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.component-tree,.component-tree ul{list-style:none;margin:0;padding:0}.component-tree ul{padding-left:14px;border-left:1px solid var(--line);margin-left:4px}.component-tree li{margin:1px 0}.component-row{all:unset;box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;width:100%;padding:3px 6px;border-radius:4px;font-size:13px;cursor:pointer}.component-row:hover{background:var(--soft)}.component-row:focus-visible{background:var(--soft);outline:2px solid var(--http);outline-offset:-2px}.component-tag{font-size:10px;padding:0 5px;border-radius:8px;background:var(--soft);color:var(--muted)}.component-row:is(:hover,:focus-visible) .component-tag{background:var(--panel)}
+.component-tree-open{display:flex;align-items:center;gap:8px;justify-content:space-between;margin:10px 0 0}
+#component-tree-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(720px,calc(100vw - 32px));max-height:min(90dvh,calc(100dvh - 32px));padding:0}
+#component-tree-dialog::backdrop{background:rgba(0,0,0,.4)}
+#component-tree-dialog .modal-body{padding:16px 20px 20px}
 .disclosure-body .flow-conn{margin-top:0}
 
 .trace-title-skeleton{display:inline-block;width:70%;min-width:130px;max-width:260px;height:1em;border-radius:4px;color:transparent;background:linear-gradient(100deg,var(--soft) 20%,var(--line) 45%,var(--soft) 70%);background-size:220% 100%;animation:trace-shimmer 1.4s ease-in-out infinite;vertical-align:middle}

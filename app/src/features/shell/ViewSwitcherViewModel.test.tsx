@@ -36,9 +36,9 @@ function setup(ai = true) {
 }
 
 describe('ViewSwitcherViewModel', () => {
-    it('lists all three views for the map, with Flowchart and a missing sitemap marked', () => {
+    it('lists four views for the map, with Flowchart, a missing sitemap and missing components marked', () => {
         const { views } = setup();
-        expect(views.views.map((v) => [v.id, v.exists])).toEqual([['architecture', true], ['flowchart', false], ['sitemap', false]]);
+        expect(views.views.map((v) => [v.id, v.exists])).toEqual([['architecture', true], ['flowchart', false], ['sitemap', false], ['components', false]]);
         expect(views.context).toBe('Map');
         expect(views.showMissing).toBe(false);
         views.show('flowchart');
@@ -84,6 +84,65 @@ describe('ViewSwitcherViewModel', () => {
     });
 });
 
+describe('Components view', () => {
+    it('asks for the sitemap first, then offers Generate', () => {
+        const { views, app } = setup();
+        views.show('components');
+        expect(app.shell.workspace).toBe('components');
+        // loading counts as busy: no message yet (the test API never answers)
+        expect(views.showMissing).toBe(false);
+        runInAction(() => { app.components.loading = false; });
+        expect(views.showMissing).toBe(true);
+        expect(views.missing.title).toBe("The components view doesn't exist for this map");
+        expect(views.missing.hint).toBe('Generate the sitemap first: components are mapped from its screens.');
+        runInAction(() => {
+            app.sitemap.sitemap = { version: 1, applicability: 'applicable', summary: '', gaps: [], applications: [{ id: 'a', label: 'A' }],
+                screens: [{ id: 's', app: 'a', label: 'S', route: '', detail: '', refs: [] }], navigation: [] };
+        });
+        expect(views.missing.hint).toBe('Components are mapped from the sitemap’s screens.');
+        views.missing.action.run();
+        expect(app.components.busy).toBe(true);
+        expect(views.showMissing).toBe(false);
+        app.components.stop();
+    });
+    it('is a trace output: a trace without it asks for the map, then offers to draw it', () => {
+        const { views, app, trace } = setup();
+        views.show('components');
+        app.traces.select(trace(), 'components');
+        expect(views.views.map((v) => v.id)).toEqual(['architecture', 'flowchart', 'sitemap', 'components']);
+        expect(app.shell.workspace).toBe('components');
+        expect(views.showMissing).toBe(true);
+        expect(views.missing.title).toBe("The components view doesn't exist for this trace");
+        expect(views.missing.hint).toBe('The repository component map is needed first, and it is mapped from the sitemap’s screens.');
+        runInAction(() => {
+            app.components.components = { version: 1, applicability: 'applicable', summary: 'x', gaps: [],
+                components: [{ id: 'page', label: 'Page', detail: '', tags: [], refs: [] }], uses: [], screens: [] };
+        });
+        expect(views.missing.hint).toBeUndefined();
+        expect(views.missing.action.label).toBe('Generate');
+        app.traces.clear();
+        expect(app.shell.workspace).toBe('components');
+    });
+    it('Used in opens the screen on the Sitemap view; the Sitemap opens components in this view', () => {
+        const { app } = setup();
+        runInAction(() => {
+            app.sitemap.sitemap = { version: 1, applicability: 'applicable', summary: '', gaps: [], applications: [{ id: 'a', label: 'A' }],
+                screens: [{ id: 's', app: 'a', label: 'S', route: '', detail: '', refs: [] }], navigation: [] };
+            app.components.components = { version: 1, applicability: 'applicable', summary: 'x', gaps: [],
+                components: [{ id: 'page', label: 'Page', detail: '', tags: [], refs: [] }], uses: [], screens: [{ screen: 's', root: 'page' }] };
+        });
+        app.views.show('components');
+        app.components.openScreen('s');
+        expect(app.shell.workspace).toBe('sitemap');
+        expect(app.sitemap.selectedId).toBe('s');
+        expect(app.sitemap.rootComponents('s').map((c) => c.id)).toEqual(['page']);
+        app.sitemap.showComponent('s', 'page');
+        expect(app.shell.workspace).toBe('components');
+        expect(app.components.graph.scope).toBe('s');
+        expect(app.components.graph.selectedId).toBe('page');
+    });
+});
+
 describe('ViewTabs', () => {
     it('switches views with arrow keys and marks missing tabs', () => {
         const { views } = setup();
@@ -95,7 +154,7 @@ describe('ViewTabs', () => {
         expect(views.current).toBe('flowchart');
         expect(screen.getByRole('tab', { name: 'Flowchart' })).toHaveFocus();
         act(() => { fireEvent.keyDown(screen.getByRole('tab', { name: 'Flowchart' }), { key: 'End' }); });
-        expect(views.current).toBe('sitemap');
+        expect(views.current).toBe('components');
         expect(screen.getByText('Map')).toHaveClass('view-context');
     });
     it('renders the missing message with its action', () => {

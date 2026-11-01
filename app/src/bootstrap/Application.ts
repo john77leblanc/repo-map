@@ -10,6 +10,7 @@ import { PlansViewModel } from '../features/plans/PlansViewModel';
 import { ReviewViewModel } from '../features/review/ReviewViewModel';
 import { ComposerViewModel } from '../features/compose/ComposerViewModel';
 import { SitemapViewModel } from '../features/sitemap/SitemapViewModel';
+import { ComponentsViewModel } from '../features/components/ComponentsViewModel';
 import { StartViewModel } from '../features/start/StartViewModel';
 import { ViewSwitcherViewModel } from '../features/shell/ViewSwitcherViewModel';
 import type { Services } from '../shared/services/contracts';
@@ -26,6 +27,7 @@ export class Application {
     readonly review: ReviewViewModel;
     readonly composer: ComposerViewModel;
     readonly sitemap: SitemapViewModel;
+    readonly components: ComponentsViewModel;
     readonly start: StartViewModel;
     readonly workspace: WorkspaceModel;
     readonly views: ViewSwitcherViewModel;
@@ -34,9 +36,22 @@ export class Application {
         readonly services: Services
     ) {
         this.sitemap = new SitemapViewModel({ repo, services,
-            getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace) });
+            getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace),
+            components: () => this.components.components,
+            showComponents: (screen, component) => {
+                this.views.show('components');
+                this.components.graph.show(screen, component);
+            } });
+        this.components = new ComponentsViewModel({ repo, services, sitemap: () => this.sitemap.sitemap,
+            getPick: () => this.settings.currentPick(), saveTrace: (trace) => this.traces.saveExisting(trace),
+            // in a trace, its own Sitemap output (if it has one)
+            openScreen: (id) => {
+                this.views.show('sitemap');
+                this.sitemap.openScreen(id);
+            } });
         this.shell = new ShellViewModel({ repo, services, onWorkspaceChange: (workspace) => {
-            if (workspace === 'sitemap') { void this.sitemap.load(); void this.sitemap.loadComponents(); }
+            // The screen panel lists components, and components are mapped from the sitemap: load both.
+            if (workspace === 'sitemap' || workspace === 'components') { void this.sitemap.load(); void this.components.load(); }
         }, onOpenSettings: (section) => this.settings.reveal(section) });
         this.workspace = new WorkspaceModel(services);
         this.settings = new SettingsViewModel({ repo, services, workspace: this.workspace });
@@ -50,7 +65,7 @@ export class Application {
             services,
             getPick,
             saveTrace,
-            onTraceUpdated: (trace) => this.traces.select(trace, this.shell.workspace),
+            onTraceUpdated: (trace) => this.traces.select(trace, this.traces.workspace),
         });
         this.traces = new TraceViewModel({
             repo,
@@ -63,11 +78,13 @@ export class Application {
             getRepoTitles: () => this.workspace.titles,
             workspaceReady: () => when(() => this.workspace.loaded),
             sitemap: this.sitemap,
+            components: this.components,
             onSelect: (trace, workspace) => this.showTrace(trace, workspace),
             onClear: () => {
                 this.flowchart.setTrace(null);
                 this.architecture.setTrace(null);
                 this.sitemap.setTrace(null);
+                this.components.setTrace(null);
                 this.architecture.setQuery('');
                 this.shell.returnToMap();
                 this.plans.close();
@@ -92,6 +109,7 @@ export class Application {
             architecture: this.architecture,
             flowchart: this.flowchart,
             sitemap: this.sitemap,
+            components: this.components,
             settings: this.settings,
             onNewTrace: () => {
                 this.composer.openNew();
@@ -103,6 +121,7 @@ export class Application {
         if (this.architecture.trace !== trace) this.architecture.setTrace(trace);
         if (this.flowchart.trace !== trace) this.flowchart.setTrace(trace);
         this.sitemap.setTrace(trace);
+        this.components.setTrace(trace);
         this.architecture.dismiss();
         this.shell.showWorkspace(workspace);
         this.shell.expandSidebar();
@@ -116,6 +135,7 @@ export class Application {
     dispose() {
         this.start.dispose();
         this.sitemap.dispose();
+        this.components.dispose();
         this.traces.dispose();
         this.plans.dispose();
         this.composer.dispose();

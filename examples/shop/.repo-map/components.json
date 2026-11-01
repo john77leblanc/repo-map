@@ -1,0 +1,754 @@
+{
+  "version": 1,
+  "applicability": "incomplete",
+  "summary": "Read every file under src/. Found 32 React components: five page roots and the components they render. Header, PriceLine and Button are shared across screens; ReviewThread and ReviewItem render each other for nested replies. Sign in has no component in src/.",
+  "components": [
+    {
+      "id": "catalog-page",
+      "label": "CatalogPage",
+      "detail": "Catalog layout: header, filters, product grid and footer.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/pages/catalog/CatalogPage.jsx",
+          "start": 6,
+          "end": 17,
+          "why": "Declares CatalogPage"
+        }
+      ]
+    },
+    {
+      "id": "product-page",
+      "label": "ProductPage",
+      "detail": "Loads one product by sku, then shows its gallery, price, Add to cart and reviews.",
+      "tags": [
+        "fetches",
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/pages/product/ProductPage.jsx",
+          "start": 9,
+          "end": 28,
+          "why": "Declares ProductPage"
+        },
+        {
+          "path": "src/pages/product/ProductPage.jsx",
+          "start": 1,
+          "end": 13,
+          "why": "Fetches /api/products/:sku"
+        },
+        {
+          "path": "src/pages/product/ProductPage.jsx",
+          "start": 23,
+          "end": 23,
+          "why": "Renders the review thread"
+        }
+      ]
+    },
+    {
+      "id": "cart-page",
+      "label": "CartPage",
+      "detail": "Cart lines from the cart store, a subtotal and a plain link to /checkout.",
+      "tags": [
+        "state",
+        "routing"
+      ],
+      "card": "cart-page",
+      "refs": [
+        {
+          "path": "src/pages/cart/CartPage.jsx",
+          "start": 7,
+          "end": 22,
+          "why": "Declares CartPage"
+        }
+      ]
+    },
+    {
+      "id": "checkout-page",
+      "label": "CheckoutPage",
+      "detail": "Hosts the checkout steps and order summary. On pay it calls placeOrder, clears the cart, then sends the browser to /orders/:id.",
+      "tags": [
+        "state",
+        "fetches",
+        "routing"
+      ],
+      "card": "checkout-page",
+      "refs": [
+        {
+          "path": "src/pages/checkout/CheckoutPage.jsx",
+          "start": 7,
+          "end": 25,
+          "why": "Declares CheckoutPage"
+        }
+      ]
+    },
+    {
+      "id": "order-page",
+      "label": "OrderPage",
+      "detail": "Loads the order and confirms it with the amount charged.",
+      "tags": [
+        "fetches",
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/pages/orders/OrderPage.jsx",
+          "start": 4,
+          "end": 17,
+          "why": "Declares OrderPage"
+        }
+      ]
+    },
+    {
+      "id": "header",
+      "label": "Header",
+      "detail": "Site header shown on most pages: logo, nav links, search and the cart badge.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/layout/Header.jsx",
+          "start": 5,
+          "end": 14,
+          "why": "Declares Header"
+        }
+      ]
+    },
+    {
+      "id": "nav-links",
+      "label": "NavLinks",
+      "detail": "Fixed links to the catalog and sign-in.",
+      "tags": [
+        "routing"
+      ],
+      "refs": [
+        {
+          "path": "src/components/layout/NavLinks.jsx",
+          "start": 6,
+          "end": 12,
+          "why": "Declares NavLinks"
+        }
+      ]
+    },
+    {
+      "id": "search-box",
+      "label": "SearchBox",
+      "detail": "Search form that reloads the catalog with ?q=.",
+      "tags": [
+        "form",
+        "routing"
+      ],
+      "refs": [
+        {
+          "path": "src/components/layout/SearchBox.jsx",
+          "start": 1,
+          "end": 13,
+          "why": "Declares SearchBox"
+        }
+      ]
+    },
+    {
+      "id": "cart-badge",
+      "label": "CartBadge",
+      "detail": "Item count from the cart store, linking to /cart.",
+      "tags": [
+        "state",
+        "routing"
+      ],
+      "refs": [
+        {
+          "path": "src/components/layout/CartBadge.jsx",
+          "start": 3,
+          "end": 7,
+          "why": "Declares CartBadge"
+        }
+      ]
+    },
+    {
+      "id": "footer",
+      "label": "Footer",
+      "detail": "Static footer text.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/layout/Footer.jsx",
+          "start": 1,
+          "end": 7,
+          "why": "Declares Footer"
+        }
+      ]
+    },
+    {
+      "id": "filter-sidebar",
+      "label": "FilterSidebar",
+      "detail": "Category radio list; picking one reloads the catalog with ?category=.",
+      "tags": [
+        "state",
+        "routing"
+      ],
+      "refs": [
+        {
+          "path": "src/components/catalog/FilterSidebar.jsx",
+          "start": 5,
+          "end": 19,
+          "why": "Declares FilterSidebar"
+        }
+      ]
+    },
+    {
+      "id": "product-grid",
+      "label": "ProductGrid",
+      "detail": "Fetches products for the current query string and lays out a card for each.",
+      "tags": [
+        "fetches",
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/catalog/ProductGrid.jsx",
+          "start": 4,
+          "end": 10,
+          "why": "Declares ProductGrid"
+        }
+      ]
+    },
+    {
+      "id": "product-card",
+      "label": "ProductCard",
+      "detail": "Image and name linking to the product page, a price and Add to cart.",
+      "tags": [
+        "routing"
+      ],
+      "refs": [
+        {
+          "path": "src/components/catalog/ProductCard.jsx",
+          "start": 4,
+          "end": 12,
+          "why": "Declares ProductCard"
+        }
+      ]
+    },
+    {
+      "id": "product-gallery",
+      "label": "ProductGallery",
+      "detail": "Main image with a thumbnail button per image.",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/product/ProductGallery.jsx",
+          "start": 3,
+          "end": 11,
+          "why": "Declares ProductGallery"
+        }
+      ]
+    },
+    {
+      "id": "add-to-cart",
+      "label": "AddToCartButton",
+      "detail": "Adds one of the product to the cart store.",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/product/AddToCartButton.jsx",
+          "start": 4,
+          "end": 11,
+          "why": "Declares AddToCartButton"
+        }
+      ]
+    },
+    {
+      "id": "review-thread",
+      "label": "ReviewThread",
+      "detail": "List of reviews. Each review renders its replies with another ReviewThread, so the two components recurse.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/product/ReviewThread.jsx",
+          "start": 3,
+          "end": 10,
+          "why": "Declares ReviewThread"
+        }
+      ]
+    },
+    {
+      "id": "review-item",
+      "label": "ReviewItem",
+      "detail": "One review (author, stars, text) and its replies.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/product/ReviewItem.jsx",
+          "start": 3,
+          "end": 11,
+          "why": "Declares ReviewItem"
+        }
+      ]
+    },
+    {
+      "id": "cart-line",
+      "label": "CartLine",
+      "detail": "One cart item with its line price; when editable, a quantity stepper and Remove.",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/cart/CartLine.jsx",
+          "start": 6,
+          "end": 15,
+          "why": "Declares CartLine"
+        }
+      ]
+    },
+    {
+      "id": "quantity-stepper",
+      "label": "QuantityStepper",
+      "detail": "Minus and plus buttons that change the quantity in the cart store (zero removes the line).",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/cart/QuantityStepper.jsx",
+          "start": 4,
+          "end": 13,
+          "why": "Declares QuantityStepper"
+        }
+      ]
+    },
+    {
+      "id": "checkout-steps",
+      "label": "CheckoutSteps",
+      "detail": "Holds the current step and the shipping address, switching from shipping to payment.",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/CheckoutSteps.jsx",
+          "start": 5,
+          "end": 12,
+          "why": "Declares CheckoutSteps"
+        }
+      ]
+    },
+    {
+      "id": "shipping-step",
+      "label": "ShippingStep",
+      "detail": "Email and address form; continues to payment.",
+      "tags": [
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/ShippingStep.jsx",
+          "start": 4,
+          "end": 18,
+          "why": "Declares ShippingStep"
+        }
+      ]
+    },
+    {
+      "id": "address-fields",
+      "label": "AddressFields",
+      "detail": "Street, city and postcode inputs.",
+      "tags": [
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/AddressFields.jsx",
+          "start": 3,
+          "end": 12,
+          "why": "Declares AddressFields"
+        }
+      ]
+    },
+    {
+      "id": "postcode-lookup",
+      "label": "PostcodeLookup",
+      "detail": "Looks up the city for a postcode on blur from /api/postcodes.",
+      "tags": [
+        "fetches",
+        "state",
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/PostcodeLookup.jsx",
+          "start": 3,
+          "end": 17,
+          "why": "Declares PostcodeLookup"
+        }
+      ]
+    },
+    {
+      "id": "payment-step",
+      "label": "PaymentStep",
+      "detail": "Saved cards, a new card form and a Back to shipping link.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/checkout/PaymentStep.jsx",
+          "start": 5,
+          "end": 14,
+          "why": "Declares PaymentStep"
+        }
+      ]
+    },
+    {
+      "id": "saved-card-picker",
+      "label": "SavedCardPicker",
+      "detail": "Signed-in shopper's saved cards from AccountContext; hidden when there are none.",
+      "tags": [
+        "context"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/SavedCardPicker.jsx",
+          "start": 5,
+          "end": 15,
+          "why": "Declares SavedCardPicker"
+        },
+        {
+          "path": "src/stores/account.js",
+          "start": 1,
+          "end": 4,
+          "why": "AccountContext it reads"
+        }
+      ]
+    },
+    {
+      "id": "card-form",
+      "label": "CardForm",
+      "detail": "Card number, expiry and CVC with the Place order button.",
+      "tags": [
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/CardForm.jsx",
+          "start": 4,
+          "end": 18,
+          "why": "Declares CardForm"
+        }
+      ]
+    },
+    {
+      "id": "card-number-field",
+      "label": "CardNumberField",
+      "detail": "Card number input that shows the detected brand.",
+      "tags": [
+        "state",
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/CardNumberField.jsx",
+          "start": 4,
+          "end": 13,
+          "why": "Declares CardNumberField"
+        }
+      ]
+    },
+    {
+      "id": "card-brand-icon",
+      "label": "CardBrandIcon",
+      "detail": "Guesses Visa, Mastercard or Amex from the number prefix.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/checkout/CardBrandIcon.jsx",
+          "start": 3,
+          "end": 6,
+          "why": "Declares CardBrandIcon"
+        }
+      ]
+    },
+    {
+      "id": "order-summary",
+      "label": "OrderSummary",
+      "detail": "Read-only cart lines, a promo code field and the discounted total.",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/OrderSummary.jsx",
+          "start": 6,
+          "end": 16,
+          "why": "Declares OrderSummary"
+        }
+      ]
+    },
+    {
+      "id": "promo-code-field",
+      "label": "PromoCodeField",
+      "detail": "Checks a promo code with /api/promos and stores the discount in the cart; shows an error for unknown codes.",
+      "tags": [
+        "fetches",
+        "state",
+        "form"
+      ],
+      "refs": [
+        {
+          "path": "src/components/checkout/PromoCodeField.jsx",
+          "start": 5,
+          "end": 25,
+          "why": "Declares PromoCodeField"
+        }
+      ]
+    },
+    {
+      "id": "price-line",
+      "label": "PriceLine",
+      "detail": "Label and a formatted USD amount.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/shared/PriceLine.jsx",
+          "start": 3,
+          "end": 10,
+          "why": "Declares PriceLine"
+        }
+      ]
+    },
+    {
+      "id": "button",
+      "label": "Button",
+      "detail": "Shared button with primary, secondary, link and icon variants.",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/shared/Button.jsx",
+          "start": 1,
+          "end": 3,
+          "why": "Declares Button"
+        }
+      ]
+    }
+  ],
+  "uses": [
+    {
+      "from": "catalog-page",
+      "to": "header"
+    },
+    {
+      "from": "catalog-page",
+      "to": "filter-sidebar"
+    },
+    {
+      "from": "catalog-page",
+      "to": "product-grid"
+    },
+    {
+      "from": "catalog-page",
+      "to": "footer"
+    },
+    {
+      "from": "product-page",
+      "to": "header"
+    },
+    {
+      "from": "product-page",
+      "to": "product-gallery"
+    },
+    {
+      "from": "product-page",
+      "to": "price-line"
+    },
+    {
+      "from": "product-page",
+      "to": "add-to-cart"
+    },
+    {
+      "from": "product-page",
+      "to": "review-thread"
+    },
+    {
+      "from": "product-page",
+      "to": "footer"
+    },
+    {
+      "from": "cart-page",
+      "to": "header"
+    },
+    {
+      "from": "cart-page",
+      "to": "cart-line"
+    },
+    {
+      "from": "cart-page",
+      "to": "price-line"
+    },
+    {
+      "from": "cart-page",
+      "to": "footer"
+    },
+    {
+      "from": "checkout-page",
+      "to": "header"
+    },
+    {
+      "from": "checkout-page",
+      "to": "checkout-steps"
+    },
+    {
+      "from": "checkout-page",
+      "to": "order-summary"
+    },
+    {
+      "from": "order-page",
+      "to": "price-line"
+    },
+    {
+      "from": "header",
+      "to": "nav-links"
+    },
+    {
+      "from": "header",
+      "to": "search-box"
+    },
+    {
+      "from": "header",
+      "to": "cart-badge"
+    },
+    {
+      "from": "product-grid",
+      "to": "product-card"
+    },
+    {
+      "from": "product-card",
+      "to": "price-line"
+    },
+    {
+      "from": "product-card",
+      "to": "add-to-cart"
+    },
+    {
+      "from": "add-to-cart",
+      "to": "button"
+    },
+    {
+      "from": "review-thread",
+      "to": "review-item"
+    },
+    {
+      "from": "review-item",
+      "to": "review-thread"
+    },
+    {
+      "from": "cart-line",
+      "to": "price-line"
+    },
+    {
+      "from": "cart-line",
+      "to": "quantity-stepper"
+    },
+    {
+      "from": "cart-line",
+      "to": "button"
+    },
+    {
+      "from": "quantity-stepper",
+      "to": "button"
+    },
+    {
+      "from": "checkout-steps",
+      "to": "shipping-step"
+    },
+    {
+      "from": "checkout-steps",
+      "to": "payment-step"
+    },
+    {
+      "from": "shipping-step",
+      "to": "address-fields"
+    },
+    {
+      "from": "shipping-step",
+      "to": "button"
+    },
+    {
+      "from": "address-fields",
+      "to": "postcode-lookup"
+    },
+    {
+      "from": "payment-step",
+      "to": "saved-card-picker"
+    },
+    {
+      "from": "payment-step",
+      "to": "card-form"
+    },
+    {
+      "from": "payment-step",
+      "to": "button"
+    },
+    {
+      "from": "saved-card-picker",
+      "to": "button"
+    },
+    {
+      "from": "card-form",
+      "to": "card-number-field"
+    },
+    {
+      "from": "card-form",
+      "to": "button"
+    },
+    {
+      "from": "card-number-field",
+      "to": "card-brand-icon"
+    },
+    {
+      "from": "order-summary",
+      "to": "cart-line"
+    },
+    {
+      "from": "order-summary",
+      "to": "promo-code-field"
+    },
+    {
+      "from": "order-summary",
+      "to": "price-line"
+    },
+    {
+      "from": "promo-code-field",
+      "to": "button"
+    }
+  ],
+  "screens": [
+    {
+      "screen": "catalog",
+      "root": "catalog-page"
+    },
+    {
+      "screen": "product",
+      "root": "product-page"
+    },
+    {
+      "screen": "cart",
+      "root": "cart-page"
+    },
+    {
+      "screen": "checkout",
+      "root": "checkout-page"
+    },
+    {
+      "screen": "order",
+      "root": "order-page"
+    }
+  ],
+  "gaps": [
+    "No app shell in src/, so who provides AccountContext could not be confirmed.",
+    "The /sign-in screen has no component in src/."
+  ],
+  "dirtyAtGeneration": true,
+  "generatedAt": "2026-10-29T20:23:11.920Z",
+  "commit": "1f9b22cc54b73847292d60a02285f8bfefe3054c"
+}

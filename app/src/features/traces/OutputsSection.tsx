@@ -47,9 +47,10 @@ export interface OutputsSectionProps {
     disabled?: boolean;
 }
 
-/** The Outputs choice (Code architecture, Flowchart, Sitemap) as a collapsible section with a count. */
+/** The Outputs choice (Code architecture, Flowchart, Sitemap, Components) as a collapsible section with a count. */
 export const OutputsSection = observer(function OutputsSection({ vm, open, onToggle, count, review = false, disabled = false }: OutputsSectionProps) {
     const sitemap = vm.deps.sitemap;
+    const components = vm.deps.components;
     return (
         <div className="trace-outputs">
             <SettingsSection id="trace-outputs" title="Outputs" count={count} open={open} onToggle={onToggle}>
@@ -70,6 +71,21 @@ export const OutputsSection = observer(function OutputsSection({ vm, open, onTog
                             onClick={() => void sitemap.generate()}>Generate sitemap</button>
                         {sitemap.busy && <button className="btn" type="button" onClick={sitemap.stop}>Stop sitemap generation</button>}
                         <p role="status">{sitemap.message}</p>
+                    </div>}
+                    <OutputOption id="withcomponents" label="Components" checked={vm.components}
+                        description={review ? 'Shows the UI components the change adds, changes or removes.' : 'Shows the UI components the process uses, including proposed changes.'}
+                        onChange={(value) => vm.setOutput('components', value)} />
+                    {vm.components && components && !components.components && !components.loading && <div>
+                        {components.canGenerate
+                            ? <p>Generate the component map before {review ? 'reviewing' : 'tracing'} components. Your {review ? 'choices' : 'question'} will stay here.</p>
+                            : <p>Generate the sitemap first: components are mapped from its screens.</p>}
+                        {components.canGenerate
+                            ? <button className="btn" type="button" disabled={components.busy}
+                                onClick={() => void components.generate()}>Generate components</button>
+                            : sitemap && <button className="btn" type="button" disabled={sitemap.busy || sitemap.loading}
+                                onClick={() => void sitemap.generate()}>Generate sitemap</button>}
+                        {components.busy && <button className="btn" type="button" onClick={components.stop}>Stop component generation</button>}
+                        <p role="status">{components.message}</p>
                     </div>}
                 </fieldset>
             </SettingsSection>

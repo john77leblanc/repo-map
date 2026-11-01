@@ -1,4 +1,6 @@
-export type Workspace = 'architecture' | 'flowchart' | 'sitemap';
+export type Workspace = 'architecture' | 'flowchart' | 'sitemap' | 'components';
+/** A top-level view tab (every view is also a trace output). */
+export type View = Workspace;
 export type ChangeStatus = 'new' | 'modified' | 'removed';
 export interface MapNode {
     id: string;
@@ -290,6 +292,25 @@ export interface SitemapTrace {
         navigation: (SitemapNavigation & { index?: number; status: ChangeStatus; rationale: string })[];
     };
 }
+/** A component as a trace changes it. */
+export type ComponentChange = UiComponent & { status: ChangeStatus; rationale: string };
+/** A render link a trace adds or removes. */
+export interface ComponentUseChange {
+    from: string;
+    to: string;
+    status: 'new' | 'removed';
+    rationale: string;
+}
+/** A trace's Components output (`lib/components-trace.mjs`). */
+export interface ComponentsTrace {
+    version: number;
+    base: ComponentMap;
+    applicability: 'relevant' | 'none';
+    summary: string;
+    gaps: string[];
+    involved: { id: string; note: string; refs: CodeRef[] }[];
+    changes: { components: ComponentChange[]; uses: ComponentUseChange[] };
+}
 export interface Trace {
     intent: 'description' | 'proposal' | 'review';
     title: string;
@@ -299,10 +320,12 @@ export interface Trace {
     steps: { id: string; note: string }[];
     edges: string[][];
     refs: CodeRef[];
-    outputs: { architecture: boolean; flowchart: boolean; sitemap?: boolean };
+    outputs: { architecture: boolean; flowchart: boolean; sitemap?: boolean; components?: boolean };
     pendingFlow: boolean;
     pendingSitemap?: boolean;
     sitemap?: SitemapTrace | null;
+    pendingComponents?: boolean;
+    components?: ComponentsTrace | null;
     flow?: Flow | null;
     /** Closer looks at flowchart boxes, by box id. */
     expansions?: Record<string, FlowExpansion>;

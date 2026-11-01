@@ -1,12 +1,12 @@
 ﻿import { makeAutoObservable } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { Workspace } from '../../models/types';
+import type { View } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import type { SettingsSectionId } from '../settings/SettingsViewModel';
 export interface ShellDeps {
     repo: RepositoryModel;
     services: Services;
-    onWorkspaceChange?: (workspace: Workspace | 'sitemap') => void;
+    onWorkspaceChange?: (workspace: View) => void;
     onLayoutChange?: () => void;
     /** Expand a Settings section when Settings opens on it. */
     onOpenSettings?: (section: SettingsSectionId) => void;
@@ -16,8 +16,8 @@ export class ShellViewModel {
     collapsed = false;
     dragging = false;
     settingsOpen = false;
-    workspace: Workspace | 'sitemap' = 'architecture';
-    repositoryWorkspace: 'architecture' | 'sitemap' = 'architecture';
+    workspace: View = 'architecture';
+    repositoryWorkspace: Exclude<View, 'flowchart'> = 'architecture';
     private initialized = false;
     constructor(readonly deps: ShellDeps) {
         makeAutoObservable(this, { deps: false }, { autoBind: true });
@@ -76,8 +76,8 @@ export class ShellViewModel {
         else return false;
         return true;
     }
-    /** Show a map view; architecture and sitemap are remembered for leaving a trace from Flowchart. */
-    showRepository(workspace: Workspace = this.repositoryWorkspace) {
+    /** Show a map view; any but Flowchart is remembered for leaving a trace from Flowchart. */
+    showRepository(workspace: View = this.repositoryWorkspace) {
         if (workspace !== 'flowchart') this.repositoryWorkspace = workspace;
         this.showWorkspace(workspace);
     }
@@ -85,7 +85,7 @@ export class ShellViewModel {
     returnToMap() {
         this.showRepository(this.workspace === 'flowchart' ? this.repositoryWorkspace : this.workspace);
     }
-    showWorkspace(workspace: Workspace | 'sitemap') {
+    showWorkspace(workspace: View) {
         this.workspace = workspace;
         this.deps.onWorkspaceChange?.(workspace);
         this.deps.onLayoutChange?.();

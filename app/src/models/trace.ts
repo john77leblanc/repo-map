@@ -4,7 +4,8 @@ import { normalizePlan, normalizeProposal } from '../../../lib/proposal.mjs';
 import { normalizeReview } from '../../../lib/review-data.mjs';
 import { traceOutputs } from '../../../lib/trace-outputs.mjs';
 import { normalizeSitemapTrace } from '../../../lib/sitemap-trace.mjs';
-import type { CodeRef, Flow, Plan, Proposal, RepoMap, Review, StreamResult, Trace, SitemapTrace } from './types';
+import { normalizeComponentsTrace } from '../../../lib/components-trace.mjs';
+import type { CodeRef, ComponentsTrace, Flow, Plan, Proposal, RepoMap, Review, StreamResult, Trace, SitemapTrace } from './types';
 
 type PlainTrace = Omit<Trace, 'pairs' | '_doc' | 'key' | 'createdAt'>;
 type TraceStep = Trace['steps'][number];
@@ -92,7 +93,8 @@ function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, works
             return true;
         });
     const sitemap = normalizeSitemapTrace(raw.sitemap, null, intent) as SitemapTrace | null;
-    if (!steps.length && !sitemap && !normalizeFlow(raw.flow)) throw new Error('no known services');
+    const components = normalizeComponentsTrace(raw.components, null, intent) as ComponentsTrace | null;
+    if (!steps.length && !sitemap && !components && !normalizeFlow(raw.flow)) throw new Error('no known services');
 
     // Saved refs are flat; fresh AI results may nest them under each step.
     const refs: unknown[] = Array.isArray(raw.refs)
@@ -151,6 +153,8 @@ function normalizeTrace(value: unknown, homeMap: RepoMap, prompt?: string, works
         ...(flow && raw.expansions ? { expansions: normalizeExpansions(raw.expansions, flow) as Trace['expansions'] } : {}),
         sitemap,
         pendingSitemap: raw.pendingSitemap === true,
+        components,
+        pendingComponents: raw.pendingComponents === true,
         outputs: traceOutputs(raw),
         pendingFlow: raw.pendingFlow === true,
         used: cleanUsed(raw.used),
@@ -190,6 +194,8 @@ function plain(trace: Trace): PlainTrace {
     if (trace.flow && trace.expansions && Object.keys(trace.expansions).length) result.expansions = trace.expansions;
     if (trace.sitemap) result.sitemap = trace.sitemap;
     if (trace.pendingSitemap) result.pendingSitemap = true;
+    if (trace.components) result.components = trace.components;
+    if (trace.pendingComponents) result.pendingComponents = true;
     if (trace.used) result.used = trace.used;
     if (trace.scope) {
         result.scope = trace.scope;

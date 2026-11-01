@@ -1,11 +1,12 @@
 import { makeAutoObservable } from 'mobx';
 import type { RepositoryModel } from '../../models/RepositoryModel';
-import type { Workspace } from '../../models/types';
+import type { View } from '../../models/types';
 import type { ShellViewModel } from './ShellViewModel';
 import type { TraceViewModel } from '../traces/TraceViewModel';
 import type { ArchitectureViewModel } from '../architecture/ArchitectureViewModel';
 import type { FlowchartViewModel } from '../flowchart/FlowchartViewModel';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
+import type { ComponentsViewModel } from '../components/ComponentsViewModel';
 import type { SettingsViewModel } from '../settings/SettingsViewModel';
 
 export interface ViewSwitcherDeps {
@@ -15,12 +16,13 @@ export interface ViewSwitcherDeps {
     architecture: ArchitectureViewModel;
     flowchart: FlowchartViewModel;
     sitemap: SitemapViewModel;
+    components: ComponentsViewModel;
     settings: SettingsViewModel;
     /** Opens the trace composer (Flowchart on the map). */
     onNewTrace: () => void;
 }
 export interface ViewTab {
-    id: Workspace;
+    id: View;
     label: string;
     exists: boolean;
     busy: boolean;
@@ -38,8 +40,8 @@ export interface MissingState {
     action: MissingAction;
 }
 
-const VIEWS: Workspace[] = ['architecture', 'flowchart', 'sitemap'];
-const LABELS: Record<Workspace, string> = { architecture: 'Architecture', flowchart: 'Flowchart', sitemap: 'Sitemap' };
+const VIEWS: View[] = ['architecture', 'flowchart', 'sitemap', 'components'];
+const LABELS: Record<View, string> = { architecture: 'Architecture', flowchart: 'Flowchart', sitemap: 'Sitemap', components: 'Components' };
 const NO_AI = 'Set up an AI tool in Settings first';
 
 /** The one row of view tabs (map or trace), and what to show when the current view doesn't exist. */
@@ -50,22 +52,23 @@ export class ViewSwitcherViewModel {
     get trace() {
         return this.deps.traces.selected;
     }
-    private exists(view: Workspace): boolean {
-        const { repo, sitemap } = this.deps;
-        // The repository sitemap uses the map-generation settings; the server reports a missing tool.
-        const generateSitemap: MissingAction = { label: 'Generate', run: () => void sitemap.generate(), disabled: sitemap.loading };
+    private exists(view: View): boolean {
+        const { repo, sitemap, components } = this.deps;
         const trace = this.trace;
         if (!trace) {
+            if (view === 'components') return !!components.components;
             if (view === 'architecture') return repo.map.nodes.length > 0;
             if (view === 'sitemap') return !!sitemap.sitemap;
             return false;
         }
         if (view === 'architecture') return trace.steps.length > 0;
         if (view === 'flowchart') return !!trace.flow;
+        if (view === 'components') return !!trace.components;
         return !!trace.sitemap;
     }
-    private busy(view: Workspace): boolean {
-        const { settings, flowchart, sitemap } = this.deps;
+    private busy(view: View): boolean {
+        const { settings, flowchart, sitemap, components } = this.deps;
+        if (view === 'components') return components.busy || (!this.trace && components.loading);
         if (view === 'architecture') return !this.trace && settings.busy;
         if (view === 'flowchart') return !!this.trace && flowchart.busy && flowchart.trace === this.trace;
         return sitemap.busy || (!this.trace && sitemap.loading);
@@ -73,22 +76,22 @@ export class ViewSwitcherViewModel {
     get views(): ViewTab[] {
         return VIEWS.map((id) => ({ id, label: LABELS[id], exists: this.exists(id), busy: this.busy(id) }));
     }
-    get current(): Workspace {
+    get current(): View {
         return this.deps.shell.workspace;
     }
     /** The current view is missing and nothing is generating it: show the message instead. */
     get showMissing() {
-        const view = this.views.find((v) => v.id === this.current)!;
-        return !view.exists && !view.busy;
+        const view = this.views.find((v) => v.id === this.current);
+        return !!view && !view.exists && !view.busy;
     }
     get context() {
         if (this.trace) return 'Trace · ' + this.trace.title;
         return this.deps.architecture.scope === 'workspace' ? 'Workspace map' : 'Map';
     }
     get missing(): MissingState {
-        const { repo, shell, traces, flowchart, sitemap, settings } = this.deps;
+        const { repo, shell, traces, flowchart, sitemap, components, settings } = this.deps;
         const view = this.current;
-        const name = view === 'architecture' ? 'architecture' : view === 'flowchart' ? 'flowchart' : 'sitemap';
+        const name = view;
         const ai = repo.aiAvailable;
         const generate = (run: () => void, disabled = false): MissingAction => ({
             label: 'Generate',
@@ -100,6 +103,14 @@ export class ViewSwitcherViewModel {
         const generateSitemap: MissingAction = { label: 'Generate', run: () => void sitemap.generate(), disabled: sitemap.loading };
         const trace = this.trace;
         if (!trace) {
+            if (view === 'components') {
+                return sitemap.sitemap?.screens.length
+                    ? { title: "The components view doesn't exist for this map", hint: 'Components are mapped from the sitemap’s screens.',
+                        error: components.error ? components.message : undefined,
+                        action: { label: 'Generate', run: () => void components.generate(), disabled: components.loading } }
+                    : { title: "The components view doesn't exist for this map", hint: 'Generate the sitemap first: components are mapped from its screens.',
+                        error: sitemap.error ? sitemap.message : undefined, action: generateSitemap };
+            }
             if (view === 'flowchart') {
                 return { title: 'Flowcharts only exist for traces', action: { label: 'New trace', run: this.deps.onNewTrace } };
             }
@@ -134,6 +145,16 @@ export class ViewSwitcherViewModel {
                 action: generate(() => void flowchart.generate(trace)),
             };
         }
+        if (view === 'components') {
+            if (!components.components) {
+                return sitemap.sitemap?.screens.length
+                    ? { title, hint: 'The repository component map is needed first.', error: components.error ? components.message : undefined,
+                        action: { label: 'Generate', run: () => void components.generate(), disabled: components.loading } }
+                    : { title, hint: 'The repository component map is needed first, and it is mapped from the sitemap’s screens.',
+                        error: sitemap.error ? sitemap.message : undefined, action: generateSitemap };
+            }
+            return { title, error: components.error ? components.message : undefined, action: generate(() => void components.generateTrace()) };
+        }
         if (!sitemap.sitemap) {
             return {
                 title,
@@ -144,7 +165,7 @@ export class ViewSwitcherViewModel {
         }
         return { title, error: sitemap.error ? sitemap.message : undefined, action: generate(() => void sitemap.generateTrace()) };
     }
-    show(view: Workspace) {
+    show(view: View) {
         const { shell, traces } = this.deps;
         if (this.trace && this.exists(view)) void traces.openOutput(view);
         else if (this.trace) shell.showWorkspace(view);

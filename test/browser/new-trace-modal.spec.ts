@@ -24,7 +24,7 @@ test('New trace opens a modal with stacked outputs, accessible tooltips and a re
     await expect(page.locator('#trace-outputs .settings-section-count')).toHaveText('2');
     await page.locator('#trace-outputs > summary').click();
     const boxes = await modal.getByRole('checkbox').all();
-    expect(boxes).toHaveLength(3);
+    expect(boxes).toHaveLength(4);
     const bounds = await Promise.all(boxes.map(box => box.boundingBox()));
     for (let i = 1; i < bounds.length; i++) {
         expect(bounds[i]!.x).toBeCloseTo(bounds[0]!.x, 0);

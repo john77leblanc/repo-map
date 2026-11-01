@@ -19,7 +19,8 @@ const STATE_LABELS: Record<OutputRow['state'], string> = { waiting: 'Waiting', d
 const ComposerForm = observer(function ComposerForm({ vm, onRefreshAgents }: ComposerModalProps) {
     const { traces, review } = vm.deps;
     const describe = vm.tab === 'describe';
-    const blocked = !traces.repo.aiAvailable || (traces.sitemap && (traces.deps.sitemap?.loading || traces.deps.sitemap?.busy));
+    const blocked = !traces.repo.aiAvailable || (traces.sitemap && (traces.deps.sitemap?.loading || traces.deps.sitemap?.busy))
+        || (traces.components && (traces.deps.components?.loading || traces.deps.components?.busy));
     const statusId = describe ? 'status' : 'review-status';
     return (
         <form id={describe ? 'composer' : 'review-form'} onSubmit={(e) => { e.preventDefault(); vm.submit(); }}>

@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 import { observer } from 'mobx-react-lite';
 import type { ViewSwitcherViewModel } from './ViewSwitcherViewModel';
 
-const panels = { architecture: 'architecture-workspace', flowchart: 'flowdlg', sitemap: 'sitemap-workspace' } as const;
+const panels = { architecture: 'architecture-workspace', flowchart: 'flowdlg', sitemap: 'sitemap-workspace', components: 'components-workspace' } as const;
 
-/** Architecture · Flowchart · Sitemap, for the map or the open trace. Missing views stay clickable. */
+/** Architecture · Flowchart · Sitemap (· Components on the map), for the map or the open trace. Missing views stay clickable. */
 export const ViewTabs = observer(function ViewTabs({ vm, leading }: { vm: ViewSwitcherViewModel; leading?: ReactNode }) {
     const views = vm.views;
     return (

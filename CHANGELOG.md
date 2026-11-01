@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Components** is a top-level view beside **Architecture**, **Flowchart** and **Sitemap**. The Sitemap toolbar's **Screens | Components** switch is gone, and **Generate components** moved from the Sitemap's **More** menu to the Components toolbar and its empty state (which asks for the sitemap first). The diagram shows components only: **All roots** (default) puts the components nothing renders on top; **Show** narrows to one screen. Boxes show just the component name. A component's panel has **About**, **Used in** (screens; click to open one on the Sitemap), **Connections** and **References**.
+
+- Traces and reviews can ask for a **Components** output (**New trace** > Outputs > **Components**; it needs the component map and offers to generate it): the components a process involves, stepped through like trace steps, and, for proposals and reviews, components and render links added, changed or removed, marked on the diagram and in the panel. It is saved with a snapshot of the component map. In a trace, the Components tab's **Show** starts on **This trace**; **Redraw** / **Add output** draws it again. `components: true` on `POST /api/trace` / `POST /api/review`; new `POST /api/trace/components` adds or redraws it on a saved trace.
+
+- A screen's panel on the Sitemap has a **Components** section: its root components (click to open one in the Components view), the component count and **View component tree**, which opens the tree in its own window (names and tags; click a component to open it in the Components view, or **Show in diagram** for the whole screen).
+
 ## 0.21.0
 
 - **Components** in the Sitemap view: **More > Generate components** maps the app's own UI components and what renders what (an AI pass after the sitemap, saved to `.repo-map/components.json`, sharing the sitemap job slot). A **Screens | Components** switch shows them as a diagram (screens on top, then their components; shared ones read `· N screens`), scoped by a **Screen** picker or **All screens**. A component's panel has **About**, **Screens**, **Connections** (**Rendered by** / **Renders**) and **References**; a screen's panel lists its component tree, with hover lighting up every screen that shows a component and **Show** opening it on the diagram. New routes: `GET /api/components`, `POST /api/components/generate`. Traces and reviews do not use components yet.

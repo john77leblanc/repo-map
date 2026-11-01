@@ -10,6 +10,30 @@ import { CopyFeedback } from '../../models/CopyFeedback';
 const copyKey = (trace: Trace) => trace._doc || trace.title || 'trace';
 import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
+import type { ComponentsViewModel } from '../components/ComponentsViewModel';
+
+/** The composer's question and output choices, kept aside while editing or watching a job. */
+interface Picks { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean; components: boolean }
+/** Browser-storage keys of the output choices. */
+const OUTPUT_KEYS: Record<Workspace, string> = { architecture: 'witharchitecture', flowchart: 'withflow', sitemap: 'withsitemap', components: 'withcomponents' };
+/** The outputs a trace asks for, from the composer's choices (sitemap and components only when picked). */
+const askFor = (p: Omit<Picks, 'prompt'>): Trace['outputs'] => ({ architecture: p.architecture, flowchart: p.flowchart,
+    ...(p.sitemap ? { sitemap: true } : {}), ...(p.components ? { components: true } : {}) });
+/** The extra outputs, as the trace and review routes take them. */
+const extraBody = (outputs: Trace['outputs']) => ({ ...(outputs.sitemap ? { sitemap: true } : {}), ...(outputs.components ? { components: true } : {}) });
+const NONE_PICKED = 'Select Code architecture, Flowchart, Sitemap, or Components.';
+const MISSING_COMPONENTS = 'Generate the component map before tracing components. Your question has been kept.';
+/** What the status says when an asked-for output came back missing (null: nothing missing). */
+function missingNote(trace: Trace, review: boolean) {
+    const missing = [trace.pendingFlow && 'the flowchart', trace.pendingSitemap && 'Sitemap', trace.pendingComponents && 'Components']
+        .filter((x): x is string => !!x);
+    if (!missing.length) return null;
+    const what = missing.join(' and ') + ' ' + (missing.length > 1 ? 'were' : 'was') + ' missing.';
+    if (review) return 'The review was kept, but ' + what + ' Re-run the review to try again.';
+    const one = missing.length === 1 && !trace.pendingFlow ? missing[0] : '';
+    return (one || missing.length > 1 ? 'Other outputs were kept, but ' : 'The walkthrough was kept, but ')
+        + what + (one ? ' Use Edit to select ' + one + ' and regenerate.' : ' Use Edit to retry the requested outputs.');
+}
 
 /** A collapsible section of the trace sidebar. */
 export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps' | 'outputs';
@@ -26,6 +50,7 @@ export interface TraceDependencies {
     isPlanBusy?(trace: Trace): boolean;
     onRequestFlow(trace: Trace): void | Promise<void>;
     sitemap?: SitemapViewModel;
+    components?: ComponentsViewModel;
     /** The map scope: new traces follow the workspace when it is shown. */
     getScope?(): 'repo' | 'workspace';
     /** The workspace's merged map, once loaded. */
@@ -67,13 +92,13 @@ export class TraceViewModel {
     kindFilter: TraceKindFilter = 'all';
     query = '';
     editing: Trace | null = null;
-    private editDefaults: { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
+    private editDefaults: Picks | null = null;
     private editWorkspace: Workspace = 'architecture';
     savingRevision = false;
-    private editDraft: { id: string; prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
+    private editDraft: (Picks & { id: string }) | null = null;
     jobs: TraceJob[] = [];
     activeJob: TraceJob | null = null;
-    private jobDefaults: { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean } | null = null;
+    private jobDefaults: Picks | null = null;
     items: Trace[] = [];
     temp: Trace | null = null;
     ready = false;
@@ -82,6 +107,7 @@ export class TraceViewModel {
     architecture = true;
     flowchart = true;
     sitemap = false;
+    components = false;
     private message = '';
     private statusError = false;
     private revisionBusy = false;
@@ -186,7 +212,12 @@ export class TraceViewModel {
         if (trace.outputs.architecture && trace.steps.length) outputs.push('architecture');
         if (trace.outputs.flowchart && trace.flow) outputs.push('flowchart');
         if (trace.outputs.sitemap && trace.sitemap) outputs.push('sitemap');
+        if (trace.outputs.components && trace.components) outputs.push('components');
         return outputs;
+    }
+    /** The composer's choices now. */
+    private get picks(): Picks {
+        return { prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap, components: this.components };
     }
     /** Inferred nodes and edges in the selected trace's flowchart. */
     get flowInferred(): number {
@@ -244,21 +275,24 @@ export class TraceViewModel {
         this[output] = value;
         if (this.editing || this.activeJob) return;
         try {
-            this.deps.services.storage.setRaw(
-                this.repo.namespace + (output === 'architecture' ? 'witharchitecture' : output === 'sitemap' ? 'withsitemap' : 'withflow'),
-                value ? '1' : '0'
-            );
+            this.deps.services.storage.setRaw(this.repo.namespace + OUTPUT_KEYS[output], value ? '1' : '0');
         } catch {
             /* Preferences are optional when storage is unavailable. */
         }
         if (output === 'sitemap' && value) void this.deps.sitemap?.load();
+        if (output === 'components' && value) this.loadComponents();
+    }
+    /** The component map (and the sitemap it is generated from), for the Components output. */
+    private loadComponents() {
+        if (!this.deps.components?.components) void this.deps.components?.load();
+        if (!this.deps.sitemap?.sitemap) void this.deps.sitemap?.load();
     }
     setImportCode(value: string) {
         this.importCode = value;
     }
     editPrompt(trace: Trace) {
         if (this.busy || this.editing || this.disposed || !trace._doc) return;
-        this.editDefaults = { prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.editDefaults = this.picks;
         this.editWorkspace = this.workspace;
         this.clear(); // Disconnect output views and cancel their active jobs.
         this.editing = trace;
@@ -267,11 +301,10 @@ export class TraceViewModel {
         this.architecture = trace.outputs.architecture;
         this.flowchart = trace.outputs.flowchart || trace.pendingFlow;
         this.sitemap = !!(trace.outputs.sitemap || trace.pendingSitemap);
+        this.components = !!(trace.outputs.components || trace.pendingComponents);
         if (this.editDraft?.id === trace._doc) {
-            this.prompt = this.editDraft.prompt;
-            this.architecture = this.editDraft.architecture;
-            this.flowchart = this.editDraft.flowchart;
-            this.sitemap = this.editDraft.sitemap;
+            const { id: _id, ...draft } = this.editDraft;
+            Object.assign(this, draft);
         }
         this.message = '';
         this.statusError = false;
@@ -286,7 +319,7 @@ export class TraceViewModel {
     cancelEdit() {
         if (!this.editing || this.savingRevision) return;
         const original = this.editing;
-        this.editDraft = { id: original._doc!, prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.editDraft = { id: original._doc!, ...this.picks };
         this.stop();
         this.finishEdit();
         this.select(original, this.editWorkspace);
@@ -349,11 +382,11 @@ export class TraceViewModel {
             return this.openSavedOutput(job.result, this.resultWorkspace(job.result, job.workspace));
         }
         this.releaseJob();
-        this.jobDefaults = { prompt: this.prompt, architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        this.jobDefaults = this.picks;
         this.clear();
         this.activeJob = job;
         this.prompt = job.prompt;
-        Object.assign(this, job.outputs, { sitemap: !!job.outputs.sitemap });
+        Object.assign(this, job.outputs, { sitemap: !!job.outputs.sitemap, components: !!job.outputs.components });
         this.composerOpen = true;
     }
     setStatus(text: string, error = false) {
@@ -362,18 +395,16 @@ export class TraceViewModel {
         if (error) this.composerOpen = true;
     }
     init() {
-        for (const output of ['architecture', 'flowchart', 'sitemap'] as const) {
+        for (const output of ['architecture', 'flowchart', 'sitemap', 'components'] as const) {
             try {
-                const value = this.deps.services.storage.getRaw(
-                    this.repo.namespace +
-                        (output === 'architecture' ? 'witharchitecture' : output === 'sitemap' ? 'withsitemap' : 'withflow')
-                );
+                const value = this.deps.services.storage.getRaw(this.repo.namespace + OUTPUT_KEYS[output]);
                 if (value !== null) this[output] = value === '1';
             } catch {
                 /* Keep defaults. */
             }
         }
         if (this.sitemap) void this.deps.sitemap?.load();
+        if (this.components) this.loadComponents();
         return this.loadSaved();
     }
     async loadSaved() {
@@ -456,7 +487,7 @@ export class TraceViewModel {
         }
         trace = isObservable(trace) ? trace : observable(trace);
         const selectionVersion = ++this.selectionVersion;
-        if (output === 'sitemap' || !explicit) {
+        if (output === 'sitemap' || output === 'components' || !explicit) {
             this.select(trace, output);
             return;
         } else if (output === 'flowchart') {
@@ -528,8 +559,14 @@ export class TraceViewModel {
     private resultWorkspace(trace: Trace, preferred: Workspace): Workspace {
         const available = this.outputsFor(trace);
         if (available.length) return available.includes(preferred) ? preferred : available[0];
-        return (trace.outputs.sitemap || trace.pendingSitemap) && (preferred === 'sitemap' || (!trace.outputs.architecture && !trace.outputs.flowchart && !trace.pendingFlow))
-            ? 'sitemap' : (trace.outputs.flowchart || trace.pendingFlow) && (preferred === 'flowchart' || !trace.outputs.architecture) ? 'flowchart' : 'architecture';
+        // nothing to show yet: the view of an output that was asked for, so its message offers to draw it
+        const asked = ([
+            ['architecture', trace.outputs.architecture],
+            ['flowchart', trace.outputs.flowchart || trace.pendingFlow],
+            ['sitemap', trace.outputs.sitemap || trace.pendingSitemap],
+            ['components', trace.outputs.components || trace.pendingComponents],
+        ] as [Workspace, boolean | undefined][]).filter(([, on]) => on).map(([id]) => id);
+        return asked.includes(preferred) ? preferred : asked[0] || 'architecture';
     }
     async keepTrace(trace: Trace, preferred: Workspace = this.workspace) {
         const selectionVersion = ++this.selectionVersion;
@@ -590,18 +627,18 @@ export class TraceViewModel {
         }
     }
     private async runNewTrace(prompt: string) {
-        const outputs = { architecture: this.architecture, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) };
-        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap) {
-            this.setStatus('Select Code architecture, Flowchart, or Sitemap.', true);
+        const outputs = askFor(this.picks);
+        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap && !outputs.components) {
+            this.setStatus(NONE_PICKED, true);
             return;
         }
-        if (!this.activeJob) this.jobDefaults = { prompt: '', architecture: this.architecture, flowchart: this.flowchart, sitemap: this.sitemap };
+        if (!this.activeJob) this.jobDefaults = { ...this.picks, prompt: '' };
         else this.jobs = this.jobs.filter((job) => job !== this.activeJob);
         const job = new TraceJob(prompt, outputs, { ...this.deps.getPick() }, this.deps.getPickLabel(), this.workspace);
         this.jobs.unshift(job);
         this.activeJob = job;
-        return this.runJob(job, '/api/trace',
-            { prompt, flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}), ...this.scopeBody, ...job.pick });
+        return this.runJob(job, '/api/trace', { prompt, flow: outputs.flowchart,
+            ...(outputs.sitemap || outputs.components ? { ...extraBody(outputs), architecture: outputs.architecture } : {}), ...this.scopeBody, ...job.pick });
     }
     /**
      * Review a code change (a pull request, two refs, or local changes). It runs as a
@@ -617,23 +654,23 @@ export class TraceViewModel {
             return null;
         }
         // a review always shows the change on the map: its changed files are grouped by card
-        const wanted = { architecture: true, flowchart: !!outputs.flowchart, ...(outputs.sitemap ? { sitemap: true } : {}) };
+        const wanted = askFor({ architecture: true, flowchart: !!outputs.flowchart, sitemap: !!outputs.sitemap, components: !!outputs.components });
         const job = new TraceJob(reviewPrompt(request), wanted, { ...this.deps.getPick() }, this.deps.getPickLabel(), 'architecture');
         job.review = { ...request };
         job.replaces = replace?._doc || '';
         this.jobs.unshift(job);
-        void this.runJob(job, '/api/review', { ...request, flow: wanted.flowchart, sitemap: !!wanted.sitemap, ...job.pick }, replace);
+        void this.runJob(job, '/api/review', { ...request, flow: wanted.flowchart, sitemap: !!wanted.sitemap, ...extraBody(wanted), ...job.pick }, replace);
         return job;
     }
     /** The outputs picked in the composer, as a review asks for them (always with the map). */
     get reviewOutputs(): Trace['outputs'] {
-        return { architecture: true, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) };
+        return askFor({ ...this.picks, architecture: true });
     }
     /** Re-run a saved review on the code as it is now, with the outputs it has; the result replaces it. */
     rerunReview(trace: Trace) {
         if (!trace.review) return null;
-        const outputs = { architecture: true, flowchart: trace.outputs.flowchart || trace.pendingFlow,
-            ...(trace.outputs.sitemap || trace.pendingSitemap ? { sitemap: true } : {}) };
+        const outputs = askFor({ architecture: true, flowchart: trace.outputs.flowchart || trace.pendingFlow,
+            sitemap: !!(trace.outputs.sitemap || trace.pendingSitemap), components: !!(trace.outputs.components || trace.pendingComponents) });
         return this.startReview(reviewRequest(trace.review), outputs, trace);
     }
     /** Ask whether the selected review still matches its branch or pull request. */
@@ -695,7 +732,7 @@ export class TraceViewModel {
         return trace._doc ? this.jobs.find((job) => job.replaces === trace._doc && job.busy) || null : null;
     }
     private async runJob(job: TraceJob, url: string, body: Record<string, unknown>, replace: Trace | null = null) {
-        const outputs = job.outputs;
+        const outputs = job.outputs as Trace['outputs'];
         const signal = job.controller.signal;
         this.controllers.add(job.controller);
         const current = () => !this.disposed && !signal.aborted;
@@ -714,6 +751,11 @@ export class TraceViewModel {
                 if (!current()) return;
                 if (!this.deps.sitemap?.sitemap) throw new Error('Generate the repository sitemap before tracing screens. Your question has been kept.');
             }
+            if (outputs.components && !this.deps.components?.components) {
+                await this.deps.components?.load();
+                if (!current()) return;
+                if (!this.deps.components?.components) throw new Error(MISSING_COMPONENTS);
+            }
             const result = await this.deps.services.api.stream<StreamResult>(url, body,
                 signal, (text) => { last = text; if (current()) job.progress.push(text); tick(); },
                 (title) => { if (current() && job.state === 'running') runInAction(() => { job.title = title.trim().slice(0, 80); }); });
@@ -727,9 +769,11 @@ export class TraceViewModel {
                 architecture: outputs.architecture && trace.steps.length > 0,
                 flowchart: outputs.flowchart && !!trace.flow,
                 ...(outputs.sitemap ? { sitemap: !!trace.sitemap } : {}),
+                ...(outputs.components ? { components: !!trace.components } : {}),
             };
             trace.pendingFlow = outputs.flowchart && !trace.flow;
             trace.pendingSitemap = !!outputs.sitemap && !trace.sitemap;
+            trace.pendingComponents = !!outputs.components && !trace.components;
             runInAction(() => {
                 job.result = trace;
                 job.title = trace.title;
@@ -744,12 +788,8 @@ export class TraceViewModel {
                 if (!saved) {
                     job.status = 'Changes could not be saved. Open the trace to retry saving before reloading.';
                     job.error = true;
-                } else if (trace.pendingFlow || trace.pendingSitemap) {
-                    job.status = job.review
-                        ? 'The review was kept, but ' + (trace.pendingSitemap ? 'Sitemap' : 'the flowchart') + ' was missing. Re-run the review to try again.'
-                        : trace.pendingSitemap
-                        ? 'Other outputs were kept, but Sitemap was missing. Use Edit to select Sitemap and regenerate.'
-                        : 'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.';
+                } else if (missingNote(trace, !!job.review)) {
+                    job.status = missingNote(trace, !!job.review)!;
                     job.error = true;
                 }
                 if (replace && this.selected?._doc === replace._doc) delete this.reviewStates[reviewKey(replace)];
@@ -794,11 +834,19 @@ export class TraceViewModel {
         const original = this.editing;
         if (!prompt || this.busy || !this.repo.aiAvailable || this.disposed) return;
         if (!original) return this.runNewTrace(prompt);
-        const outputs = { architecture: this.architecture, flowchart: this.flowchart, ...(this.sitemap ? { sitemap: true } : {}) },
+        const outputs = askFor(this.picks),
             origin = original ? this.editWorkspace : this.workspace;
-        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap) {
-            this.setStatus('Select Code architecture, Flowchart, or Sitemap.', true);
+        if (!outputs.architecture && !outputs.flowchart && !outputs.sitemap && !outputs.components) {
+            this.setStatus(NONE_PICKED, true);
             return;
+        }
+        if (outputs.components && !this.deps.components?.components) {
+            await this.deps.components?.load();
+            if (!this.deps.components?.components) {
+                this.setStatus(MISSING_COMPONENTS, true);
+                return;
+            }
+            if (this.disposed || this.busy || this.editing !== original) return;
         }
         if (outputs.sitemap && !this.deps.sitemap?.sitemap) {
             await this.deps.sitemap?.load();
@@ -827,7 +875,8 @@ export class TraceViewModel {
         try {
             const result = await this.deps.services.api.stream<StreamResult>(
                 '/api/trace',
-                { prompt, ...(original ? { previousTrace: plain(original), architecture: outputs.architecture } : {}), flow: outputs.flowchart, ...(outputs.sitemap ? { sitemap: true, architecture: outputs.architecture } : {}),
+                { prompt, ...(original ? { previousTrace: plain(original), architecture: outputs.architecture } : {}), flow: outputs.flowchart,
+                    ...(outputs.sitemap || outputs.components ? { ...extraBody(outputs), architecture: outputs.architecture } : {}),
                     // a revision keeps the original's scope
                     ...(original ? (original.scope ? { scope: original.scope } : {}) : this.scopeBody), ...this.deps.getPick() },
                 ctl.signal,
@@ -847,7 +896,8 @@ export class TraceViewModel {
                 );
             const trace = this.normalize({ ...(result.trace as object), outputs, used: result.used }, prompt);
             if (original) {
-                if ((outputs.architecture && !trace.steps.length) || (outputs.flowchart && !trace.flow) || (outputs.sitemap && !trace.sitemap)) {
+                if ((outputs.architecture && !trace.steps.length) || (outputs.flowchart && !trace.flow) || (outputs.sitemap && !trace.sitemap)
+                    || (outputs.components && !trace.components)) {
                     throw new Error('Not all requested outputs were returned. The original trace and edited question were kept. Try again.');
                 }
                 trace._doc = original._doc;
@@ -855,14 +905,17 @@ export class TraceViewModel {
                 trace.plan = null;
                 if (!outputs.flowchart) trace.flow = null;
                 if (!outputs.sitemap) trace.sitemap = null;
+                if (!outputs.components) trace.components = null;
             }
             trace.outputs = {
                 architecture: outputs.architecture && trace.steps.length > 0,
                 flowchart: outputs.flowchart && !!trace.flow,
                 ...(outputs.sitemap ? { sitemap: !!trace.sitemap } : {}),
+                ...(outputs.components ? { components: !!trace.components } : {}),
             };
             trace.pendingFlow = outputs.flowchart && !trace.flow;
             trace.pendingSitemap = !!outputs.sitemap && !trace.sitemap;
+            trace.pendingComponents = !!outputs.components && !trace.components;
             runInAction(() =>
                 this.setStatus(
                     'Done in ' + Math.round((Date.now() - start) / 1000) + 's' + spend(result)
@@ -876,12 +929,8 @@ export class TraceViewModel {
                 runInAction(() => {
                     if (original) { this.editDraft = null; this.finishEdit(); }
                     this.prompt = '';
-                    if (trace.pendingFlow)
-                        this.setStatus(
-                            'The walkthrough was kept, but the flowchart was missing. Use Edit to retry the requested outputs.',
-                            true
-                        );
-                    if (trace.pendingSitemap) this.setStatus('Other outputs were kept, but Sitemap was missing. Use Edit to select Sitemap and regenerate.', true);
+                    const missing = missingNote(trace, false);
+                    if (missing) this.setStatus(missing, true);
                 });
         } catch (error) {
             if (!this.disposed)
@@ -891,7 +940,7 @@ export class TraceViewModel {
                             ? 'Stopped.'
                             : error instanceof Error && error.message !== 'no known services'
                               ? error.message
-                              : outputs.sitemap ? 'The AI returned no usable trace outputs. Your question was kept; try again.' : "The answer didn't name any services on this map. Try rephrasing.",
+                              : outputs.sitemap || outputs.components ? 'The AI returned no usable trace outputs. Your question was kept; try again.' : "The answer didn't name any services on this map. Try rephrasing.",
                         !ctl.signal.aborted
                     )
                 );

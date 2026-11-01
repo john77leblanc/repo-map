@@ -49,6 +49,8 @@ test('repository sitemap generates, navigates, survives trace exploration, and f
     await page.goto('/');
     await page.getByRole('tab', { name: 'Architecture', exact: true }).focus();
     await page.keyboard.press('End');
+    await expect(page.getByRole('tab', { name: 'Components', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
     await expect(page.locator('#view-missing h2')).toHaveText("The sitemap view doesn't exist for this map");
     await page.locator('#view-missing').getByRole('button', { name: 'Generate', exact: true }).click();

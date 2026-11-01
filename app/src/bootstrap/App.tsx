@@ -11,6 +11,7 @@ import { ComposerModal } from '../features/compose/ComposerModal';
 import { ReferenceModal } from '../shared/ui/ReferenceModal';
 import { CodeReference } from '../shared/ui/CodeReference';
 import { SitemapWorkspace } from '../features/sitemap/SitemapWorkspace';
+import { ComponentsWorkspace } from '../features/components/ComponentsWorkspace';
 import { StartView } from '../features/start/StartView';
 import { MissingView, ViewTabs } from '../features/shell/ViewTabs';
 import { ScopeSwitch } from '../features/architecture/WorkspaceBar';
@@ -55,6 +56,8 @@ export const App = observer(function App() {
                             )} />
                         {app.views.showMissing ? (
                             <MissingView vm={app.views} />
+                        ) : app.shell.workspace === 'components' ? (
+                            <ComponentsWorkspace vm={app.components} />
                         ) : app.shell.workspace === 'sitemap' ? (
                             <SitemapWorkspace vm={app.sitemap} />
                         ) : app.shell.workspace === 'architecture' ? (

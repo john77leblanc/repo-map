@@ -12,7 +12,7 @@ export const COMPOSER_TABS: { id: ComposerTab; label: string }[] = [
     { id: 'pr', label: 'Pull request' },
     { id: 'local', label: 'Local changes' },
 ];
-const OUTPUT_LABELS: Record<Workspace, string> = { architecture: 'Code architecture', flowchart: 'Flowchart', sitemap: 'Sitemap' };
+const OUTPUT_LABELS: Record<Workspace, string> = { architecture: 'Code architecture', flowchart: 'Flowchart', sitemap: 'Sitemap', components: 'Components' };
 
 export interface OutputRow {
     id: Workspace;
@@ -81,13 +81,13 @@ export class ComposerViewModel {
     /** How many outputs the job will make (a review always draws the map). */
     get outputCount() {
         const t = this.traces;
-        return Number(this.isReview || t.architecture) + Number(t.flowchart) + Number(t.sitemap);
+        return Number(this.isReview || t.architecture) + Number(t.flowchart) + Number(t.sitemap) + Number(t.components);
     }
     /** The requested outputs and whether each came back. */
     get outputRows(): OutputRow[] {
         const job = this.job;
         if (!job) return [];
-        const asked = (['architecture', 'flowchart', 'sitemap'] as const).filter((id) => job.outputs[id]);
+        const asked = (['architecture', 'flowchart', 'sitemap', 'components'] as const).filter((id) => job.outputs[id]);
         return asked.map((id) => ({
             id, label: OUTPUT_LABELS[id],
             state: job.result ? (job.result.outputs[id] ? 'done' : 'missing') : job.busy ? 'waiting' : 'stopped',

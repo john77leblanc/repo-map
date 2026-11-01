@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RepositoryModel } from '../../models/RepositoryModel';
-import type { ComponentsResult, SitemapResult } from '../../models/types';
+import type { ComponentMap, SitemapResult } from '../../models/types';
 import type { Services } from '../../shared/services/contracts';
 import { SitemapViewModel } from './SitemapViewModel';
 import { SitemapWorkspace } from './SitemapWorkspace';
+
+HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+HTMLDialogElement.prototype.close = function () { this.open = false; };
 
 const result: SitemapResult = { status: { state: 'current' }, sitemap: {
     version: 1, applicability: 'applicable', summary: 'Two applications.', gaps: [],
@@ -18,14 +21,23 @@ const result: SitemapResult = { status: { state: 'current' }, sitemap: {
         { from: 'home', to: 'shop', label: 'Visit store', condition: '', refs: [] },
     ],
 } };
-function fixture() {
+const ref = { path: 'src/Home.tsx', start: 1, end: 9 };
+const componentMap: ComponentMap = { version: 1, applicability: 'applicable', summary: 'Pages.', gaps: [],
+    components: [
+        { id: 'home-page', label: 'HomePage', detail: '', tags: ['fetches'], refs: [ref] },
+        { id: 'shop-page', label: 'ShopPage', detail: '', tags: [], refs: [ref] },
+        { id: 'price', label: 'PriceLine', detail: '', tags: [], refs: [ref] },
+    ],
+    uses: [{ from: 'home-page', to: 'price' }, { from: 'shop-page', to: 'price' }],
+    screens: [{ screen: 'home', root: 'home-page' }, { screen: 'shop', root: 'shop-page' }] };
+function fixture({ map = null, showComponents }: { map?: ComponentMap | null; showComponents?: (screen: string, component?: string) => void } = {}) {
     const services: Services = {
         api: { get: vi.fn().mockResolvedValue(result), request: vi.fn(), stream: vi.fn().mockResolvedValue(result) },
         storage: { get: vi.fn(), set: vi.fn(), getRaw: vi.fn(), setRaw: vi.fn() },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
     };
     const repo = new RepositoryModel(services);
-    const vm = new SitemapViewModel({ repo, services });
+    const vm = new SitemapViewModel({ repo, services, components: () => map, showComponents });
     return { vm, services };
 }
 afterEach(cleanup);
@@ -47,8 +59,8 @@ describe('Sitemap', () => {
         expect(screen.queryByRole('button', { name: 'Refresh status' })).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'More' }));
         fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
-        // the sitemap and the component map
-        await waitFor(() => expect(services.api.get).toHaveBeenCalledTimes(3));
+        // the sitemap again
+        await waitFor(() => expect(services.api.get).toHaveBeenCalledTimes(2));
         expect(screen.queryByRole('button', { name: 'Refresh status' })).toBeNull();
         // the screen panel is closed until a screen is picked, and More has no Show/Hide details
         fireEvent.click(more);
@@ -207,80 +219,58 @@ describe('Sitemap', () => {
         expect(vm.sitemap).toEqual(result.sitemap);
         vm.dispose();
     });
-    it('generates components and shows the tree of each screen, lighting up screens that share a component', async () => {
-        const { vm, services } = fixture();
+    it('lists a screen\'s root components and opens them, or its tree, in the Components view', async () => {
+        const showComponents = vi.fn();
+        const { vm } = fixture({ map: componentMap, showComponents });
         await vm.load();
-        const ref = { path: 'src/Home.tsx', start: 1, end: 9 };
-        const components: ComponentsResult = { status: { state: 'current' }, components: {
-            version: 1, applicability: 'applicable', summary: 'Pages.', gaps: [],
-            components: [
-                { id: 'home-page', label: 'HomePage', detail: '', tags: ['fetches'], refs: [ref] },
-                { id: 'shop-page', label: 'ShopPage', detail: '', tags: [], refs: [ref] },
-                { id: 'price', label: 'PriceLine', detail: '', tags: [], refs: [ref] },
-            ],
-            uses: [{ from: 'home-page', to: 'price' }, { from: 'shop-page', to: 'price' }],
-            screens: [{ screen: 'home', root: 'home-page' }, { screen: 'shop', root: 'shop-page' }],
-        } };
-        vi.mocked(services.api.stream).mockResolvedValueOnce(components);
         render(<SitemapWorkspace vm={vm} />);
-        fireEvent.click(screen.getByRole('button', { name: 'More' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Generate components' }));
-        await waitFor(() => expect(vm.components).toBeTruthy());
-        expect(services.api.stream).toHaveBeenLastCalledWith('/api/components/generate', {}, expect.anything(), expect.any(Function));
-        expect(vm.message).toBe('Component map saved.');
+        // no diagram switch in the Sitemap toolbar any more
+        expect(screen.queryByRole('group', { name: 'Diagram' })).toBeNull();
         fireEvent.keyDown(screen.getByRole('button', { name: 'Dashboard' }), { key: 'Enter' });
-        fireEvent.click(within(screen.getByRole('complementary', { name: 'Screen details' })).getByRole('button', { name: /Components/ }));
-        const tree = screen.getByRole('list', { name: 'Components on this screen' });
-        expect(tree.textContent).toContain('HomePage');
-        expect(tree.textContent).toContain('fetches');
-        expect(tree.textContent).toContain('PriceLine · 2 screens');
-        fireEvent.mouseEnter(screen.getByText('PriceLine').parentElement!);
-        expect(vm.highlightIds?.nodes).toEqual(['home', 'shop']);
-        fireEvent.mouseLeave(screen.getByText('PriceLine').parentElement!);
-        expect(vm.highlightIds).toBeNull();
+        const details = screen.getByRole('complementary', { name: 'Screen details' });
+        fireEvent.click(within(details).getByRole('button', { name: /^Components/ }));
+        const roots = within(details).getByRole('region', { name: 'Root components' });
+        expect(within(roots).getAllByRole('button').map((b) => b.textContent)).toEqual(['HomePagefetches']);
+        expect(details.textContent).toContain('2 components in all');
+        fireEvent.click(within(roots).getByRole('button', { name: /HomePage/ }));
+        expect(showComponents).toHaveBeenLastCalledWith('home', 'home-page');
+        // the tree window: names and tags only; rows and Show in diagram go to the Components view
+        fireEvent.click(within(details).getByRole('button', { name: 'View component tree' }));
+        expect(vm.treeScreenId).toBe('home');
+        const dialog = screen.getByRole('dialog', { name: 'Dashboard components' });
+        const tree = within(dialog).getByRole('list', { name: 'Components on this screen' });
+        expect(tree.textContent).toContain('PriceLine');
+        expect(tree.textContent).not.toContain('screens');
+        expect(tree.textContent).not.toContain('Home.tsx');
+        expect(within(tree).getAllByRole('button').map((b) => b.getAttribute('aria-label')))
+            .toEqual(['Show HomePage in the Components diagram', 'Show PriceLine in the Components diagram']);
+        fireEvent.click(within(tree).getByRole('button', { name: 'Show PriceLine in the Components diagram' }));
+        expect(vm.treeOpen).toBe(false);
+        expect(showComponents).toHaveBeenLastCalledWith('home', 'price');
+        fireEvent.click(within(details).getByRole('button', { name: 'View component tree' }));
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Dashboard components' })).getByRole('button', { name: 'Show in diagram' }));
+        expect(vm.treeOpen).toBe(false);
+        expect(showComponents).toHaveBeenLastCalledWith('home', undefined);
     });
-    it('switches to a Components diagram scoped to a screen, with a panel for the picked component', async () => {
+    it('shows a hint for a screen with no components, and no components section in a trace', async () => {
+        const { vm } = fixture({ map: componentMap });
+        await vm.load();
+        render(<SitemapWorkspace vm={vm} />);
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Settings' }), { key: 'Enter' });
+        const details = screen.getByRole('complementary', { name: 'Screen details' });
+        fireEvent.click(within(details).getByRole('button', { name: /^Components/ }));
+        expect(details.textContent).toContain('No components were linked to this screen.');
+        expect(within(details).queryByRole('button', { name: 'View component tree' })).toBeNull();
+        act(() => vm.setTrace({ intent: 'description' } as never));
+        expect(vm.components).toBeNull();
+    });
+    it('opens a screen from another application', async () => {
         const { vm } = fixture();
         await vm.load();
-        const ref = { path: 'src/Home.tsx', start: 1, end: 9 };
-        vm.components = { version: 1, applicability: 'applicable', summary: 'Pages.', gaps: [],
-            components: [
-                { id: 'home-page', label: 'HomePage', detail: 'The dashboard.', tags: ['state'], refs: [ref] },
-                { id: 'shop-page', label: 'ShopPage', detail: '', tags: [], refs: [ref] },
-                { id: 'price', label: 'PriceLine', detail: '', tags: [], refs: [ref] },
-                { id: 'chart', label: 'Chart', detail: '', tags: [], refs: [ref] },
-            ],
-            uses: [{ from: 'home-page', to: 'price' }, { from: 'shop-page', to: 'price' }, { from: 'home-page', to: 'chart' }],
-            screens: [{ screen: 'home', root: 'home-page' }, { screen: 'shop', root: 'shop-page' }] };
-        const { container } = render(<SitemapWorkspace vm={vm} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Components' }));
-        expect(vm.showingComponents).toBe(true);
-        const graph = vm.componentGraph;
-        // first screen with components; screens are start boxes above their components
-        expect(graph.scope).toBe('home');
-        expect(graph.graph.nodes.map((n) => n.id)).toEqual(['screen:home', 'home-page', 'price', 'chart']);
-        expect(graph.graph.nodes.find((n) => n.id === 'price')?.label).toBe('PriceLine · 2 screens');
-        expect(graph.graph.edges).toContainEqual({ from: 'screen:home', to: 'home-page' });
-        expect(container.querySelector('#components-canvas')).toBeTruthy();
-        fireEvent.change(screen.getByLabelText('Screen'), { target: { value: '*' } });
-        expect(graph.graph.nodes.map((n) => n.id)).toEqual(['screen:home', 'screen:shop', 'home-page', 'shop-page', 'price', 'chart']);
-        act(() => graph.pick('price'));
-        const panel = screen.getByRole('complementary', { name: 'Component details' });
-        expect(panel.textContent).toContain('PriceLine');
-        expect(screen.getByRole('tab', { name: 'Rendered by (2)' }).getAttribute('aria-selected')).toBe('true');
-        // a screen from the panel goes back to the screens diagram with it open
-        fireEvent.click(within(panel).getByRole('button', { name: /^Screens/ }));
-        fireEvent.click(within(panel).getByRole('button', { name: 'Shop' }));
-        expect(vm.showingComponents).toBe(false);
+        expect(vm.appId).toBe('admin');
+        act(() => vm.openScreen('shop'));
+        expect(vm.appId).toBe('shop');
         expect(vm.selectedId).toBe('shop');
-        // and Show in a screen's tree comes back with the component picked
-        fireEvent.click(within(screen.getByRole('complementary', { name: 'Screen details' })).getByRole('button', { name: /^Components/ }));
-        fireEvent.click(screen.getByRole('button', { name: 'Show ShopPage in the Components diagram' }));
-        expect(vm.showingComponents).toBe(true);
-        expect(graph.scope).toBe('shop');
-        expect(graph.selectedId).toBe('shop-page');
-        // traces keep the screens diagram
-        act(() => vm.setTrace({ intent: 'description' } as never));
-        expect(vm.componentsAvailable).toBe(false);
+        expect(vm.detailsOpen).toBe(true);
     });
 });

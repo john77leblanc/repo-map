@@ -19,7 +19,7 @@ export interface TraceHomeProps extends TraceViewProps {
     /** Whether that window is open, for the button's aria-expanded. */
     composerOpen?: boolean;
 }
-const outputCount = (vm: TraceViewModel) => Number(vm.architecture) + Number(vm.flowchart) + Number(vm.sitemap);
+const outputCount = (vm: TraceViewModel) => Number(vm.architecture) + Number(vm.flowchart) + Number(vm.sitemap) + Number(vm.components);
 /** The question box of the New trace window's Describe tab. */
 export const DescribeFields = observer(function DescribeFields({ vm, onSubmit }: TraceViewProps & { onSubmit(): void }) {
     return (
@@ -89,7 +89,8 @@ export const TraceComposer = observer(function TraceComposer({ vm }: TraceViewPr
                     count={outputCount(vm)} disabled={!vm.repo.aiAvailable || vm.busy} />
                 <div className="trace-actions">
                     <button className="btn primary" id="run" type="button"
-                        disabled={vm.busy || !vm.repo.aiAvailable || (vm.sitemap && (vm.deps.sitemap?.loading || vm.deps.sitemap?.busy))}
+                        disabled={vm.busy || !vm.repo.aiAvailable || (vm.sitemap && (vm.deps.sitemap?.loading || vm.deps.sitemap?.busy))
+                            || (vm.components && (vm.deps.components?.loading || vm.deps.components?.busy))}
                         onClick={() => void vm.runTrace()}>
                         Regenerate
                     </button>

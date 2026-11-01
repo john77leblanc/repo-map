@@ -90,6 +90,8 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await expect(page.getByRole('tab', { name: 'Flowchart', exact: true })).toBeFocused();
     await expect(page.locator('#view-missing h2')).toHaveText("The flowchart view doesn't exist for this trace");
     await page.keyboard.press('End');
+    await expect(page.getByRole('tab', { name: 'Components', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toBeFocused();
     await expect(page.locator('#sitemap-svgbox .change-new.fn')).toHaveCount(1);
     await page.setViewportSize({ width: 768, height: 900 });
