@@ -154,7 +154,8 @@ export interface Proposal {
 }
 export interface Plan {
     summary: string;
-    tasks: { title: string; detail: string; files: string[] }[];
+    /** `done` is ticked by the user in the plan window. */
+    tasks: { title: string; detail: string; files: string[]; done?: boolean }[];
     interfaces: string[];
     tests: string[];
     risks: string[];

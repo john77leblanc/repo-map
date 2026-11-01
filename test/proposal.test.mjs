@@ -76,6 +76,11 @@ test('proposal prompts distinguish evidence from design and preserve it for redr
     assert.match(planPrompt(config, map, trace), /Preserve the proposed design/);
     assert.equal(normalizePlan({ tasks: [] }), null);
     assert.equal(normalizePlan(plan).tasks.length, 1);
+    const titled = (title, extra = {}) => normalizePlan({ tasks: [{ title, detail: 'd', ...extra }] }).tasks[0];
+    for (const title of ['Step 2: Wire', '3. Wire', '4) Wire', 'step 5 - Wire']) assert.equal(titled(title).title, 'Wire');
+    assert.equal(titled('2FA setup').title, '2FA setup');
+    assert.equal(titled('Wire', { done: true }).done, true);
+    assert.equal('done' in titled('Wire', { done: 'yes' }), false);
 });
 
 const selection = { agent: { id: 'claude', models: [{ id: 'opus' }, { id: 'haiku' }], efforts: ['low', 'high'] }, model: 'opus', effort: 'high', label: 'Test agent' };

@@ -1,5 +1,6 @@
 ﻿import { expect, it, vi } from 'vitest';
-import { PlansViewModel, planText } from './PlansViewModel';
+import { observable } from 'mobx';
+import { PlansViewModel, planMarkdown } from './PlansViewModel';
 import { fixture, raw } from '../traces/testFixtures';
 import { normalizeTrace } from '../../models/trace';
 const plan = {
@@ -14,7 +15,7 @@ it('generates on demand, caches, and retains plan on failed regeneration', async
     const t = normalizeTrace({ ...raw, intent: 'proposal' }, repo.map);
     await vm.open(t);
     expect(saveTrace).toHaveBeenCalledOnce();
-    expect(planText(t.plan!)).toContain('new: coupons.mjs');
+    expect(planMarkdown(t.plan!)).toContain('new: coupons.mjs');
     vm.close();
     await vm.open(t);
     expect(services.api.stream).toHaveBeenCalledOnce();
@@ -139,4 +140,30 @@ it('says Copied! on the Copy button for two seconds', async () => {
     } finally {
         vi.useRealTimers();
     }
+});
+it('ticks steps, saves them, copies them as a task list and clears them on regenerate', async () => {
+    const { repo, services } = fixture();
+    repo.setAiAvailable(true);
+    const saveTrace = vi.fn(async () => {});
+    const two = { ...plan, tasks: [...plan.tasks, { title: 'Wire', detail: 'Line one\nLine two', files: [] }], risks: ['Expiry clock'] };
+    vi.mocked(services.api.stream).mockResolvedValue({ plan: two });
+    const vm = new PlansViewModel({ repo, services, getPick: () => ({}), saveTrace });
+    const t = observable(normalizeTrace({ ...raw, intent: 'proposal' }, repo.map));
+    await vm.open(t);
+    saveTrace.mockClear();
+    await vm.toggleDone(0);
+    expect(t.plan!.tasks[0].done).toBe(true);
+    expect(saveTrace).toHaveBeenCalledExactlyOnceWith(t);
+    expect(planMarkdown(t.plan!)).toBe(
+        'Coupons\n\n## Steps\n\n1. [x] **Validate**\n   Check expiry\n   Files: `new: coupons.mjs`\n\n2. [ ] **Wire**\n   Line one\n   Line two\n\n## Risks\n\n- Expiry clock'
+    );
+    vm.toggleExpanded(0);
+    expect(vm.isExpanded(0)).toBe(true);
+    await vm.toggleDone(0);
+    expect(t.plan!.tasks[0].done).toBeUndefined();
+    expect(vm.isExpanded(0)).toBe(false);
+    await vm.toggleDone(1);
+    await vm.generatePlan();
+    expect(t.plan!.tasks.some((task) => task.done)).toBe(false);
+    vm.dispose();
 });

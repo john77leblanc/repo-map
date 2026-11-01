@@ -11,26 +11,32 @@ export interface PlanDependencies {
     getPick(): AgentPick;
     saveTrace(trace: Trace): Promise<void>;
 }
-export function planText(plan: Plan) {
+/** The plan's lists after its steps, in display order. */
+export const SECTIONS = {
+    interfaces: 'Interface changes',
+    tests: 'Tests',
+    risks: 'Risks',
+    questions: 'Open questions',
+} as const;
+export type PlanSection = keyof typeof SECTIONS;
+export const SECTION_KEYS = Object.keys(SECTIONS) as PlanSection[];
+/** The plan as Markdown: steps are a task list that keeps what was ticked. */
+export function planMarkdown(plan: Plan) {
+    const step = (t: Plan['tasks'][number], i: number) => {
+        const marker = `${i + 1}. `,
+            pad = ' '.repeat(marker.length);
+        const body = [
+            ...t.detail.split('\n'),
+            ...(t.files.length ? ['Files: ' + t.files.map((f) => '`' + f + '`').join(', ')] : []),
+        ].map((line) => (line ? pad + line : ''));
+        return [`${marker}[${t.done ? 'x' : ' '}] **${t.title}**`, ...body].join('\n');
+    };
     return [
         plan.summary,
-        ...plan.tasks.map(
-            (t, i) =>
-                `${i + 1}. ${t.title}\n${t.detail}${t.files.length ? '\nFiles: ' + t.files.join(', ') : ''}`
-        ),
-        ...(['interfaces', 'tests', 'risks', 'questions'] as const)
+        '## Steps\n\n' + plan.tasks.map(step).join('\n\n'),
+        ...SECTION_KEYS
             .filter((k) => plan[k].length)
-            .map(
-                (k) =>
-                    ({
-                        interfaces: 'Interface changes',
-                        tests: 'Tests',
-                        risks: 'Risks',
-                        questions: 'Open questions',
-                    })[k] +
-                    '\n' +
-                    plan[k].map((s) => '- ' + s).join('\n')
-            ),
+            .map((k) => `## ${SECTIONS[k]}\n\n` + plan[k].map((s) => '- ' + s).join('\n')),
     ]
         .filter(Boolean)
         .join('\n\n');
@@ -43,6 +49,12 @@ export class PlansViewModel {
     error = false;
     /** The Copy button reads "Copied!" for a moment. */
     readonly copied = new CopyFeedback();
+    /** Done steps show only their title unless opened here (by index). */
+    readonly expanded = new Set<number>();
+    /** The lists after the steps start closed. */
+    readonly openSections = new Set<PlanSection>();
+    /** Steps start open. */
+    stepsClosed = false;
     private controller: AbortController | null = null;
     private disposed = false;
     constructor(readonly deps: PlanDependencies) {
@@ -56,9 +68,32 @@ export class PlansViewModel {
         return this.trace?.plan;
     }
     isGenerating(trace: Trace) {
+        return this.busy && this.isSame(trace);
+    }
+    private isSame(trace: Trace) {
         // A library row (`key`) and the open trace (`_doc`) are different copies of one saved trace.
         const id = (t: Trace) => t._doc || t.key;
-        return this.busy && !!this.trace && (this.trace === trace || (!!id(trace) && id(trace) === id(this.trace)));
+        return !!this.trace && (this.trace === trace || (!!id(trace) && id(trace) === id(this.trace)));
+    }
+    private resetFolds() {
+        this.expanded.clear();
+        this.openSections.clear();
+        this.stepsClosed = false;
+    }
+    setStepsOpen(open: boolean) {
+        this.stepsClosed = !open;
+    }
+    /** Ticked steps out of all steps. */
+    get progress() {
+        const tasks = this.plan?.tasks ?? [];
+        return { done: tasks.filter((t) => t.done).length, total: tasks.length };
+    }
+    isSectionOpen(k: PlanSection) {
+        return this.openSections.has(k);
+    }
+    setSectionOpen(k: PlanSection, open: boolean) {
+        if (open) this.openSections.add(k);
+        else this.openSections.delete(k);
     }
     async open(trace: Trace) {
         // Reopening a plan that is still generating just shows it again.
@@ -67,6 +102,8 @@ export class PlansViewModel {
             return;
         }
         this.stop();
+        // reopening the same plan keeps what was unfolded
+        if (!this.isSame(trace)) this.resetFolds();
         this.trace = trace;
         this.isOpen = true;
         this.status = '';
@@ -114,6 +151,7 @@ export class PlansViewModel {
                 throw new Error('The AI tool answered without a usable implementation plan.');
             runInAction(() => {
                 trace.plan = plan;
+                this.resetFolds();
             });
             await this.deps.saveTrace(trace);
             if (active())
@@ -137,10 +175,35 @@ export class PlansViewModel {
                 });
         }
     }
+    isExpanded(i: number) {
+        return this.expanded.has(i);
+    }
+    toggleExpanded(i: number) {
+        if (this.expanded.has(i)) this.expanded.delete(i);
+        else this.expanded.add(i);
+    }
+    /** Ticks a step on or off and saves it with the trace. */
+    async toggleDone(i: number) {
+        const trace = this.trace,
+            task = trace?.plan?.tasks[i];
+        if (!trace || !task || this.busy) return;
+        if (task.done) delete task.done;
+        else task.done = true;
+        this.expanded.delete(i);
+        try {
+            await this.deps.saveTrace(trace);
+        } catch {
+            if (!this.disposed && this.trace === trace)
+                runInAction(() => {
+                    this.status = "Couldn't save the step. Try again.";
+                    this.error = true;
+                });
+        }
+    }
     async copy() {
         if (!this.plan) return;
         try {
-            await this.deps.services.browser.copy(planText(this.plan));
+            await this.deps.services.browser.copy(planMarkdown(this.plan));
             if (!this.disposed) this.copied.flash();
         } catch {
             if (!this.disposed)

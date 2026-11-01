@@ -18,8 +18,10 @@ export interface DisclosureProps {
     id: string;
     headId?: string;
     title: ReactNode;
-    /** Right-aligned badge, e.g. how many items the row holds. */
-    count?: number;
+    /** Right-aligned badge, e.g. how many items the row holds, or progress such as `2/5`. */
+    count?: number | string;
+    /** Extra class for the badge (the plan marks finished progress). */
+    countClassName?: string;
     open: boolean;
     onToggle: (open: boolean) => void;
     /** Extra props for the header button (hover and focus handlers). */
@@ -28,13 +30,13 @@ export interface DisclosureProps {
 }
 
 /** One collapsible row: a full-width header button and, while open, its body. Open state is owned by the view model. */
-export function Disclosure({ id, headId = id + '-head', title, count, open, onToggle, headProps, children }: DisclosureProps) {
+export function Disclosure({ id, headId = id + '-head', title, count, countClassName, open, onToggle, headProps, children }: DisclosureProps) {
     return (
         <li className="disclosure" data-section={id}>
             <button {...headProps} className="disclosure-head" type="button" id={headId} aria-expanded={open}
                 aria-controls={id} onClick={() => onToggle(!open)}>
                 <span className="disclosure-title">{title}</span>
-                {count != null && <>{' '}<span className="disclosure-count">{count}</span></>}
+                {count != null && <>{' '}<span className={'disclosure-count' + (countClassName ? ' ' + countClassName : '')}>{count}</span></>}
             </button>
             {open && (
                 <div className="disclosure-body" id={id} role="region" aria-labelledby={headId}>
