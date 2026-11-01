@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.22.0
 
 - Implementation plan steps are numbered cards with a **Done** checkbox, so you can tick them off one at a time as you work through them. Done steps are dimmed and folded to their title (click it to open). Ticks are saved with the trace (`plan.tasks[].done`); **Regenerate** clears them. **Copy** copies the plan as Markdown: `## Steps` as a task list (`1. [x] **Title**`) that keeps the ticks, then the other sections as headings. The plan opens with a **Summary** heading, then collapsible rows: **Steps** (open by default; its header shows progress such as `2/5`, filled in when all are done), then **Interface changes**, **Tests**, **Risks** and **Open questions** (closed by default, with their item count on the right). What is open is kept while the same plan is reopened. Step titles no longer repeat a "Step 2:" / "2." the AI tool adds.
 
