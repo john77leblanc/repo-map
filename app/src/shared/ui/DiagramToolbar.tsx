@@ -51,11 +51,11 @@ function DiagramToolbar({ prefix, label, available, selectors, tools, extraActio
                     ? <ProgressLine id={prefix + '-status'} text={status} entries={log} busy={busy || loading} error={error} />
                     : <span className={'status' + (busy || loading ? ' busy' : error ? ' err' : '')}
                         id={prefix + '-status'} role="status" aria-live="polite">{status}</span>}
+                {extraActions}
                 <ExportMenu prefix={prefix} available={available} copied={copied} exporting={exporting} onCopy={onCopy} onDownload={(format) => {
                     const style = getComputedStyle(document.documentElement);
                     onDownload(format, variable => style.getPropertyValue(variable).trim());
                 }} />
-                {extraActions}
                 <button className="btn sm" id={prefix + '-stop'} type="button" hidden={!busy || !stoppable} onClick={onStop}>Stop</button>
                 {search}
             </div>

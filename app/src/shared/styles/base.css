@@ -671,6 +671,7 @@ dialog.modal>.fhead{flex:none}
 .seams .cl{flex-wrap:wrap}
 #architecture-workspace .canvas-controls,#architecture-workspace .canvas-controls>.controls{flex:1}
 .arch-show{display:inline-flex;align-items:center;gap:6px;font-size:13px}.arch-show select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:4px}
+#architecture-workspace .canvas-controls .btn{font-size:12px;padding:4px 8px}#architecture-workspace .canvas-controls .search-toggle{gap:5px}#architecture-workspace .canvas-controls .search-toggle svg{width:12px;height:12px}
 .search-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:6px}.search-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none}.search-toggle[aria-expanded="true"]{background:var(--soft);border-color:var(--http)}
 .search-side{display:flex;flex-direction:column;overflow:hidden}
 .side-search{display:block;margin:6px 0 10px;flex:none}.side-search input{width:100%;box-sizing:border-box}
@@ -733,4 +734,4 @@ dialog.modal>.fhead{flex:none}
 .view-row{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0}
 .view-row h4{margin:0;font-size:14px}.view-row-status{margin:0}.view-row-status p{margin:0 0 4px}.view-row-status p:last-child{margin-bottom:0}
 .view-row .row{margin:0}
-.flow-actions .search-toggle{margin-left:0}
+.flow-actions .search-toggle{margin-left:0;font-size:12px;padding:4px 8px;gap:5px}.flow-actions .search-toggle svg{width:12px;height:12px}
