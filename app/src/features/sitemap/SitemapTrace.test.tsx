@@ -38,8 +38,8 @@ it('exports the visible journey and proposals with standalone context styling', 
     expect(source).toContain('[Modified] checkout');
     expect(source).not.toContain('isolated');
     vm.select('checkout');
-    vm.downloadSvg(() => '#123456');
-    const [name, svg, type] = vi.mocked(services.browser.download).mock.calls[0];
+    await vm.exportAs('svg', () => '#123456');
+    const [name, svg, type] = vi.mocked(services.browser.download).mock.calls[0] as [string, string, string];
     expect(name).toBe('guest-checkout-sitemap.svg');
     expect(type).toBe('image/svg+xml');
     expect(svg).toContain('.fc .context{opacity:.35}');
@@ -47,7 +47,7 @@ it('exports the visible journey and proposals with standalone context styling', 
     expect(svg).not.toContain('class="fn t-process sel');
     expect(svg).not.toContain('isolated');
     vm.setScope('app');
-    vm.downloadSvg(() => '#fff');
+    await vm.exportAs('svg', () => '#fff');
     expect(vi.mocked(services.browser.download).mock.calls[1][1]).toContain('isolated');
     const { container } = render(<SitemapWorkspace vm={vm} />);
     fireEvent.click(screen.getByRole('button', { name: 'Diagram key' }));

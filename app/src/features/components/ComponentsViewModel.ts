@@ -8,7 +8,7 @@ import { composeComponentsTrace, normalizeComponentsTrace } from '../../../../li
 import type { Services } from '../../shared/services/contracts';
 import { renderFlowSvg } from '../../../flowchart.mjs';
 import { flowToMermaid } from '../../../../lib/flow.mjs';
-import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
+import { DiagramExport, diagramFilename, type ExportFormat, type ExportSource } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { ComponentGraphViewModel } from './ComponentGraphViewModel';
 
@@ -45,6 +45,7 @@ class ComponentsViewModel {
     /** Progress of the last generation, for the one-line status and its history. */
     readonly log = new ProgressLog();
     readonly copy = new CopyFeedback();
+    readonly exports: DiagramExport;
     private controller: AbortController | null = null;
     private disposed = false;
     private copyRevision = 0;
@@ -52,8 +53,14 @@ class ComponentsViewModel {
     constructor(readonly deps: ComponentsDeps) {
         this.graph = new ComponentGraphViewModel({ sitemap: deps.sitemap, components: () => this.displayed, output: () => this.output,
             review: () => this.trace?.intent === 'review' });
+        this.exports = new DiagramExport(deps.services, () => this.exportSource(), (message) => {
+            if (!this.disposed) runInAction(() => {
+                this.message = message;
+                this.error = true;
+            });
+        });
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
-            deps: false, graph: false, copy: false, components: observableRef, trace: observableRef, controller: false, disposed: false, copyRevision: false,
+            deps: false, graph: false, copy: false, exports: false, components: observableRef, trace: observableRef, controller: false, disposed: false, copyRevision: false,
         }, { autoBind: true });
     }
     get repo() { return this.deps.repo; }
@@ -121,12 +128,15 @@ class ComponentsViewModel {
             });
         }
     }
-    downloadSvg(resolve: (variable: string) => string) {
+    private exportSource(): ExportSource | null {
         const layout = this.graph.layout;
-        if (!layout || this.disposed) return;
-        const svg = standaloneSvg(renderFlowSvg(layout, { title: this.exportTitle }), FC_CSS, resolve);
+        if (!layout || this.disposed) return null;
         const name = diagramFilename(this.exportName, '');
-        this.deps.services.browser.download((name ? name + '-' : '') + 'components.svg', svg, 'image/svg+xml');
+        return { svg: renderFlowSvg(layout, { title: this.exportTitle }), css: FC_CSS, title: this.exportTitle,
+            filename: (name ? name + '-' : '') + 'components' };
+    }
+    exportAs(format: ExportFormat, resolve: (variable: string) => string) {
+        return this.exports.run(format, resolve);
     }
     private accept(result: ComponentsResult | null | undefined) {
         this.resetCopy();

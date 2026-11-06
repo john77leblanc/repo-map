@@ -35,6 +35,7 @@ function fixture({ map = null, showComponents }: { map?: ComponentMap | null; sh
         api: { get: vi.fn().mockResolvedValue(result), request: vi.fn(), stream: vi.fn().mockResolvedValue(result) },
         storage: { get: vi.fn(), set: vi.fn(), getRaw: vi.fn(), setRaw: vi.fn() },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     };
     const repo = new RepositoryModel(services);
     const vm = new SitemapViewModel({ repo, services, components: () => map, showComponents });
@@ -156,8 +157,8 @@ describe('Sitemap', () => {
         const source = vi.mocked(services.browser.copy).mock.calls.at(-1)![0];
         expect(source).toContain('Admin: Dashboard');
         expect(source).not.toContain('Settings');
-        vm.downloadSvg(() => '#123456');
-        const [name, svg] = vi.mocked(services.browser.download).mock.calls[0];
+        await vm.exportAs('svg', () => '#123456');
+        const [name, svg] = vi.mocked(services.browser.download).mock.calls[0] as [string, string, string];
         expect(name).toBe('sitemap.svg');
         expect(svg).toContain('Admin: Dashboard');
         expect(svg).not.toContain('Settings');

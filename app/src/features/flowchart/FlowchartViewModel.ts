@@ -11,7 +11,7 @@ import { CopyFeedback } from '../../models/CopyFeedback';
 import { normalizeFlow, flowToMermaid, flowLanes, flowRepos, countInferred } from '../../../../lib/flow.mjs';
 import { traceOutputs } from '../../../../lib/trace-outputs.mjs';
 import { FC_CSS } from './styles';
-import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
+import { DiagramExport, diagramFilename, type ExportFormat, type ExportSource } from '../../shared/diagramExport';
 
 export interface FlowchartDeps {
     repo: RepositoryModel;
@@ -71,6 +71,7 @@ export class FlowchartViewModel {
     statusTarget = CHART;
     error = false;
     readonly copy = new CopyFeedback();
+    readonly exports: DiagramExport;
     compact = false;
     /** Boxes whose closer look is drawn in the chart. Saved per trace in the browser. */
     shown: string[] = [];
@@ -82,6 +83,14 @@ export class FlowchartViewModel {
     private disposed = false;
     constructor(readonly deps: FlowchartDeps) {
         this.compact = deps.services.storage.get<boolean>(deps.repo.namespace + 'flow-compact', false) === true;
+        this.exports = new DiagramExport(deps.services, () => this.exportSource(), (message) => {
+            if (!this.disposed && !this.busy)
+                runInAction(() => {
+                    this.statusTarget = CHART;
+                    this.status = message;
+                    this.error = true;
+                });
+        });
         makeAutoObservable<
             FlowchartViewModel,
             'controller' | 'revision' | 'disposed'
@@ -91,6 +100,7 @@ export class FlowchartViewModel {
                 deps: false,
                 focus: false,
                 copy: false,
+                exports: false,
                 trace: observableRef,
                 controller: false,
                 revision: false,
@@ -265,16 +275,6 @@ export class FlowchartViewModel {
     get panelOpen() {
         return !!this.selected || this.marked.length > 0;
     }
-    /** Marked steps in pick order, with their labels. */
-    get markedNodes() {
-        const shown = this.displayFlow?.nodes || [];
-        return this.marked.map((id) => shown.find((n) => n.id === id)).filter((n): n is NonNullable<typeof n> => !!n);
-    }
-    collapseMarked(label = '') {
-        if (this.marked.length < 2) return;
-        const taken = new Set(this.collapse.groups.map((g) => g.id));
-        let n = this.collapse.groups.length + 1;
-        while (taken.has(`s${n}`)) n++;
     /**
      * The box getting a closer look, for its spinner. A look drawn open in the chart
      * replaces its box, so its first step spins instead.
@@ -285,6 +285,16 @@ export class FlowchartViewModel {
         const entry = this.shown.includes(id) ? this.trace?.expansions?.[id]?.entry : undefined;
         return new Set(entry ? [id, entry] : [id]);
     }
+    /** Marked steps in pick order, with their labels. */
+    get markedNodes() {
+        const shown = this.displayFlow?.nodes || [];
+        return this.marked.map((id) => shown.find((n) => n.id === id)).filter((n): n is NonNullable<typeof n> => !!n);
+    }
+    collapseMarked(label = '') {
+        if (this.marked.length < 2) return;
+        const taken = new Set(this.collapse.groups.map((g) => g.id));
+        let n = this.collapse.groups.length + 1;
+        while (taken.has(`s${n}`)) n++;
         const members = this.baseFlow?.nodes.map((node) => node.id).filter((id) => this.marked.includes(id)) || [];
         this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: `s${n}`, label: label.trim(), members }] };
         this.marked = [];
@@ -660,11 +670,13 @@ export class FlowchartViewModel {
                 });
         }
     }
-    downloadSvg(resolve: (variable: string) => string) {
-        if (!this.layout || !this.trace) return;
-        const svg = standaloneSvg(this.svg, FC_CSS, resolve);
-        const name = diagramFilename(this.trace.title || 'flowchart', 'flowchart');
-        this.deps.services.browser.download(name + '.svg', svg, 'image/svg+xml');
+    private exportSource(): ExportSource | null {
+        if (!this.layout || !this.trace || this.disposed) return null;
+        return { svg: this.svg, css: FC_CSS, title: this.trace.title || 'Flowchart',
+            filename: diagramFilename(this.trace.title || 'flowchart', 'flowchart') };
+    }
+    exportAs(format: ExportFormat, resolve: (variable: string) => string) {
+        return this.exports.run(format, resolve);
     }
     dispose() {
         this.stop(false);

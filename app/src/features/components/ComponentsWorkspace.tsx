@@ -58,7 +58,7 @@ const ComponentsWorkspace = observer(function ComponentsWorkspace({ vm }: { vm: 
                     const canvas = root.current?.querySelector('#components-canvas');
                     if (canvas) graph.fit(canvas.clientWidth, canvas.clientHeight);
                 }}
-                onCopy={vm.copyMermaid} onDownload={vm.downloadSvg} onStop={vm.stop}
+                onCopy={vm.copyMermaid} onDownload={vm.exportAs} exporting={vm.exports.exporting} onStop={vm.stop}
                 extraActions={<DiagramMore id="components-actions" open={vm.actionsOpen} setOpen={vm.setActionsOpen} actions={[
                     { label: vm.infoOpen || !graph.layout ? 'Hide info' : 'Show info', run: vm.toggleInfo,
                         disabled: !graph.layout, expanded: vm.infoOpen || !graph.layout, controls: 'components-info' },

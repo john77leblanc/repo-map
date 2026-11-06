@@ -14,6 +14,7 @@ export function fixture() {
             setRaw: vi.fn(),
         },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     };
     const repo = new RepositoryModel(services);
     repo.bootstrap = {

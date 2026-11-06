@@ -30,6 +30,7 @@ function fixture() {
             setRaw: (key, value) => { values.set(key, value); },
         },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     };
     const repo = new RepositoryModel(services);
     repo.bootstrap = { config: { name: 'shop', columns: [] }, repo: {}, ai: { available: true, label: 'AI' } };

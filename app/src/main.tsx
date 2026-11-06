@@ -4,6 +4,7 @@ import { createApplication } from './bootstrap/Application';
 import { App, ApplicationContext } from './bootstrap/App';
 import { createApiClient } from './shared/services/api';
 import { createBrowserService, createStorage } from './shared/services/browser';
+import { createDiagramExporter } from './shared/services/exporter';
 import './shared/styles/base.css';
 
 configure({ enforceActions: 'always' });
@@ -22,6 +23,7 @@ try {
 createApplication({
     api: createApiClient(),
     browser: createBrowserService(),
+    exporter: createDiagramExporter(),
     storage: createStorage(storage),
 })
     .then((app) => {

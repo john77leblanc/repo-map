@@ -5,7 +5,7 @@ import { fixture } from './testFixture';
 import { decodeTrace, encodeTrace } from '../../models/trace';
 import { FlowchartViewModel } from './FlowchartViewModel';
 describe('FlowchartViewModel', () => {
-    it('preserves lane metadata through sharing and remembers compact layout without changing the flow', () => {
+    it('preserves lane metadata through sharing and remembers compact layout without changing the flow', async () => {
         const { vm, trace, services } = fixture();
         trace.flow!.lanes = [{ id: 'web', label: 'Frontend' }, { id: 'api', label: 'Backend' }];
         trace.flow!.nodes[0].lane = 'web';
@@ -25,10 +25,10 @@ describe('FlowchartViewModel', () => {
         expect(next.compact).toBe(true);
         vm.select('a');
         expect(vm.selectedLane).toBe('Frontend');
-        vm.downloadSvg(() => '#fff');
+        await vm.exportAs('svg', () => '#fff');
         expect(vi.mocked(services.browser.download).mock.calls[0][1]).not.toContain('class="execution-lane"');
         vm.setCompact(false);
-        vm.downloadSvg(() => '#fff');
+        await vm.exportAs('svg', () => '#fff');
         expect(vi.mocked(services.browser.download).mock.calls[1][1]).toContain('class="execution-lane"');
         vm.dispose();
         next.dispose();
@@ -156,8 +156,8 @@ describe('FlowchartViewModel', () => {
         expect(vm.error).toBe(false);
         await vm.copyMermaid();
         expect(services.browser.copy).toHaveBeenCalledWith(expect.stringContaining('flowchart TD'));
-        vm.downloadSvg(() => '#fff');
-        const [name, svg, type] = vi.mocked(services.browser.download).mock.calls[0];
+        await vm.exportAs('svg', () => '#fff');
+        const [name, svg, type] = vi.mocked(services.browser.download).mock.calls[0] as [string, string, string];
         expect(name).toBe('checkout.svg');
         expect(type).toBe('image/svg+xml');
         expect(svg).toContain('<style>.fc{');

@@ -34,6 +34,7 @@ function fixture({ map = sitemap as Sitemap | null } = {}) {
         api: { get: vi.fn().mockResolvedValue(result), request: vi.fn(), stream: vi.fn().mockResolvedValue(result) },
         storage: { get: vi.fn(), set: vi.fn(), getRaw: vi.fn(), setRaw: vi.fn() },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     };
     const repo = new RepositoryModel(services);
     const openScreen = vi.fn();
@@ -172,7 +173,7 @@ describe('Components', () => {
         await vm.load();
         await vm.copyMermaid();
         expect(services.browser.copy).toHaveBeenCalledWith(expect.stringContaining('PriceLine'));
-        vm.downloadSvg(() => '#000');
+        await vm.exportAs('svg', () => '#000');
         expect(vi.mocked(services.browser.download).mock.calls[0][0]).toBe('components.svg');
     });
 });

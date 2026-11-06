@@ -356,7 +356,7 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             const canvas = root.current?.querySelector('#fl-canvas');
                             if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);
                         }}
-                        onCopy={vm.copyMermaid} onDownload={vm.downloadSvg} onStop={() => vm.stop()}
+                        onCopy={vm.copyMermaid} onDownload={vm.exportAs} exporting={vm.exports.exporting} onStop={() => vm.stop()}
                     />
                     <FlowchartLegend open={vm.keyOpen} proposal={hasChanges(vm.trace)} review={vm.trace.intent === 'review'} />
                     {!hasFlow && (

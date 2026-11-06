@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ExportFormat } from '../diagramExport';
 import type { ProgressEntry } from '../../models/ProgressLog';
 import { ProgressLine } from './ProgressLine';
 import { KeyToggle } from './KeyToggle';
@@ -23,7 +24,9 @@ interface DiagramToolbarProps {
     onZoom: (factor: number) => void;
     onFit: () => void;
     onCopy: () => void;
-    onDownload: (resolve: (variable: string) => string) => void;
+    onDownload: (format: ExportFormat, resolve: (variable: string) => string) => void;
+    /** The format being exported, while it is built. */
+    exporting?: ExportFormat | null;
     onStop: () => void;
     /** False hides Stop while busy, for a job stopped from elsewhere (e.g. a side panel). */
     stoppable?: boolean;
@@ -32,7 +35,7 @@ interface DiagramToolbarProps {
 }
 
 function DiagramToolbar({ prefix, label, available, selectors, tools, extraActions, diagramKey,
-    status, log, busy, loading, error, copied, onZoom, onFit, onCopy, onDownload, onStop, stoppable = true, search }: DiagramToolbarProps) {
+    status, log, busy, loading, error, copied, exporting, onZoom, onFit, onCopy, onDownload, onStop, stoppable = true, search }: DiagramToolbarProps) {
     return (
         <div className="diagram-toolbar flow-tools">
             <div className="flow-zoom" role="group" aria-label={label + ' controls'}>
@@ -48,9 +51,9 @@ function DiagramToolbar({ prefix, label, available, selectors, tools, extraActio
                     ? <ProgressLine id={prefix + '-status'} text={status} entries={log} busy={busy || loading} error={error} />
                     : <span className={'status' + (busy || loading ? ' busy' : error ? ' err' : '')}
                         id={prefix + '-status'} role="status" aria-live="polite">{status}</span>}
-                <ExportMenu prefix={prefix} available={available} copied={copied} onCopy={onCopy} onDownload={() => {
+                <ExportMenu prefix={prefix} available={available} copied={copied} exporting={exporting} onCopy={onCopy} onDownload={(format) => {
                     const style = getComputedStyle(document.documentElement);
-                    onDownload(variable => style.getPropertyValue(variable).trim());
+                    onDownload(format, variable => style.getPropertyValue(variable).trim());
                 }} />
                 {extraActions}
                 <button className="btn sm" id={prefix + '-stop'} type="button" hidden={!busy || !stoppable} onClick={onStop}>Stop</button>

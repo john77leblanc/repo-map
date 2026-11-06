@@ -29,6 +29,7 @@ function setup({ withSitemap = true } = {}) {
         },
         storage: { get: <T,>(_key: string, fallback: T) => fallback, set: vi.fn(), getRaw: () => null, setRaw: vi.fn() },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     } as unknown as Services;
     const repo = new RepositoryModel(services);
     repo.bootstrap = { config: { name: 'Test', columns: [] }, repo: {}, ai: { available: true, label: 'AI' } };

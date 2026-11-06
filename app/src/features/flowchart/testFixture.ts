@@ -28,6 +28,7 @@ export function fixture() {
     const services: Services = {
         api: { get: vi.fn(), request: vi.fn(), stream: vi.fn().mockResolvedValue({ flow }) },
         browser: { copy: vi.fn().mockResolvedValue(undefined), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
         storage: { get: vi.fn(), set: vi.fn(), getRaw: vi.fn(), setRaw: vi.fn() },
     };
     const repo = Object.assign(Object.create(RepositoryModel.prototype) as RepositoryModel, {

@@ -16,6 +16,7 @@ function setup(ai = true) {
         api: { get: vi.fn(() => new Promise(() => {})), request: vi.fn(() => new Promise(() => {})), stream: vi.fn(() => new Promise(() => {})) },
         storage: { get: <T,>(_key: string, fallback: T) => fallback, set: vi.fn(), getRaw: () => null, setRaw: vi.fn() },
         browser: { copy: vi.fn(), download: vi.fn(), reload: vi.fn() },
+        exporter: { fontFace: vi.fn(async () => ''), png: vi.fn(async () => new Blob(['png'])), pdf: vi.fn(async () => new Blob(['pdf'])) },
     } as unknown as Services;
     const repo = new RepositoryModel(services);
     repo.bootstrap = {

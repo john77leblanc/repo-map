@@ -187,7 +187,7 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     const canvas = root.current?.querySelector('#sitemap-canvas');
                     if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);
                 }}
-                onCopy={vm.copyMermaid} onDownload={vm.downloadSvg} onStop={vm.stop}
+                onCopy={vm.copyMermaid} onDownload={vm.exportAs} exporting={vm.exports.exporting} onStop={vm.stop}
                 extraActions={<DiagramMore id="sitemap-actions" open={vm.actionsOpen} setOpen={vm.setActionsOpen} actions={[
                     { label: vm.infoOpen || !vm.layout ? 'Hide info' : 'Show info', run: vm.toggleInfo,
                         disabled: !vm.layout, expanded: vm.infoOpen || !vm.layout, controls: 'sitemap-info' },

@@ -9,7 +9,7 @@ import type { Services } from '../../shared/services/contracts';
 import { anchorBranchCaptions, fitCaptions, layoutFlow, renderFlowSvg } from '../../../flowchart.mjs';
 import { DiagramFocusModel } from '../../shared/DiagramFocusModel';
 import { flowToMermaid } from '../../../../lib/flow.mjs';
-import { standaloneSvg, diagramFilename } from '../../shared/diagramExport';
+import { DiagramExport, diagramFilename, type ExportFormat, type ExportSource } from '../../shared/diagramExport';
 import { FC_CSS } from '../flowchart/styles';
 import { SITEMAP_CSS } from './styles';
 import { CopyFeedback } from '../../models/CopyFeedback';
@@ -48,6 +48,7 @@ class SitemapViewModel {
     actionsOpen = false;
     keyOpen = false;
     readonly copy = new CopyFeedback();
+    readonly exports: DiagramExport;
     stepIndex: number | null = null;
     freshness: SitemapResult['status'] = { state: 'missing' };
     appId = '';
@@ -73,8 +74,14 @@ class SitemapViewModel {
     private copyRevision = 0;
 
     constructor(readonly deps: SitemapDeps) {
+        this.exports = new DiagramExport(deps.services, () => this.exportSource(), (message) => {
+            if (!this.disposed) runInAction(() => {
+                this.message = message;
+                this.error = true;
+            });
+        });
         makeAutoObservable<this, 'controller' | 'disposed' | 'copyRevision'>(this, {
-            deps: false, focus: false, copy: false, search: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
+            deps: false, focus: false, copy: false, exports: false, search: false, sitemap: observableRef, trace: observableRef, highlightIds: observableRef, controller: false, disposed: false,
             copyRevision: false,
         }, { autoBind: true });
     }
@@ -330,12 +337,15 @@ class SitemapViewModel {
             });
         }
     }
-    downloadSvg(resolve: (variable: string) => string) {
+    private exportSource(): ExportSource | null {
         const layout = this.layout;
-        if (!layout || this.disposed) return;
-        const svg = standaloneSvg(renderFlowSvg(layout, { title: this.exportTitle }), FC_CSS + SITEMAP_CSS, resolve);
+        if (!layout || this.disposed) return null;
         const name = diagramFilename(this.exportName, '');
-        this.deps.services.browser.download((name ? name + '-sitemap' : 'sitemap') + '.svg', svg, 'image/svg+xml');
+        return { svg: renderFlowSvg(layout, { title: this.exportTitle }), css: FC_CSS + SITEMAP_CSS, title: this.exportTitle,
+            filename: name ? name + '-sitemap' : 'sitemap' };
+    }
+    exportAs(format: ExportFormat, resolve: (variable: string) => string) {
+        return this.exports.run(format, resolve);
     }
     get freshnessLabel() {
         const labels: Record<string, string> = {

@@ -43,8 +43,8 @@ export function createBrowserService(): BrowserService {
             window.history.replaceState(null, '', window.location.pathname + window.location.hash);
             return Object.fromEntries(params);
         },
-        download(name, text, type) {
-            const url = URL.createObjectURL(new Blob([text], { type }));
+        download(name, data, type) {
+            const url = URL.createObjectURL(new Blob([data], { type }));
             const anchor = document.createElement('a');
             anchor.href = url;
             anchor.download = name;
