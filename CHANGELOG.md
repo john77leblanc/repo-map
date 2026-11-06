@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.1
+
+- **Settings → Map → Views**: while the sitemap is being generated, **Regenerate components** is disabled with a note saying it waits for the sitemap (components are mapped from its screens). While components are being generated, **Regenerate sitemap** is disabled too. Both jobs share one lock, so clicking either button gave an "already running" error before.
+
+- **Flowchart**: while a closer look is being made, its box shows a spinner where the closer-look **+** badge sits (on its first step if the look is drawn open in the chart).
+
+- A trace's Sitemap opens on **Show: Trace screens** (the journey's screens only) instead of **Trace + nearby**. Picking a screen that isn't shown still widens the view.
+
+- **Back to all traces** while editing a trace's prompt now ends the edit like **Cancel** (the draft is kept for the next **Edit**). Before, the sidebar was left empty.
+
 ## 0.22.0
 
 - Implementation plan steps are numbered cards with a **Done** checkbox, so you can tick them off one at a time as you work through them. Done steps are dimmed and folded to their title (click it to open). Ticks are saved with the trace (`plan.tasks[].done`); **Regenerate** clears them. **Copy** copies the plan as Markdown: `## Steps` as a task list (`1. [x] **Title**`) that keeps the ticks, then the other sections as headings. The plan opens with a **Summary** heading, then collapsible rows: **Steps** (open by default; its header shows progress such as `2/5`, filled in when all are done), then **Interface changes**, **Tests**, **Risks** and **Open questions** (closed by default, with their item count on the right). What is open is kept while the same plan is reopened. Step titles no longer repeat a "Step 2:" / "2." the AI tool adds.

@@ -595,7 +595,7 @@ export const TraceBackButton = observer(function TraceBackButton({ vm }: TraceVi
             type="button"
             hidden={!vm.selected || !!vm.editing}
             onClick={() => {
-                vm.clear();
+                vm.back();
                 document.getElementById('new-trace')?.focus();
             }}
         >

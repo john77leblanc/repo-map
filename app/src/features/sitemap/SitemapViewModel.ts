@@ -37,7 +37,7 @@ interface SitemapDeps {
 class SitemapViewModel {
     sitemap: Sitemap | null = null;
     trace: Trace | null = null;
-    scope: SitemapScope = 'nearby';
+    scope: SitemapScope = 'trace';
     infoOpen = false;
     /** The screen panel: closed until a screen is picked. */
     detailsOpen = false;
@@ -140,7 +140,7 @@ class SitemapViewModel {
         this.message = '';
         this.error = false;
         this.trace = trace;
-        this.scope = 'nearby';
+        this.scope = 'trace';
         this.selectedId = null;
         this.stepIndex = null;
         this.highlightIds = null;

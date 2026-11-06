@@ -33,7 +33,7 @@ export const App = observer(function App() {
                 selectedTrace={!!app.traces.selected}
                 needsAttention={app.settings.notice}
                 onBack={() => {
-                    app.traces.clear();
+                    app.traces.back();
                     document.getElementById('new-trace')?.focus();
                 }}
                 settings={

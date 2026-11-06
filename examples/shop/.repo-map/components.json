@@ -1,58 +1,45 @@
 {
   "version": 1,
   "applicability": "incomplete",
-  "summary": "Read every file under src/. Found 32 React components: five page roots and the components they render. Header, PriceLine and Button are shared across screens; ReviewThread and ReviewItem render each other for nested replies. Sign in has no component in src/.",
+  "summary": "I read all 29 React components under src/ (5 pages and 24 shared or feature components). Each of the 5 sitemap screens has its page component as its root. The Catalog, Product, Cart and Checkout pages render the same Header and Footer, and the Order page renders neither. Checkout switches between a shipping step and a payment step, keeping the current step in local state. Product reviews are nested: ReviewThread and ReviewItem render each other. The cart store is a plain module that many components read, and saved cards come from AccountContext.",
   "components": [
     {
       "id": "catalog-page",
       "label": "CatalogPage",
-      "detail": "Catalog layout: header, filters, product grid and footer.",
+      "detail": "Catalog screen: header, filter sidebar, product grid, footer",
       "tags": [],
       "refs": [
         {
           "path": "src/pages/catalog/CatalogPage.jsx",
           "start": 6,
           "end": 17,
-          "why": "Declares CatalogPage"
+          "why": "Declares the component and renders its children"
         }
       ]
     },
     {
       "id": "product-page",
       "label": "ProductPage",
-      "detail": "Loads one product by sku, then shows its gallery, price, Add to cart and reviews.",
+      "detail": "Fetches a product by sku and shows the gallery, price, add-to-cart button and reviews",
       "tags": [
-        "fetches",
-        "state"
+        "state",
+        "fetches"
       ],
       "refs": [
         {
           "path": "src/pages/product/ProductPage.jsx",
           "start": 9,
           "end": 28,
-          "why": "Declares ProductPage"
-        },
-        {
-          "path": "src/pages/product/ProductPage.jsx",
-          "start": 1,
-          "end": 13,
-          "why": "Fetches /api/products/:sku"
-        },
-        {
-          "path": "src/pages/product/ProductPage.jsx",
-          "start": 23,
-          "end": 23,
-          "why": "Renders the review thread"
+          "why": "Declares the component, fetches the product, renders its children"
         }
       ]
     },
     {
       "id": "cart-page",
       "label": "CartPage",
-      "detail": "Cart lines from the cart store, a subtotal and a plain link to /checkout.",
+      "detail": "Lists the cart lines from the cart store, shows the subtotal and a checkout link",
       "tags": [
-        "state",
-        "routing"
+        "state"
       ],
       "card": "cart-page",
       "refs": [
@@ -60,18 +47,19 @@
           "path": "src/pages/cart/CartPage.jsx",
           "start": 7,
           "end": 22,
-          "why": "Declares CartPage"
+          "why": "Declares the component, reads the cart store"
         }
       ]
     },
     {
       "id": "checkout-page",
       "label": "CheckoutPage",
-      "detail": "Hosts the checkout steps and order summary. On pay it calls placeOrder, clears the cart, then sends the browser to /orders/:id.",
+      "detail": "Hosts the checkout steps and order summary; on submit, places the order, clears the cart and redirects to the order page",
       "tags": [
         "state",
         "fetches",
-        "routing"
+        "routing",
+        "form"
       ],
       "card": "checkout-page",
       "refs": [
@@ -79,61 +67,73 @@
           "path": "src/pages/checkout/CheckoutPage.jsx",
           "start": 7,
           "end": 25,
-          "why": "Declares CheckoutPage"
+          "why": "Declares the component; calls placeOrder and window.location.assign"
         }
       ]
     },
     {
       "id": "order-page",
       "label": "OrderPage",
-      "detail": "Loads the order and confirms it with the amount charged.",
+      "detail": "Fetches an order by id and shows the confirmation and charged total",
       "tags": [
-        "fetches",
-        "state"
+        "state",
+        "fetches"
       ],
       "refs": [
         {
           "path": "src/pages/orders/OrderPage.jsx",
           "start": 4,
           "end": 17,
-          "why": "Declares OrderPage"
+          "why": "Declares the component and fetches the order"
         }
       ]
     },
     {
       "id": "header",
       "label": "Header",
-      "detail": "Site header shown on most pages: logo, nav links, search and the cart badge.",
+      "detail": "Site header: logo, nav links, search box, cart badge",
       "tags": [],
       "refs": [
         {
           "path": "src/components/layout/Header.jsx",
           "start": 5,
           "end": 14,
-          "why": "Declares Header"
+          "why": "Declares the component and renders its children"
+        }
+      ]
+    },
+    {
+      "id": "footer",
+      "label": "Footer",
+      "detail": "Static site footer",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/layout/Footer.jsx",
+          "start": 1,
+          "end": 7,
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "nav-links",
       "label": "NavLinks",
-      "detail": "Fixed links to the catalog and sign-in.",
-      "tags": [
-        "routing"
-      ],
+      "detail": "Nav anchors for Catalog and Sign in",
+      "tags": [],
       "refs": [
         {
           "path": "src/components/layout/NavLinks.jsx",
           "start": 6,
           "end": 12,
-          "why": "Declares NavLinks"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "search-box",
       "label": "SearchBox",
-      "detail": "Search form that reloads the catalog with ?q=.",
+      "detail": "Search form that navigates to /?q=",
       "tags": [
         "form",
         "routing"
@@ -143,45 +143,30 @@
           "path": "src/components/layout/SearchBox.jsx",
           "start": 1,
           "end": 13,
-          "why": "Declares SearchBox"
+          "why": "Declares the component; handles submit and navigates"
         }
       ]
     },
     {
       "id": "cart-badge",
       "label": "CartBadge",
-      "detail": "Item count from the cart store, linking to /cart.",
+      "detail": "Link to the cart showing the item count from the cart store",
       "tags": [
-        "state",
-        "routing"
+        "state"
       ],
       "refs": [
         {
           "path": "src/components/layout/CartBadge.jsx",
           "start": 3,
           "end": 7,
-          "why": "Declares CartBadge"
-        }
-      ]
-    },
-    {
-      "id": "footer",
-      "label": "Footer",
-      "detail": "Static footer text.",
-      "tags": [],
-      "refs": [
-        {
-          "path": "src/components/layout/Footer.jsx",
-          "start": 1,
-          "end": 7,
-          "why": "Declares Footer"
+          "why": "Declares the component, reads the cart store"
         }
       ]
     },
     {
       "id": "filter-sidebar",
       "label": "FilterSidebar",
-      "detail": "Category radio list; picking one reloads the catalog with ?category=.",
+      "detail": "Category radio filters; reads the URL query and navigates when a category is picked",
       "tags": [
         "state",
         "routing"
@@ -191,63 +176,73 @@
           "path": "src/components/catalog/FilterSidebar.jsx",
           "start": 5,
           "end": 19,
-          "why": "Declares FilterSidebar"
+          "why": "Declares the component, uses local state and window.location"
         }
       ]
     },
     {
       "id": "product-grid",
       "label": "ProductGrid",
-      "detail": "Fetches products for the current query string and lays out a card for each.",
+      "detail": "Fetches products using the URL query and renders product cards",
       "tags": [
-        "fetches",
-        "state"
+        "state",
+        "fetches"
       ],
       "refs": [
         {
           "path": "src/components/catalog/ProductGrid.jsx",
           "start": 4,
           "end": 10,
-          "why": "Declares ProductGrid"
+          "why": "Declares the component, fetches /api/products"
         }
       ]
     },
     {
       "id": "product-card",
       "label": "ProductCard",
-      "detail": "Image and name linking to the product page, a price and Add to cart.",
-      "tags": [
-        "routing"
-      ],
+      "detail": "Product tile: link, image, price, add-to-cart button",
+      "tags": [],
       "refs": [
         {
           "path": "src/components/catalog/ProductCard.jsx",
           "start": 4,
           "end": 12,
-          "why": "Declares ProductCard"
+          "why": "Declares the component"
         }
       ]
     },
     {
-      "id": "product-gallery",
-      "label": "ProductGallery",
-      "detail": "Main image with a thumbnail button per image.",
-      "tags": [
-        "state"
-      ],
+      "id": "price-line",
+      "label": "PriceLine",
+      "detail": "Label plus a formatted USD amount",
+      "tags": [],
       "refs": [
         {
-          "path": "src/components/product/ProductGallery.jsx",
+          "path": "src/components/shared/PriceLine.jsx",
           "start": 3,
-          "end": 11,
-          "why": "Declares ProductGallery"
+          "end": 10,
+          "why": "Declares the component"
         }
       ]
     },
     {
-      "id": "add-to-cart",
+      "id": "button",
+      "label": "Button",
+      "detail": "The app's own button with a variant class",
+      "tags": [],
+      "refs": [
+        {
+          "path": "src/components/shared/Button.jsx",
+          "start": 1,
+          "end": 3,
+          "why": "Declares the component"
+        }
+      ]
+    },
+    {
+      "id": "add-to-cart-button",
       "label": "AddToCartButton",
-      "detail": "Adds one of the product to the cart store.",
+      "detail": "Adds the product to the cart store",
       "tags": [
         "state"
       ],
@@ -256,42 +251,58 @@
           "path": "src/components/product/AddToCartButton.jsx",
           "start": 4,
           "end": 11,
-          "why": "Declares AddToCartButton"
+          "why": "Declares the component, calls cart.add"
+        }
+      ]
+    },
+    {
+      "id": "product-gallery",
+      "label": "ProductGallery",
+      "detail": "Image viewer with thumbnail buttons",
+      "tags": [
+        "state"
+      ],
+      "refs": [
+        {
+          "path": "src/components/product/ProductGallery.jsx",
+          "start": 3,
+          "end": 11,
+          "why": "Declares the component with an index state"
         }
       ]
     },
     {
       "id": "review-thread",
       "label": "ReviewThread",
-      "detail": "List of reviews. Each review renders its replies with another ReviewThread, so the two components recurse.",
+      "detail": "List of reviews; nested recursively through ReviewItem",
       "tags": [],
       "refs": [
         {
           "path": "src/components/product/ReviewThread.jsx",
           "start": 3,
           "end": 10,
-          "why": "Declares ReviewThread"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "review-item",
       "label": "ReviewItem",
-      "detail": "One review (author, stars, text) and its replies.",
+      "detail": "One review plus a nested thread of its replies",
       "tags": [],
       "refs": [
         {
           "path": "src/components/product/ReviewItem.jsx",
           "start": 3,
           "end": 11,
-          "why": "Declares ReviewItem"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "cart-line",
       "label": "CartLine",
-      "detail": "One cart item with its line price; when editable, a quantity stepper and Remove.",
+      "detail": "Cart line showing the price, plus a quantity stepper and remove button when editable",
       "tags": [
         "state"
       ],
@@ -300,14 +311,14 @@
           "path": "src/components/cart/CartLine.jsx",
           "start": 6,
           "end": 15,
-          "why": "Declares CartLine"
+          "why": "Declares the component, uses the cart store"
         }
       ]
     },
     {
       "id": "quantity-stepper",
       "label": "QuantityStepper",
-      "detail": "Minus and plus buttons that change the quantity in the cart store (zero removes the line).",
+      "detail": "+/- buttons that update the quantity in the cart store",
       "tags": [
         "state"
       ],
@@ -316,14 +327,14 @@
           "path": "src/components/cart/QuantityStepper.jsx",
           "start": 4,
           "end": 13,
-          "why": "Declares QuantityStepper"
+          "why": "Declares the component, calls cart.setQuantity"
         }
       ]
     },
     {
       "id": "checkout-steps",
       "label": "CheckoutSteps",
-      "detail": "Holds the current step and the shipping address, switching from shipping to payment.",
+      "detail": "Switches between the shipping and payment steps and keeps the shipping address",
       "tags": [
         "state"
       ],
@@ -332,14 +343,14 @@
           "path": "src/components/checkout/CheckoutSteps.jsx",
           "start": 5,
           "end": 12,
-          "why": "Declares CheckoutSteps"
+          "why": "Declares the component and renders a step based on its state"
         }
       ]
     },
     {
       "id": "shipping-step",
       "label": "ShippingStep",
-      "detail": "Email and address form; continues to payment.",
+      "detail": "Shipping form: email and address fields",
       "tags": [
         "form"
       ],
@@ -348,62 +359,59 @@
           "path": "src/components/checkout/ShippingStep.jsx",
           "start": 4,
           "end": 18,
-          "why": "Declares ShippingStep"
+          "why": "Declares the component and handles form submit"
         }
       ]
     },
     {
       "id": "address-fields",
       "label": "AddressFields",
-      "detail": "Street, city and postcode inputs.",
-      "tags": [
-        "form"
-      ],
+      "detail": "Address fieldset with postcode lookup",
+      "tags": [],
       "refs": [
         {
           "path": "src/components/checkout/AddressFields.jsx",
           "start": 3,
           "end": 12,
-          "why": "Declares AddressFields"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "postcode-lookup",
       "label": "PostcodeLookup",
-      "detail": "Looks up the city for a postcode on blur from /api/postcodes.",
+      "detail": "Postcode input; on blur, fetches the city hint",
       "tags": [
-        "fetches",
         "state",
-        "form"
+        "fetches"
       ],
       "refs": [
         {
           "path": "src/components/checkout/PostcodeLookup.jsx",
           "start": 3,
           "end": 17,
-          "why": "Declares PostcodeLookup"
+          "why": "Declares the component, fetches /api/postcodes"
         }
       ]
     },
     {
       "id": "payment-step",
       "label": "PaymentStep",
-      "detail": "Saved cards, a new card form and a Back to shipping link.",
+      "detail": "Payment section: saved card picker, card form, back button",
       "tags": [],
       "refs": [
         {
           "path": "src/components/checkout/PaymentStep.jsx",
           "start": 5,
           "end": 14,
-          "why": "Declares PaymentStep"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "saved-card-picker",
       "label": "SavedCardPicker",
-      "detail": "Signed-in shopper's saved cards from AccountContext; hidden when there are none.",
+      "detail": "Lists the account's saved cards from AccountContext",
       "tags": [
         "context"
       ],
@@ -412,20 +420,14 @@
           "path": "src/components/checkout/SavedCardPicker.jsx",
           "start": 5,
           "end": 15,
-          "why": "Declares SavedCardPicker"
-        },
-        {
-          "path": "src/stores/account.js",
-          "start": 1,
-          "end": 4,
-          "why": "AccountContext it reads"
+          "why": "Declares the component and reads AccountContext"
         }
       ]
     },
     {
       "id": "card-form",
       "label": "CardForm",
-      "detail": "Card number, expiry and CVC with the Place order button.",
+      "detail": "Card details form that submits to onSubmit",
       "tags": [
         "form"
       ],
@@ -434,45 +436,44 @@
           "path": "src/components/checkout/CardForm.jsx",
           "start": 4,
           "end": 18,
-          "why": "Declares CardForm"
+          "why": "Declares the component and handles submit"
         }
       ]
     },
     {
       "id": "card-number-field",
       "label": "CardNumberField",
-      "detail": "Card number input that shows the detected brand.",
+      "detail": "Controlled card number input with a brand icon",
       "tags": [
-        "state",
-        "form"
+        "state"
       ],
       "refs": [
         {
           "path": "src/components/checkout/CardNumberField.jsx",
           "start": 4,
           "end": 13,
-          "why": "Declares CardNumberField"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "card-brand-icon",
       "label": "CardBrandIcon",
-      "detail": "Guesses Visa, Mastercard or Amex from the number prefix.",
+      "detail": "Shows the card brand detected from the number",
       "tags": [],
       "refs": [
         {
           "path": "src/components/checkout/CardBrandIcon.jsx",
           "start": 3,
           "end": 6,
-          "why": "Declares CardBrandIcon"
+          "why": "Declares the component"
         }
       ]
     },
     {
       "id": "order-summary",
       "label": "OrderSummary",
-      "detail": "Read-only cart lines, a promo code field and the discounted total.",
+      "detail": "Cart lines (read-only by default), promo field, and total after discount",
       "tags": [
         "state"
       ],
@@ -481,17 +482,17 @@
           "path": "src/components/checkout/OrderSummary.jsx",
           "start": 6,
           "end": 16,
-          "why": "Declares OrderSummary"
+          "why": "Declares the component, reads the cart store"
         }
       ]
     },
     {
       "id": "promo-code-field",
       "label": "PromoCodeField",
-      "detail": "Checks a promo code with /api/promos and stores the discount in the cart; shows an error for unknown codes.",
+      "detail": "Promo code form; fetches the promo and sets the discount in the cart store",
       "tags": [
-        "fetches",
         "state",
+        "fetches",
         "form"
       ],
       "refs": [
@@ -499,35 +500,7 @@
           "path": "src/components/checkout/PromoCodeField.jsx",
           "start": 5,
           "end": 25,
-          "why": "Declares PromoCodeField"
-        }
-      ]
-    },
-    {
-      "id": "price-line",
-      "label": "PriceLine",
-      "detail": "Label and a formatted USD amount.",
-      "tags": [],
-      "refs": [
-        {
-          "path": "src/components/shared/PriceLine.jsx",
-          "start": 3,
-          "end": 10,
-          "why": "Declares PriceLine"
-        }
-      ]
-    },
-    {
-      "id": "button",
-      "label": "Button",
-      "detail": "Shared button with primary, secondary, link and icon variants.",
-      "tags": [],
-      "refs": [
-        {
-          "path": "src/components/shared/Button.jsx",
-          "start": 1,
-          "end": 3,
-          "why": "Declares Button"
+          "why": "Declares the component, fetches /api/promos"
         }
       ]
     }
@@ -563,7 +536,7 @@
     },
     {
       "from": "product-page",
-      "to": "add-to-cart"
+      "to": "add-to-cart-button"
     },
     {
       "from": "product-page",
@@ -627,10 +600,10 @@
     },
     {
       "from": "product-card",
-      "to": "add-to-cart"
+      "to": "add-to-cart-button"
     },
     {
-      "from": "add-to-cart",
+      "from": "add-to-cart-button",
       "to": "button"
     },
     {
@@ -745,10 +718,13 @@
     }
   ],
   "gaps": [
-    "No app shell in src/, so who provides AccountContext could not be confirmed.",
-    "The /sign-in screen has no component in src/."
+    "src/ has no app shell or router. How routes map to pages, and how sku and orderId reach ProductPage and OrderPage, is not visible.",
+    "AccountContext (src/stores/account.js) is said to be provided by the app shell, but no Provider exists in src/, so the parent of SavedCardPicker's data is not known.",
+    "CheckoutPage receives the card details but never calls src/api/payments.js; no component in src/ uses the payments client.",
+    "CheckoutSteps renders either ShippingStep or PaymentStep depending on its step state, so only one shows at a time.",
+    "ReviewThread and ReviewItem render each other recursively, so the uses graph has a cycle."
   ],
-  "dirtyAtGeneration": true,
-  "generatedAt": "2026-10-29T20:23:11.920Z",
-  "commit": "1f9b22cc54b73847292d60a02285f8bfefe3054c"
+  "dirtyAtGeneration": false,
+  "generatedAt": "2026-11-02T04:20:41.725Z",
+  "commit": "4c2d6590edbf95476ca97f1fcc9f7fc5b4a075c2"
 }

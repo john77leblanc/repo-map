@@ -27,6 +27,8 @@ interface DiagramViewModel {
     markMode?: boolean;
     /** Search matches, tinted on the diagram. */
     matched?: ReadonlySet<string>;
+    /** Nodes an AI job is working on, shown with a spinner badge. */
+    busyNodes?: ReadonlySet<string>;
     /** Lane heading fold buttons, when the diagram supports collapsing lanes. */
     toggleLane?(id: string): void;
     isLaneCollapsed?(id: string): boolean;
@@ -190,6 +192,31 @@ const DiagramSvg = observer(function DiagramSvg({
         host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) =>
             node.classList.toggle('match', !!matched?.has(node.dataset.id || '')));
     }, [svg, matched]);
+    const busyNodes = vm.busyNodes;
+    useLayoutEffect(() => {
+        type Box = { id: string; type: string; x: number; y: number; w: number; h: number };
+        const boxes = new Map(((layout?.nodes || []) as Box[]).map((n) => [n.id, n]));
+        host.current?.querySelectorAll<SVGElement>('.fn').forEach((node) => {
+            const box = boxes.get(node.dataset.id || '');
+            const on = !!box && !!busyNodes?.has(box.id);
+            node.classList.toggle('working', on);
+            node.querySelector('.busy-badge')?.remove();
+            if (on) node.setAttribute('aria-busy', 'true');
+            else node.removeAttribute('aria-busy');
+            if (!on || !box) return;
+            // The top-right corner, where the closer-look badge sits (on the edge for diamonds).
+            const diamond = box.type === 'decision';
+            const round = box.type === 'start' || box.type === 'end';
+            const cx = diamond ? box.x + box.w * 0.75 : box.x + box.w - (round ? box.h / 4 : 2);
+            const cy = diamond ? box.y + box.h * 0.25 : box.y + 2;
+            const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            badge.setAttribute('class', 'busy-badge');
+            badge.setAttribute('aria-hidden', 'true');
+            badge.setAttribute('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
+            badge.innerHTML = '<circle class="busy-bg" r="8"/><g class="busy-spin"><circle class="busy-arc" r="5"/></g>';
+            node.appendChild(badge);
+        });
+    }, [svg, busyNodes, layout]);
     const highlight = vm.highlight;
     useLayoutEffect(() => {
         const element = host.current?.querySelector('svg');

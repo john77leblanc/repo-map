@@ -103,6 +103,12 @@ describe('FlowchartWorkspace', () => {
         expect(closer.previousElementSibling?.className).toBe('fside-rule');
         expect(container.querySelector('.disclosure[data-section="fl-closer"]')).toBe(null);
         await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Look closer' })));
+        // the box being looked at shows a spinner in place of its closer-look badge
+        const box = container.querySelector('#fl-canvas .fn[data-id="a"]')!;
+        expect(box.classList.contains('working')).toBe(true);
+        expect(box.getAttribute('aria-busy')).toBe('true');
+        expect(box.querySelectorAll('.busy-badge')).toHaveLength(1);
+        expect(container.querySelectorAll('#fl-canvas .busy-badge')).toHaveLength(1);
         act(() => progress('Reading the cart'));
         expect(container.querySelector('#fl-closer-status')?.textContent).toMatch(/^Reading the cart/);
         expect(container.querySelector('#fl-status')?.textContent).toBe('');
@@ -110,6 +116,8 @@ describe('FlowchartWorkspace', () => {
         await act(async () => fireEvent.click(container.querySelector('#fl-closer-stop')!));
         expect(container.querySelector('#fl-closer-status')?.textContent).toBe('Stopped.');
         expect(container.querySelector('#fl-status')?.textContent).toBe('');
+        expect(container.querySelector('#fl-canvas .busy-badge')).toBe(null);
+        expect(container.querySelector('#fl-canvas .fn[data-id="a"]')?.hasAttribute('aria-busy')).toBe(false);
         unmount();
         vm.dispose();
     });

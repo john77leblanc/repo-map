@@ -319,13 +319,24 @@ export class TraceViewModel {
         this.editing = null;
         this.composerOpen = false;
     }
-    cancelEdit() {
-        if (!this.editing || this.savingRevision) return;
-        const original = this.editing;
+    /** End an edit without regenerating, keeping the draft for the next Edit. */
+    private abandonEdit() {
+        const original = this.editing!;
         this.editDraft = { id: original._doc!, ...this.picks };
         this.stop();
         this.finishEdit();
+        return original;
+    }
+    cancelEdit() {
+        if (!this.editing || this.savingRevision) return;
+        const original = this.abandonEdit();
         this.select(original, this.editWorkspace);
+    }
+    /** Back to all traces: ends any edit (like Cancel), then clears the selection. */
+    back() {
+        if (this.savingRevision) return;
+        if (this.editing) this.abandonEdit();
+        this.clear();
     }
     closeComposer() {
         if (this.editing) return;

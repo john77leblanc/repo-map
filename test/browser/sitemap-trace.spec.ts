@@ -27,11 +27,12 @@ test('screen-only proposals preserve snapshots and expose journeys, context, ori
     await expect(page.getByRole('tab', { name: 'Sitemap', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#sitemap-svgbox .change-new.fn')).toHaveCount(1);
     await expect(page.locator('#sitemap-svgbox .change-removed.fe')).toHaveCount(1);
-    await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveClass(/context/);
-    await expect(page.locator('#sitemap-svgbox [data-id="account"]')).toHaveCount(0);
-    await page.getByLabel('Show').selectOption('trace');
+    // Show starts on the trace's own screens.
+    await expect(page.getByLabel('Show')).toHaveValue('trace');
     await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveCount(0);
     await page.getByLabel('Show').selectOption('nearby');
+    await expect(page.locator('#sitemap-svgbox [data-id="receipt"]')).toHaveClass(/context/);
+    await expect(page.locator('#sitemap-svgbox [data-id="account"]')).toHaveCount(0);
     // Pick the journey's first screen, then walk to step 3 with Next.
     await expect(page.locator('#sitemap-details')).toHaveCount(0);
     await page.locator('#sitemap-svgbox [data-id="cart"]').click();

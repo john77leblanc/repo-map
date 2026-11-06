@@ -275,6 +275,16 @@ export class FlowchartViewModel {
         const taken = new Set(this.collapse.groups.map((g) => g.id));
         let n = this.collapse.groups.length + 1;
         while (taken.has(`s${n}`)) n++;
+    /**
+     * The box getting a closer look, for its spinner. A look drawn open in the chart
+     * replaces its box, so its first step spins instead.
+     */
+    get busyNodes(): ReadonlySet<string> | undefined {
+        const id = this.expandingId;
+        if (!id) return undefined;
+        const entry = this.shown.includes(id) ? this.trace?.expansions?.[id]?.entry : undefined;
+        return new Set(entry ? [id, entry] : [id]);
+    }
         const members = this.baseFlow?.nodes.map((node) => node.id).filter((id) => this.marked.includes(id)) || [];
         this.collapse = { ...this.collapse, groups: [...this.collapse.groups, { id: `s${n}`, label: label.trim(), members }] };
         this.marked = [];

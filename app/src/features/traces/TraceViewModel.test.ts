@@ -642,6 +642,18 @@ describe('editing saved trace prompts', () => {
         expect(vm.prompt).toBe('Revised complete question');
         vm.dispose();
     });
+    it('going back to all traces ends the edit and keeps the draft', () => {
+        const { vm, original } = editing();
+        vm.setOutput('flowchart', false);
+        vm.back();
+        expect(vm.editing).toBeNull();
+        expect(vm.selected).toBeNull();
+        expect(vm.composerOpen).toBe(false);
+        expect(vm.flowchart).toBe(true);
+        vm.editPrompt(original);
+        expect(vm.prompt).toBe('Revised complete question');
+        vm.dispose();
+    });
     it('retains an unsaved revision for retry while keeping the saved identity', async () => {
         const { vm, services } = editing();
         vi.mocked(services.api.stream).mockResolvedValue({ trace: { ...raw, flow } });

@@ -248,23 +248,28 @@ const RootViewRows = observer(function RootViewRows({ vm }: { vm: SettingsViewMo
             statusId: id + '-status', stopId: id + '-stop' };
     const sitemapExists = !!sitemap.sitemap;
     const componentsExist = !!components.components;
+    // Both jobs share one server lock, and components are mapped from the sitemap's screens.
+    const waitSitemap = 'Waits for the sitemap: components are mapped from its screens.';
+    const waitComponents = 'Waits for components to finish.';
     return <>
         <ViewJobRow id="view-sitemap" title="Sitemap"
-            status={sitemap.loading ? 'Checking…' : sitemap.sitemap ? sitemap.freshnessLabel + '.' : 'Not generated yet.'}
+            status={sitemap.loading ? 'Checking…' : components.busy && !sitemap.busy ? waitComponents
+                : sitemap.sitemap ? sitemap.freshnessLabel + '.' : 'Not generated yet.'}
             job={job(sitemap, 'view-sitemap')}>
-            <button className="btn sm" id="view-sitemap-go" type="button" disabled={sitemap.busy || sitemap.loading}
-                title="Analyze the repository's screens and navigation again, and replace .repo-map/sitemap.json."
+            <button className="btn sm" id="view-sitemap-go" type="button" disabled={sitemap.busy || sitemap.loading || components.busy}
+                title={components.busy ? waitComponents : "Analyze the repository's screens and navigation again, and replace .repo-map/sitemap.json."}
                 onClick={vm.redrawSitemap}>
                 {vm.armed === 'sitemap' ? 'Confirm regenerate' : sitemapExists ? 'Regenerate sitemap' : 'Generate sitemap'}
             </button>
         </ViewJobRow>
         <ViewJobRow id="view-components" title="Components"
-            status={components.loading ? 'Checking…' : !components.canGenerate ? 'Needs the sitemap first: components are mapped from its screens.'
+            status={components.loading ? 'Checking…' : sitemap.busy && !components.busy ? waitSitemap
+                : !components.canGenerate ? 'Needs the sitemap first: components are mapped from its screens.'
                 : components.components ? components.freshnessLabel + '.' : 'Not generated yet.'}
             job={job(components, 'view-components')}>
             <button className="btn sm" id="view-components-go" type="button"
-                disabled={components.busy || components.loading || !components.canGenerate}
-                title="Map the UI components that build each screen again, and replace .repo-map/components.json."
+                disabled={components.busy || components.loading || !components.canGenerate || sitemap.busy}
+                title={sitemap.busy ? waitSitemap : 'Map the UI components that build each screen again, and replace .repo-map/components.json.'}
                 onClick={vm.redrawComponents}>
                 {vm.armed === 'components' ? 'Confirm regenerate' : componentsExist ? 'Regenerate components' : 'Generate components'}
             </button>

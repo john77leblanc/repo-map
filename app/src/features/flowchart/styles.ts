@@ -33,6 +33,14 @@ export const UI_CSS = `.fc .fn{cursor:pointer;outline:none}
 .fc .fn.match .fs{fill:color-mix(in srgb,var(--event) 28%,var(--panel))}
 .fc .mk-badge circle{fill:var(--http);stroke:var(--panel);stroke-width:2}
 .fc .mk-badge path{fill:none;stroke:var(--panel);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fc .fn.working .xp-badge{display:none}
+.fc .busy-badge{pointer-events:none}
+.fc .busy-badge .busy-bg{fill:var(--panel);stroke:var(--ext);stroke-width:1.5}
+.fc .busy-badge .busy-arc{fill:none;stroke:var(--ext);stroke-width:2;stroke-linecap:round;stroke-dasharray:22 10}
+.fc .busy-badge .busy-spin{transform-box:fill-box;transform-origin:center;animation:fc-spin .8s linear infinite}
+@keyframes fc-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.fc .busy-badge .busy-spin{animation:fc-pulse 1.4s ease-in-out infinite}}
+@keyframes fc-pulse{50%{opacity:.35}}
 .fside-input{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;font-weight:600;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin:2px 0 10px}
 .fside-input:focus{outline:2px solid var(--http);outline-offset:1px}
 .fside .disclosure-list.in-closer{border-left:3px solid var(--ext)}

@@ -81,6 +81,10 @@ it('shows repeated journey steps, nearby context, cross-application navigation, 
     vm.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal', sitemap: output }, repo.map)));
     const before = JSON.stringify(output.base);
     const { container } = render(<SitemapWorkspace vm={vm} />);
+    // Show starts on the trace's own screens
+    expect(vm.scope).toBe('trace');
+    expect(container.querySelector('[data-id="admin"]')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'nearby' } });
     expect(container.querySelector('[data-id="isolated"]')).toBeNull();
     expect(container.querySelector('[data-id="admin"]')?.classList.contains('context')).toBe(true);
     expect(container.querySelector('[data-id="cart"]')?.textContent).toContain('1, 2. cart');
@@ -171,8 +175,10 @@ it('lists navigation as connection rows in the screen panel, with hover highligh
     expect(vm.selectedId).toBeNull();
     expect(container.querySelector('#sitemap-details')).toBeNull();
     // Selecting a hidden screen widens the Show scope.
-    vm.setScope('trace');
-    vm.select('receipt');
+    act(() => {
+        vm.setScope('trace');
+        vm.select('receipt');
+    });
     expect(vm.scope).toBe('nearby');
     expect(container.querySelector('[data-id="receipt"]')).not.toBeNull();
     vm.dispose();

@@ -1,11 +1,11 @@
 {
   "version": 1,
   "applicability": "incomplete",
-  "summary": "One storefront with six screens: Catalog, Product, Cart, Checkout, Order confirmation and Sign in. There is no router file in src/, so routes come from link targets and redirects. Every page except the order confirmation shares the site header, whose links reach the catalog, the cart and sign-in.",
+  "summary": "Single React storefront with 5 page components: Catalog, Product detail, Cart, Checkout (two-step Shipping/Payment wizard) and Order confirmation. No router file is in src/, so routes come from link hrefs and window.location.assign calls. The shared Header (logo, nav links, search, cart badge) appears on Catalog, Product, Cart and Checkout. A /sign-in link exists but no page for it is in src/.",
   "applications": [
     {
       "id": "storefront",
-      "label": "Shop Map Storefront"
+      "label": "Shop Map storefront"
     }
   ],
   "screens": [
@@ -14,28 +14,40 @@
       "app": "storefront",
       "label": "Catalog",
       "route": "/",
-      "detail": "Product grid with a category filter and search (?q=, ?category=). Loads products from /api/products.",
+      "detail": "Product grid loaded from /api/products using the current query string. Has a category filter sidebar (All/Mugs/Posters/Stickers, uses ?category=) and header search (?q=). Product cards have add-to-cart buttons.",
       "refs": [
         {
           "path": "src/pages/catalog/CatalogPage.jsx",
           "start": 6,
           "end": 17,
-          "why": "Declares CatalogPage"
+          "why": "Catalog page component"
+        },
+        {
+          "path": "src/components/catalog/FilterSidebar.jsx",
+          "start": 3,
+          "end": 19,
+          "why": "Category filter"
+        },
+        {
+          "path": "src/components/catalog/ProductGrid.jsx",
+          "start": 4,
+          "end": 10,
+          "why": "Product fetch and grid"
         }
       ]
     },
     {
       "id": "product",
       "app": "storefront",
-      "label": "Product",
-      "route": "/products/:id",
-      "detail": "One product: image gallery, price, Add to cart and a threaded review list with replies.",
+      "label": "Product detail",
+      "route": "/products/:sku",
+      "detail": "Fetches the product by SKU. Shows the gallery, price, add-to-cart button and review thread.",
       "refs": [
         {
           "path": "src/pages/product/ProductPage.jsx",
           "start": 9,
           "end": 28,
-          "why": "Declares ProductPage and loads the product"
+          "why": "Product page component"
         }
       ]
     },
@@ -44,13 +56,13 @@
       "app": "storefront",
       "label": "Cart",
       "route": "/cart",
-      "detail": "Cart lines with quantity steppers and Remove, a subtotal and a Check out link.",
+      "detail": "Lists cart lines with quantity steppers and a subtotal, plus a checkout link.",
       "refs": [
         {
           "path": "src/pages/cart/CartPage.jsx",
           "start": 7,
           "end": 22,
-          "why": "Declares CartPage"
+          "why": "Cart page component"
         }
       ]
     },
@@ -59,25 +71,25 @@
       "app": "storefront",
       "label": "Checkout",
       "route": "/checkout",
-      "detail": "Two steps (shipping, then payment) beside an order summary with a promo code field. Paying calls placeOrder, clears the cart and redirects to the order page. A declined payment throws and no UI handles it.",
+      "detail": "Two-step wizard: Shipping (email and address) then Payment (pick a saved card if a signed-in account has cards, or use the card form; Back to shipping link). Shows an order summary sidebar. Submitting places the order and clears the cart.",
       "refs": [
         {
           "path": "src/pages/checkout/CheckoutPage.jsx",
           "start": 7,
           "end": 25,
-          "why": "Declares CheckoutPage and its submit handler"
+          "why": "Checkout page and submit"
         },
         {
-          "path": "src/api/orders.js",
+          "path": "src/components/checkout/CheckoutSteps.jsx",
           "start": 5,
-          "end": 14,
-          "why": "placeOrder flow used on submit"
+          "end": 12,
+          "why": "Shipping/payment step state"
         },
         {
-          "path": "src/api/payments.js",
-          "start": 3,
-          "end": 13,
-          "why": "Payment charge that can throw 'Payment declined'"
+          "path": "src/components/checkout/SavedCardPicker.jsx",
+          "start": 5,
+          "end": 15,
+          "why": "Saved cards shown only when account has cards"
         }
       ]
     },
@@ -86,28 +98,13 @@
       "app": "storefront",
       "label": "Order confirmation",
       "route": "/orders/:id",
-      "detail": "Confirms the order and shows the amount charged, with a link back to the catalog.",
+      "detail": "Fetches the order and shows the confirmation and amount charged. No site header.",
       "refs": [
         {
           "path": "src/pages/orders/OrderPage.jsx",
           "start": 4,
           "end": 17,
-          "why": "Declares OrderPage"
-        }
-      ]
-    },
-    {
-      "id": "sign-in",
-      "app": "storefront",
-      "label": "Sign in",
-      "route": "/sign-in",
-      "detail": "Linked from the header, but no page for it exists in src/. It is likely served by a hosted sign-in provider.",
-      "refs": [
-        {
-          "path": "src/components/layout/NavLinks.jsx",
-          "start": 3,
-          "end": 3,
-          "why": "Header link to /sign-in"
+          "why": "Order page component"
         }
       ]
     }
@@ -116,14 +113,20 @@
     {
       "from": "catalog",
       "to": "product",
-      "label": "Open product",
+      "label": "Open product card",
       "condition": "",
       "refs": [
         {
           "path": "src/components/catalog/ProductCard.jsx",
-          "start": 7,
-          "end": 7,
-          "why": "Card links to /products/:sku"
+          "start": 4,
+          "end": 12,
+          "why": "Link to /products/:sku"
+        },
+        {
+          "path": "src/components/catalog/ProductGrid.jsx",
+          "start": 9,
+          "end": 9,
+          "why": "Grid renders cards"
         }
       ]
     },
@@ -135,9 +138,15 @@
       "refs": [
         {
           "path": "src/components/layout/CartBadge.jsx",
-          "start": 6,
-          "end": 6,
-          "why": "Header badge links to /cart"
+          "start": 3,
+          "end": 7,
+          "why": "Link to /cart"
+        },
+        {
+          "path": "src/pages/catalog/CatalogPage.jsx",
+          "start": 9,
+          "end": 9,
+          "why": "Header rendered"
         }
       ]
     },
@@ -149,23 +158,41 @@
       "refs": [
         {
           "path": "src/components/layout/CartBadge.jsx",
-          "start": 6,
-          "end": 6,
-          "why": "Header badge links to /cart"
+          "start": 3,
+          "end": 7,
+          "why": "Link to /cart"
+        },
+        {
+          "path": "src/pages/product/ProductPage.jsx",
+          "start": 17,
+          "end": 17,
+          "why": "Header rendered"
         }
       ]
     },
     {
       "from": "product",
       "to": "catalog",
-      "label": "Logo or Catalog link",
+      "label": "Logo / Catalog link / search",
       "condition": "",
       "refs": [
         {
           "path": "src/components/layout/Header.jsx",
-          "start": 8,
-          "end": 8,
-          "why": "Logo links to /"
+          "start": 5,
+          "end": 14,
+          "why": "Logo to /, nav, search"
+        },
+        {
+          "path": "src/components/layout/NavLinks.jsx",
+          "start": 1,
+          "end": 4,
+          "why": "Catalog link"
+        },
+        {
+          "path": "src/pages/product/ProductPage.jsx",
+          "start": 17,
+          "end": 17,
+          "why": "Header rendered"
         }
       ]
     },
@@ -179,21 +206,27 @@
           "path": "src/pages/cart/CartPage.jsx",
           "start": 17,
           "end": 17,
-          "why": "Anchor href=\"/checkout\""
+          "why": "Link to /checkout"
         }
       ]
     },
     {
       "from": "cart",
       "to": "catalog",
-      "label": "Logo or Catalog link",
+      "label": "Logo / Catalog link / search",
       "condition": "",
       "refs": [
         {
           "path": "src/components/layout/Header.jsx",
-          "start": 8,
-          "end": 8,
-          "why": "Logo links to /"
+          "start": 5,
+          "end": 14,
+          "why": "Header links"
+        },
+        {
+          "path": "src/pages/cart/CartPage.jsx",
+          "start": 12,
+          "end": 12,
+          "why": "Header rendered"
         }
       ]
     },
@@ -201,13 +234,33 @@
       "from": "checkout",
       "to": "order",
       "label": "Place order",
-      "condition": "Payment accepted",
+      "condition": "After order placed successfully",
       "refs": [
         {
           "path": "src/pages/checkout/CheckoutPage.jsx",
-          "start": 13,
-          "end": 13,
-          "why": "Redirects to /orders/:id after placeOrder"
+          "start": 10,
+          "end": 14,
+          "why": "assign to /orders/:id"
+        }
+      ]
+    },
+    {
+      "from": "checkout",
+      "to": "catalog",
+      "label": "Logo / Catalog link / search",
+      "condition": "",
+      "refs": [
+        {
+          "path": "src/components/layout/Header.jsx",
+          "start": 5,
+          "end": 14,
+          "why": "Header links"
+        },
+        {
+          "path": "src/pages/checkout/CheckoutPage.jsx",
+          "start": 18,
+          "end": 18,
+          "why": "Header rendered"
         }
       ]
     },
@@ -219,9 +272,15 @@
       "refs": [
         {
           "path": "src/components/layout/CartBadge.jsx",
-          "start": 6,
-          "end": 6,
-          "why": "Header badge links to /cart"
+          "start": 3,
+          "end": 7,
+          "why": "Link to /cart"
+        },
+        {
+          "path": "src/pages/checkout/CheckoutPage.jsx",
+          "start": 18,
+          "end": 18,
+          "why": "Header rendered"
         }
       ]
     },
@@ -235,30 +294,19 @@
           "path": "src/pages/orders/OrderPage.jsx",
           "start": 14,
           "end": 14,
-          "why": "Anchor href=\"/\""
-        }
-      ]
-    },
-    {
-      "from": "catalog",
-      "to": "sign-in",
-      "label": "Sign in",
-      "condition": "Signed out",
-      "refs": [
-        {
-          "path": "src/components/layout/NavLinks.jsx",
-          "start": 3,
-          "end": 3,
-          "why": "Header link to /sign-in"
+          "why": "Link to /"
         }
       ]
     }
   ],
   "gaps": [
-    "No router or app entry file in src/, so routes are inferred from links and redirects.",
-    "The /sign-in link has no page in src/."
+    "No router or app shell in src/: routes come from hrefs/assign calls, and the route-to-page mapping (and how sku/orderId props are passed) isn't shown in code.",
+    "Header 'Sign in' links to /sign-in, but no sign-in page exists in src/. The arrow is omitted.",
+    "No sign-in requirement on any page was found. AccountContext is provided by an app shell that isn't in src/.",
+    "Cart badge links from Cart to itself are omitted.",
+    "Some entries were invalid, duplicated, or beyond the size limit and were omitted."
   ],
-  "dirtyAtGeneration": true,
-  "generatedAt": "2026-10-29T20:23:11.920Z",
-  "commit": "1f9b22cc54b73847292d60a02285f8bfefe3054c"
+  "dirtyAtGeneration": false,
+  "generatedAt": "2026-11-02T04:19:16.826Z",
+  "commit": "4c2d6590edbf95476ca97f1fcc9f7fc5b4a075c2"
 }
