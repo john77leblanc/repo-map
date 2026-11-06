@@ -192,6 +192,8 @@ const SitemapWorkspace = observer(function SitemapWorkspace({ vm }: { vm: Sitema
                     { label: vm.infoOpen || !vm.layout ? 'Hide info' : 'Show info', run: vm.toggleInfo,
                         disabled: !vm.layout, expanded: vm.infoOpen || !vm.layout, controls: 'sitemap-info' },
                     { label: 'Refresh status', run: () => void vm.load(), disabled: vm.loading || vm.busy },
+                    ...(vm.output ? [{ id: 'sitemap-redraw', label: 'Redraw trace sitemap', run: () => void vm.generateTrace(),
+                        disabled: !vm.canRedrawTrace, title: vm.repo.aiAvailable ? undefined : 'Set up an AI tool in Settings first' }] : []),
                 ]} />}
                 search={vm.layout && <SearchToggle id="sitemap-search-toggle" controls="sitemap-details" open={vm.search.open} onToggle={vm.toggleSearch} />}
             />

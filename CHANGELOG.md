@@ -2,6 +2,8 @@
 
 ## 0.22.1
 
+- The trace sidebar's **Views** section is gone. A trace output that is missing is drawn, added or retried with **Generate** on its view, as before; one that exists is redrawn from its diagram's **More** menu: **Redraw flowchart**, **Redraw trace sitemap** or **Redraw trace components**. A trace kept without an output now says to open that output's tab.
+
 - **Export** on the Flowchart, Sitemap and Components toolbars adds **Download PNG** (2x, scaled down for very large diagrams to stay within browser canvas limits), **Download PDF** (vector, one page sized to the diagram; the PDF library loads only when first used) and **Download HTML** (one self-contained page with the diagram and zoom/pan that works offline). All exports, SVG included, now embed the IBM Plex Sans font, so text looks the same outside the app. The button reads **Exporting…** while a file is built.
 
 - **Settings → Map → Views**: while the sitemap is being generated, **Regenerate components** is disabled with a note saying it waits for the sitemap (components are mapped from its screens). While components are being generated, **Regenerate sitemap** is disabled too. Both jobs share one lock, so clicking either button gave an "already running" error before.

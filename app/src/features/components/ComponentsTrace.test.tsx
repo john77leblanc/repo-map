@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { observable, runInAction } from 'mobx';
 import { fixture, raw } from '../traces/testFixtures';
 import { TraceViewModel } from '../traces/TraceViewModel';
 import { decodeTrace, encodeTrace, normalizeTrace } from '../../models/trace';
@@ -66,7 +67,7 @@ it('keeps the other outputs when Components comes back missing', async () => {
     await vm.runTrace();
     await vi.waitFor(() => expect(vm.selected?.pendingComponents).toBe(true));
     expect(vm.selected?.outputs.architecture).toBe(true);
-    expect(vm.status).toBe('Other outputs were kept, but Components was missing. Use Views to draw it again.');
+    expect(vm.status).toBe('Other outputs were kept, but Components was missing. Open its tab to draw it again.');
     vm.dispose();
     components.dispose();
 });
@@ -81,5 +82,18 @@ it('asks a review for Components and re-runs it with them', () => {
     expect(services.api.stream).toHaveBeenLastCalledWith('/api/review', expect.objectContaining({ components: true, local: true }),
         expect.any(AbortSignal), expect.any(Function), expect.any(Function));
     vm.dispose();
+    components.dispose();
+});
+
+it('offers Redraw trace components only for a trace that has them', () => {
+    const { components, repo } = setup();
+    runInAction(() => { components.components = base; });
+    components.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal' }, repo.map)));
+    expect(components.canRedraw).toBe(true);
+    expect(components.canRedrawTrace).toBe(false);
+    components.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal', components: output }, repo.map)));
+    expect(components.canRedrawTrace).toBe(true);
+    runInAction(() => { repo.bootstrap!.ai = { available: false, label: '' }; });
+    expect(components.canRedrawTrace).toBe(false);
     components.dispose();
 });

@@ -11,7 +11,6 @@ const copyKey = (trace: Trace) => trace._doc || trace.title || 'trace';
 import { countInferred } from '../../../../lib/flow.mjs';
 import type { SitemapViewModel } from '../sitemap/SitemapViewModel';
 import type { ComponentsViewModel } from '../components/ComponentsViewModel';
-import type { FlowchartViewModel } from '../flowchart/FlowchartViewModel';
 
 /** The composer's question and output choices, kept aside while editing or watching a job. */
 interface Picks { prompt: string; architecture: boolean; flowchart: boolean; sitemap: boolean; components: boolean }
@@ -33,11 +32,11 @@ function missingNote(trace: Trace, review: boolean) {
     if (review) return 'The review was kept, but ' + what + ' Re-run the review to try again.';
     const one = missing.length === 1 && !trace.pendingFlow ? missing[0] : '';
     return (one || missing.length > 1 ? 'Other outputs were kept, but ' : 'The walkthrough was kept, but ')
-        + what + ' Use Views to draw ' + (missing.length > 1 ? 'them' : 'it') + ' again.';
+        + what + (missing.length > 1 ? ' Open their tabs to draw them again.' : ' Open its tab to draw it again.');
 }
 
 /** A collapsible section of the trace sidebar. */
-export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps' | 'outputs' | 'views';
+export type TraceSection = 'summary' | 'proposal' | 'review' | 'files' | 'steps' | 'outputs';
 export interface TraceDependencies {
     repo: RepositoryModel;
     services: Services;
@@ -52,8 +51,6 @@ export interface TraceDependencies {
     onRequestFlow(trace: Trace): void | Promise<void>;
     sitemap?: SitemapViewModel;
     components?: ComponentsViewModel;
-    /** For the sidebar's Views: whether this trace's flowchart is being drawn. */
-    flowchart?: FlowchartViewModel;
     /** The map scope: new traces follow the workspace when it is shown. */
     getScope?(): 'repo' | 'workspace';
     /** The workspace's merged map, once loaded. */
@@ -118,7 +115,7 @@ export class TraceViewModel {
     importMessage = '';
     code = '';
     /** Which trace sidebar sections are open (kept while switching traces). */
-    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, review: true, files: false, steps: true, outputs: false, views: false };
+    sections: Record<TraceSection, boolean> = { summary: false, proposal: false, review: true, files: false, steps: true, outputs: false };
     /** Review status checks, by review (see reviewKey). */
     reviewStates: Record<string, ReviewState> = {};
     /** Which card groups of a review's changed files are open, by card id ('' = other files). */
@@ -459,24 +456,6 @@ export class TraceViewModel {
         this.selected = null;
         this.code = '';
         this.deps.onClear();
-    }
-    /** Views → Flowchart: draw (or redraw) the selected trace's flowchart, on the Flowchart view. */
-    redrawFlow() {
-        const trace = this.selected;
-        if (!trace || !this.repo.aiAvailable || this.flowBusy) return;
-        void this.deps.onRequestFlow(trace);
-    }
-    get flowBusy() {
-        const flowchart = this.deps.flowchart;
-        return !!flowchart && flowchart.busy && flowchart.trace === this.selected && !!flowchart.chartStatus;
-    }
-    /** Views → Sitemap / Components: draw this trace's output again, on its view. */
-    redrawOutput(view: 'sitemap' | 'components') {
-        const trace = this.selected;
-        const output = this.deps[view];
-        if (!trace || !output || output.busy || output.loading) return;
-        this.select(trace, view);
-        void output.generateTrace();
     }
     setSection(id: TraceSection, open: boolean) {
         this.sections[id] = open;

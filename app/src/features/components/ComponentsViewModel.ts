@@ -73,6 +73,8 @@ class ComponentsViewModel {
     }
     /** A trace can draw its output once the repository map exists. */
     get canRedraw() { return !!this.trace && !!this.components && this.repo.aiAvailable; }
+    /** More → Redraw trace components: only for a drawn output; a missing one is drawn from the missing view. */
+    get canRedrawTrace() { return !!this.output && this.canRedraw && !this.busy && !this.loading; }
     /** Components are mapped from the sitemap's screens. */
     get canGenerate() { return !!this.sitemap?.screens.length; }
     get copied() { return this.copy.copied; }

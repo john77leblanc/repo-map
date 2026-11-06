@@ -8,6 +8,7 @@ import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { FC_CSS, UI_CSS } from './styles';
 import { DiagramSvg } from '../../shared/ui/DiagramSvg';
 import { DiagramToolbar } from '../../shared/ui/DiagramToolbar';
+import { DiagramMore } from '../../shared/ui/DiagramMore';
 import { Tabs, type TabItem } from '../../shared/ui/Tabs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { SidePanel } from '../../shared/ui/SidePanel';
@@ -357,12 +358,15 @@ export const FlowchartWorkspace = observer(function FlowchartWorkspace({
                             if (canvas) vm.fit(canvas.clientWidth, canvas.clientHeight);
                         }}
                         onCopy={vm.copyMermaid} onDownload={vm.exportAs} exporting={vm.exports.exporting} onStop={() => vm.stop()}
+                        extraActions={hasFlow && <DiagramMore id="flowchart-actions" open={vm.actionsOpen} setOpen={vm.setActionsOpen} actions={[
+                            { id: 'flowchart-redraw', label: 'Redraw flowchart', run: vm.redraw, disabled: !vm.canRedraw,
+                                title: vm.repo.aiAvailable ? undefined : 'Set up an AI tool in Settings first' },
+                        ]} />}
                     />
                     <FlowchartLegend open={vm.keyOpen} proposal={hasChanges(vm.trace)} review={vm.trace.intent === 'review'} />
                     {!hasFlow && (
                         <p id="flow-missing" className="hint">
-                            The supporting walkthrough was kept. Draw the flowchart from the trace's
-                            Views to complete this output.
+                            The supporting walkthrough was kept. Draw the flowchart to complete this output.
                         </p>
                     )}
                     <div

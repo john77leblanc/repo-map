@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { observable } from 'mobx';
+import { observable, runInAction } from 'mobx';
 import { fixture, raw, flow } from '../traces/testFixtures';
 import { TraceViewModel } from '../traces/TraceViewModel';
 import { normalizeTrace, encodeTrace, decodeTrace } from '../../models/trace';
@@ -252,4 +252,22 @@ it.each([[true, false], [false, true], [true, true]])('keeps successful outputs 
     expect(vm.status).toContain('Sitemap was missing');
     vm.dispose();
     sitemap.dispose();
+});
+
+it('redraws a trace’s sitemap from More, only once it has one', () => {
+    const { repo, services } = fixture();
+    const vm = new SitemapViewModel({ repo, services });
+    runInAction(() => { vm.sitemap = base; });
+    vm.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal' }, repo.map)));
+    const { unmount } = render(<SitemapWorkspace vm={vm} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.queryByRole('button', { name: 'Redraw trace sitemap' })).toBeNull();
+    unmount();
+    vm.setTrace(observable(normalizeTrace({ ...raw, intent: 'proposal', sitemap: output }, repo.map)));
+    render(<SitemapWorkspace vm={vm} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Redraw trace sitemap' }));
+    expect(services.api.stream).toHaveBeenCalled();
+    expect(vm.busy).toBe(true);
+    vm.dispose();
 });

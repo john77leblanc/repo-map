@@ -65,6 +65,8 @@ export class FlowchartViewModel {
     sections: Record<StepSection, boolean> = { about: false, refs: false, connections: false };
     scale = 1;
     keyOpen = false;
+    /** The toolbar's More popover. */
+    actionsOpen = false;
     busy = false;
     status = '';
     /** `'chart'` for the toolbar, else the box whose closer look the status belongs to. */
@@ -499,6 +501,16 @@ export class FlowchartViewModel {
     select(id: string | null) {
         this.selectedId = id;
         this.deps.onNodeSelected?.(id);
+    }
+    setActionsOpen(open: boolean) {
+        this.actionsOpen = open;
+    }
+    /** More → Redraw flowchart: only for a drawn chart; a missing one is drawn from the missing view. */
+    get canRedraw() {
+        return !!this.trace?.flow && this.repo.aiAvailable && !this.busy;
+    }
+    redraw() {
+        if (this.canRedraw) void this.generate(this.trace!);
     }
     toggleKey() {
         this.keyOpen = !this.keyOpen;

@@ -7,7 +7,6 @@ import { CHANGE_LABELS } from '../../../../lib/proposal.mjs';
 import { reviewLabel } from '../../../../lib/review-data.mjs';
 import { Disclosure, DisclosureList } from '../../shared/ui/Disclosure';
 import { OutputsSection } from './OutputsSection';
-import { ViewJobRow } from '../../shared/ui/ViewJobRow';
 import type { TraceJob } from './TraceJob';
 import type { TraceKindFilter, TraceViewModel } from './TraceViewModel';
 import type { Trace, Workspace } from '../../models/types';
@@ -467,51 +466,6 @@ export const TraceWalkthrough = observer(function TraceWalkthrough({ vm }: Trace
         </div>
     );
 });
-/** The trace's Views: draw one output again without rerunning the trace. */
-export const TraceViewsSection = observer(function TraceViewsSection({ vm, trace }: TraceViewProps & { trace: Trace }) {
-    const { flowchart, sitemap, components } = vm.deps;
-    const ai = vm.repo.aiAvailable;
-    const noAi = ai ? undefined : 'Set up an AI tool in Settings first';
-    const state = (drawn: boolean, pending: boolean | undefined, none: string) =>
-        drawn ? 'Drawn.' : pending ? 'Asked for, but the last run did not finish it.' : none;
-    const flowError = !!flowchart?.error && flowchart.trace === trace && !vm.flowBusy;
-    return (
-        <SettingsSection id="trace-views" title="Views" open={vm.sections.views} onToggle={(open) => vm.setSection('views', open)}>
-            <div className="views-list">
-                {flowchart && (
-                    <ViewJobRow id="trace-view-flowchart" title="Flowchart" error={flowError}
-                        status={flowError ? flowchart.status : state(!!trace.flow, trace.pendingFlow, 'Not drawn.')}>
-                        <button className="btn sm" id="trace-view-flowchart-go" type="button" disabled={!ai || vm.flowBusy}
-                            title={noAi} onClick={vm.redrawFlow}>
-                            {vm.flowBusy ? 'Drawing…' : trace.flow ? 'Redraw' : 'Draw'}
-                        </button>
-                    </ViewJobRow>
-                )}
-                {sitemap && (
-                    <ViewJobRow id="trace-view-sitemap" title="Sitemap"
-                        status={!sitemap.sitemap ? 'Needs the repository sitemap: generate it in Settings → Map → Views.'
-                            : state(!!trace.sitemap, trace.pendingSitemap, 'Not added.')}>
-                        <button className="btn sm" id="trace-view-sitemap-go" type="button" title={noAi}
-                            disabled={!ai || !sitemap.sitemap || sitemap.busy || sitemap.loading} onClick={() => vm.redrawOutput('sitemap')}>
-                            {sitemap.busy && sitemap.trace === trace ? 'Drawing…' : trace.sitemap ? 'Redraw' : trace.pendingSitemap ? 'Retry' : 'Add'}
-                        </button>
-                    </ViewJobRow>
-                )}
-                {components && (
-                    <ViewJobRow id="trace-view-components" title="Components"
-                        status={!components.components ? 'Needs the repository component map: generate it in Settings → Map → Views.'
-                            : state(!!trace.components, trace.pendingComponents, 'Not added.')}>
-                        <button className="btn sm" id="trace-view-components-go" type="button" title={noAi}
-                            disabled={!ai || !components.components || components.busy || components.loading} onClick={() => vm.redrawOutput('components')}>
-                            {components.busy && components.trace === trace ? 'Drawing…' : trace.components ? 'Redraw' : trace.pendingComponents ? 'Retry' : 'Add'}
-                        </button>
-                    </ViewJobRow>
-                )}
-                <p className="hint">{trace.review ? 'Architecture comes with the review: use Re-run review to redo it.' : 'Architecture comes with the walkthrough: use Edit to run the trace again.'}</p>
-            </div>
-        </SettingsSection>
-    );
-});
 export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm }: TraceViewProps) {
     const code = useRef<HTMLTextAreaElement>(null);
     const section = useRef<HTMLElement>(null);
@@ -582,7 +536,6 @@ export const SelectedTraceSidebar = observer(function SelectedTraceSidebar({ vm 
             <div id="trace-walkthrough">
                 <TraceWalkthrough vm={vm} />
             </div>
-            {vm.selected && <TraceViewsSection vm={vm} trace={vm.selected} />}
             </div>
         </section>
     );

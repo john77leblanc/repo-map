@@ -63,6 +63,8 @@ const ComponentsWorkspace = observer(function ComponentsWorkspace({ vm }: { vm: 
                     { label: vm.infoOpen || !graph.layout ? 'Hide info' : 'Show info', run: vm.toggleInfo,
                         disabled: !graph.layout, expanded: vm.infoOpen || !graph.layout, controls: 'components-info' },
                     { label: 'Refresh status', run: () => void vm.load(), disabled: vm.loading || vm.busy },
+                    ...(vm.output ? [{ id: 'components-redraw', label: 'Redraw trace components', run: () => void vm.generateTrace(),
+                        disabled: !vm.canRedrawTrace, title: vm.repo.aiAvailable ? undefined : 'Set up an AI tool in Settings first' }] : []),
                 ]} />}
                 search={graph.layout && <SearchToggle id="components-search-toggle" controls="component-details" open={graph.search.open} onToggle={graph.toggleSearch} />}
             />

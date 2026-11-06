@@ -79,7 +79,6 @@ export class Application {
             workspaceReady: () => when(() => this.workspace.loaded),
             sitemap: this.sitemap,
             components: this.components,
-            flowchart: this.flowchart,
             onSelect: (trace, workspace) => this.showTrace(trace, workspace),
             onClear: () => {
                 this.flowchart.setTrace(null);

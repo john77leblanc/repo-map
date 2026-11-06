@@ -119,6 +119,8 @@ class SitemapViewModel {
         return rootsFor(map, screenId).map((root: string) => componentTree(map, root) as ComponentNode | null).filter((n: ComponentNode | null): n is ComponentNode => !!n);
     }
     get output() { return this.trace?.sitemap; }
+    /** More → Redraw trace sitemap: only for a drawn output; a missing one is drawn from the missing view. */
+    get canRedrawTrace() { return !!this.output && !!this.sitemap && this.repo.aiAvailable && !this.busy && !this.loading; }
     get displayed(): Sitemap | null { return this.output ? composeSitemapTrace(this.output) as Sitemap : this.trace ? null : this.sitemap; }
     get applications() { return this.displayed?.applications || []; }
     get selected() { return this.displayed?.screens.find((screen) => screen.id === this.selectedId) || null; }

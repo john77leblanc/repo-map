@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { runInAction } from 'mobx';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryModel } from '../../models/RepositoryModel';
@@ -199,19 +199,19 @@ describe('a view being drawn', () => {
         views.show('components');
         expect(views.generating).toBeNull();
     });
-    it('draws a trace’s flowchart from the sidebar’s Views, on the Flowchart view', () => {
+    it('has no Views section in the sidebar: a missing flowchart is drawn from the missing view, a drawn one redrawn from More', () => {
         const { views, app, trace } = setup();
         app.traces.select(trace());
         render(<SelectedTraceSidebar vm={app.traces} />);
-        fireEvent.click(screen.getByText('Views'));
-        const row = screen.getByRole('region', { name: 'Flowchart' });
-        expect(row.textContent).toContain('Not drawn.');
-        fireEvent.click(within(row).getByRole('button', { name: 'Draw' }));
-        expect(app.shell.workspace).toBe('flowchart');
-        expect(views.generating).toMatchObject({ title: 'Drawing the flowchart…' });
-        expect(within(row).getByRole('button', { name: 'Drawing…' })).toBeDisabled();
-        // Sitemap and Components need the repository maps first
-        expect(within(screen.getByRole('region', { name: 'Sitemap' })).getByRole('button', { name: 'Add' })).toBeDisabled();
-        expect(screen.getByRole('region', { name: 'Components' }).textContent).toContain('Needs the repository component map');
+        expect(screen.queryByText('Views')).toBeNull();
+        views.show('flowchart');
+        expect(views.missing.action).toMatchObject({ label: 'Generate', disabled: false });
+        expect(app.flowchart.canRedraw).toBe(false);
+        const flow = { nodes: [{ id: 'a', type: 'start', label: 'Start' }], edges: [] };
+        app.traces.select(trace({ flow, outputs: { architecture: true, flowchart: true } } as Partial<Trace>), 'flowchart');
+        expect(app.flowchart.canRedraw).toBe(true);
+        app.flowchart.redraw();
+        expect(views.generating).toMatchObject({ title: 'Redrawing the flowchart…' });
+        expect(app.flowchart.canRedraw).toBe(false);
     });
 });
